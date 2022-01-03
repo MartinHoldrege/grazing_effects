@@ -1,3 +1,9 @@
+# folders
+data_raw/*
+data_processed/*
+paper/*
+figures/*
+
 # History files
 .Rhistory
 .Rapp.history
