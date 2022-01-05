@@ -1,0 +1,119 @@
+# Martin Holdrege
+
+
+# functions that assign factor levels -------------------------------------
+
+# convert grazing intensity to a factor
+graze2factor <- function(x) {
+  # x--input vector of grazing levels
+  
+  levels <- c("24", "41", "58", "74")
+  # sometimes x may be a character vector (of numbers) so this way the
+  # function will work if input is the numeric or char version
+  x2 <- as.character(x) 
+  
+  stopifnot(x2 %in% levels)
+  out <- factor(x, levels = levels,
+                labels = c("Low", "Medium", "High", "Very High"))
+  out
+}
+
+
+# converting time period (e.g. mid, vs. end of century)
+# into a factor
+years2factor <- function(x) {
+  # x--input vector of time periods
+  x2 <- x
+  
+  x2[is.na(x2)] <- "Current" # in model output, NA is 1981-2010
+  
+  levels <- c("Current", "d50yrs", "d90yrs")
+
+  stopifnot(x2 %in% levels)
+  
+  out <- factor(x2, levels = levels,
+                labels = c("Current", "2030-2060", "2070-2100"))
+  out
+}
+
+# converting RCP to a factor
+rcp2factor <- function(x) {
+  # x--input vector of time periods
+  x2 <- x
+  
+  x2[is.na(x2)] <- "Current" # in model output NA is the current time period
+  
+  levels <- c("Current", "RCP45", "RCP85")
+  
+  stopifnot(x2 %in% levels)
+  
+  out <- factor(x2, levels = levels,
+                labels = c("Current", "RPC4.5", "RCP8.5"))
+  out
+}
+
+# Rename plant functional types into the 5 main categories used in M.E.'s 
+# chapter 2
+
+pft5_factor <- function(x) {
+  # x --character vector of plant functional types
+  out <- case_when(
+    x == "sagebrush" ~ "Sagebrush",
+    x %in% c("p.cool.forb", "p.warm.forb") ~ "Perennial Forbs",
+    x == "p.cool.grass" ~ "C3 Perennial Grasses",
+    x == "p.warm.grass" ~ "C4 Perennial Grasses",
+    x == "a.cool.grass" ~ "Cheatgrass",
+    TRUE ~ NA_character_
+  )
+  levels <- c("Sagebrush", 
+              "C3 Perennial Grasses",
+              "C4 Perennial Grasses",
+              "Cheatgrass",
+              "Perennial Forbs")
+  out <- factor(out,levels = levels)
+  if (!all(levels %in% out)) {
+    warning("Some PFT levels are missing")
+  }
+
+  out
+}
+
+
+# calculate percent change ------------------------------------------------
+
+#' Calculate scaled percent change in biomass
+#'
+#' @param df --grouped dataframe
+#' @param by --variables to group by when calculating max current biomass
+#'
+#' @return dataframe of percent change in biomass from current conditions,
+#' scaled by maximum current biomass
+scaled_change <- function(df,  by = c("PFT", "graze")) {
+  stopifnot(
+    is_grouped_df(df),# should be already grouped
+    c("biomass", "RCP", "years", "PFT", "graze") %in% names(df)
+    )
+  current_mean <- df %>% 
+    ungroup() %>% 
+    group_by(across(all_of(by))) %>% 
+    filter(RCP == "Current") %>% 
+    summarize(max_biomass = max(biomass),
+              .groups = "drop")
+  
+  out <- left_join(df, current_mean, by = by) %>% 
+    # percent change scaled by max biomass across sites
+    mutate(bio_diff = (biomass - biomass[RCP == "Current"])/max_biomass*100) %>% 
+    select(-max_biomass) %>% 
+    filter(RCP != "Current")
+  
+  # checks
+  n_current <- sum(df$RCP == "Current")
+  if(nrow(df) - n_current != nrow(out)) {
+    stop("Output of function has in incorrect number of rows")
+  }
+  
+  out
+
+}
+
+
