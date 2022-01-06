@@ -111,6 +111,11 @@ scaled_change <- function(df,  by = c("PFT", "graze")) {
   if(nrow(df) - n_current != nrow(out)) {
     stop("Output of function has in incorrect number of rows")
   }
+  # if this warning is thrown, consider updating function (e.g. Nan, is caused
+  # by dividing by 0 so maybe replace the percent diff with 100)
+  if(any(is.nan(out$bio_diff) | is.na(out$bio_diff))) {
+    warning("Some bio diff are NA or NaN, consider fixing output")
+  }
   
   out
 
