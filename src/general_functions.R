@@ -59,17 +59,17 @@ pft5_factor <- function(x) {
   # x --character vector of plant functional types
   out <- case_when(
     x == "sagebrush" ~ "Sagebrush",
-    x %in% c("p.cool.forb", "p.warm.forb") ~ "Perennial Forbs",
-    x == "p.cool.grass" ~ "C3 Perennial Grasses",
-    x == "p.warm.grass" ~ "C4 Perennial Grasses",
+    x %in% c("p.cool.forb", "p.warm.forb") ~ "Pforb",
+    x == "p.cool.grass" ~ "C3Pgrass",
+    x == "p.warm.grass" ~ "C4Pgrass",
     x == "a.cool.grass" ~ "Cheatgrass",
     TRUE ~ NA_character_
   )
   levels <- c("Sagebrush", 
-              "C3 Perennial Grasses",
-              "C4 Perennial Grasses",
+              "C3Pgrass",
+              "C4Pgrass",
               "Cheatgrass",
-              "Perennial Forbs")
+              "Pforb")
   out <- factor(out,levels = levels)
   if (!all(levels %in% out)) {
     warning("Some PFT levels are missing")
