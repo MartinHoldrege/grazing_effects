@@ -1,8 +1,15 @@
 # folders
 data_raw/*
-data_processed/*
 paper/*
-figures/*
+
+# figure files
+*.jpeg
+*.jpg
+*.tiff
+
+# data files
+*.xls
+*.csv
 
 # History files
 .Rhistory
