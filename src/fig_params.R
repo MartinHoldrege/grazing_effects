@@ -40,8 +40,8 @@ years2lab <- function(x) {
   # returns--character vector of letter designations of the time period
   out <- case_when(
     str_detect(x, "_Current_") ~ "C",
-    str_detect(x, "_2030-2060_") ~ "M",
-    str_detect(x, "_2070-2100_") ~ "E"
+    str_detect(x, "_2030-2060") ~ "M",
+    str_detect(x, "_2070-2100") ~ "E"
   )
   if(any(is.na(out))) {
     warning("Not all time periods matched")

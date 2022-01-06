@@ -66,20 +66,19 @@ dev.off()
 # PFTs, by, RCP, grazing treatment and time period
 
 # dataframe for geom_text
-yr_anno1 <- pft5_bio_d2 %>% 
-  group_by(PFT, RCP, years) %>% 
+rcp_anno1 <- pft5_bio_d2 %>% 
+  group_by(PFT, RCP) %>% 
   summarise(x = median(as.numeric(id2)),
-            y = max(bio_diff) + (max(bio_diff) - min(bio_diff))*0.15) %>%
+            y = max(bio_diff) + (max(bio_diff) - min(bio_diff))*0.05) %>%
   group_by(PFT) %>% 
-  mutate(y = max(y),
-         years = str_replace(years, "-", "-\n"))
+  mutate(y = max(y))
 
 jpeg("figures/biomass/pub_qual/pft5_bio_diff_boxplot.jpeg",
      res = 600, height = 8, width = 5, units = "in")
 
 ggplot(pft5_bio_d2, aes(id2, bio_diff, fill = graze)) +
-  geom_text(data = yr_anno1, 
-            aes(x, y, label = years, fill = NULL),
+  geom_text(data = rcp_anno1, 
+            aes(x, y, label = RCP, fill = NULL),
             size = 2.5, vjust = "top", lineheight = .7) +
   geom_boxplot(position = "dodge",
                outlier.size = outlier.size) +
@@ -87,11 +86,10 @@ ggplot(pft5_bio_d2, aes(id2, bio_diff, fill = graze)) +
   scale_fill_manual(values = cols_graze, 
                     name = "Grazing Treatment") +
   # so just display the RCP
-  scale_x_discrete(labels = function(x) str_extract(x, "RCP(4.5|8.5)")) +
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5),
-        legend.position = c(0.75, 0.15)) +
+  scale_x_discrete(labels = years2lab) +
+  theme(legend.position = c(0.75, 0.15)) +
   geom_vline(xintercept = 2.5, linetype = 2) +
   labs(y = lab_bio2,
-       x = lab_rcp)
+       x = lab_yrs)
 
 dev.off()
