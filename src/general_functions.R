@@ -14,7 +14,7 @@ graze2factor <- function(x) {
   
   stopifnot(x2 %in% levels)
   out <- factor(x, levels = levels,
-                labels = c("Low", "Medium", "High", "Very High"))
+                labels = c("Light", "Moderate", "Heavy", "Very Heavy"))
   out
 }
 
@@ -48,7 +48,7 @@ rcp2factor <- function(x) {
   stopifnot(x2 %in% levels)
   
   out <- factor(x2, levels = levels,
-                labels = c("Current", "RPC4.5", "RCP8.5"))
+                labels = c("Current", "RCP4.5", "RCP8.5"))
   out
 }
 

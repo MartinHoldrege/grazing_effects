@@ -10,7 +10,7 @@
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
-source("functions/general_functions.R")
+source("src/general_functions.R")
 
 # read in files -----------------------------------------------------------
 
@@ -25,9 +25,15 @@ bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT.csv",
 
 bio4 <- bio3 %>% 
   mutate(graze = graze2factor(intensity),
+         RCP = rcp2factor(RCP),
          years = years2factor(years),
-         RCP = rcp2factor(RCP)) %>% 
-  dplyr::select(-intensity)
+         # the unique combination of treatments
+         id = paste(RCP, years, graze, sep = "_"), 
+         id = str_replace(id, " ", "")) %>% 
+  dplyr::select(-intensity) %>% 
+  # using arrange so that id is an appropriately ordered factor
+  arrange(graze, RCP, years) %>% 
+  mutate(id = factor(id, levels = unique(id)))
 
 
 # note: when 0 biomass is simulated the PFT still shows up, but just with 
@@ -36,12 +42,13 @@ bio4 <- bio3 %>%
 # total biomass by PFT ----------------------------------------------------
 # creating dataframes where biomass is grouped into PFT's of interest
 
-group_cols <- c('years', 'RCP', 'graze', 'site', "PFT", 'GCM')
+# GCM--needs to be listed last for sequential grouping below
+group_cols <- c('years', 'RCP', 'graze', 'site', "PFT", "id", 'GCM')
 # * pft5 ------------------------------------------------------------------
 
 # 5 main pft categories
 pft5_bio1 <- bio4 %>% 
-  mutate(PFT = pft5_factor(PFT)) %>% 
+  mutate(PFT = pft5_factor(PFT)) %>%
   group_by(across(all_of(group_cols))) %>% 
   # b/some PFTs combined
   summarize(biomass = sum(biomass), .groups = "drop_last") %>% 
@@ -59,16 +66,21 @@ pft5_bio2 <- pft5_bio1 %>%
 # d stands for 'difference'
 # % change in biomass from current conditions ,
 # scaled by maximum biomass under current conditions(for a given grazing trmt)
-# STOP: Continue here--diff should be done for each GCM then median
-# calculated
+
 pft5_bio_d1 <-  pft5_bio1 %>% 
   group_by(site, PFT, graze) %>%  
   scaled_change(by = c("PFT", "graze")) %>% 
   # median across GCMs
-  group_by(site, years, RCP, PFT, graze) %>% 
+  group_by(site, years, RCP, PFT, graze, id) %>% 
   summarise(biomass = median(biomass),
             bio_diff = median(bio_diff),
             .groups = "drop") 
 
+#adding another id variable
+pft5_bio_d2 <- pft5_bio_d1 %>% 
+  arrange(RCP, years) %>% # for creating ordered factor
+  # id variable grazing removed
+  mutate(id2 = str_replace(id, "_[A-z]+$", ""),
+         id2 = factor(id2, levels = unique(id2)))
 
 
