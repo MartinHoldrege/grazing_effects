@@ -24,6 +24,7 @@ path1 <- "data_raw/interpolation_data_RR"
 # template raster
 template <- raster(file.path(path1, "CoreARTR_combined_DayMet_cropped_trimmed.tif"))
 
+
 # Read in 200 points (this data from RR has bioclim variables already)
 pts <- read.csv(file.path(path1, "Simulated_sites_final200.csv"))
 
@@ -33,6 +34,7 @@ site_nums <- read_csv("data_raw/site_locations.csv", show_col_types = FALSE)
 # Read in raw bioclim data for sagebrush extent and set cellnumbers as rownames
 # (tc stands for 'targetcells')
 tc1 <- readRDS(file.path(path1, "bioclim_coreARTR_DayMet_trimmed.csv"))
+
 
 
 # Prep data -------------------------------------------------------------
@@ -49,22 +51,27 @@ bioclim_vars <- c("bioclim_01", "bioclim_04", "bioclim_09", "bioclim_12",
                   "bioclim_15", "bioclim_18")
 
 tc2 <- tc1[, c("cellnumbers", "x", "y", bioclim_vars)]
+
 # rounding (so x, y used everwhere will match)
 digits <-  4
 tc2 <- tc2 %>% 
   mutate(x = round(x, digits = digits),
          y = round(y, digits = digits))
 
+
 # criteria for matchingvars function (here using 10% of range of data)
 # this is for scaling the variables
 criteria <- map_dbl(tc2[, bioclim_vars], function(x) {
   (max(x) - min(x))*0.1
 })
+
 criteria
+
 
 # * subset cell data ------------------------------------------------------
 # location and climate data for the 200 sites where simulations were actually
 # done
+
 
 # round 
 
@@ -194,3 +201,4 @@ interpolatePoints(
   filepath = "./data_processed/interpolated_rasters/bio_diff",
   overwrite = TRUE
 )
+
