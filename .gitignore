@@ -5,7 +5,11 @@ paper/*
 # figure files
 *.jpeg
 *.jpg
+*.pdf
+
+# raster files
 *.tiff
+*.tif
 
 # data files
 *.xls
