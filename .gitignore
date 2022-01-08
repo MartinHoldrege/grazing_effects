@@ -5,6 +5,7 @@ paper/*
 # figure files
 *.jpeg
 *.jpg
+*.png
 *.pdf
 
 # raster files

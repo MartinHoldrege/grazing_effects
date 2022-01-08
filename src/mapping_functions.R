@@ -5,6 +5,9 @@
 # Purpose--various functions used when creating maps
 # This script sourced by other functions
 
+
+# dependencies ------------------------------------------------------------
+
 source("src/fig_params.R") # for cols_map_bio() color ramp function
 
 # breaks ------------------------------------------------------------------
@@ -81,6 +84,19 @@ create_breaks_cols <- function(x,
 
 # maps --------------------------------------------------------------------
 
+#' Create map of biomass data in western states
+#' 
+#' @description Note: this was designed to use SpatRaster objects, so 
+#' the 'terra' package should be loaded before using the function
+#'
+#' @param rast Raster of class "SpatRaster", from the terra package. 
+#' @param subset Number or string that identifies the layer of the rast
+#' that should be plotted
+#' @param title Title of figure
+#' @param vec Numeric vector (optional), to base the breaks/cut points used
+#' in plotting on. By default it uses the values of the cells in the raster.
+#'
+#' @return A map of biomass
 image_bio <- function(rast, subset, title = "", vec = NULL) {
   
   stopifnot(
@@ -89,6 +105,8 @@ image_bio <- function(rast, subset, title = "", vec = NULL) {
   
   # extract raster cell data as a fector
   if(is.null(vec)) {
+    # I suspect extracting the actual values into memory like
+    # this is inefficient
     vec <- values(subset(rast, subset = subset))
   }
   
@@ -128,4 +146,68 @@ image_bio <- function(rast, subset, title = "", vec = NULL) {
        cex.axis = 0.9, labels = b$legendbks)
   
 }
+
+#' Create map of % change of biomass in western states
+#' 
+#' @description At the moment this figure uses fixed cut points for the colors
+#'
+#' @param rast Raster of class "SpatRaster", from the terra package. 
+#' @param subset Number or string that identifies the layer of the rast
+#' that should be plotted
+#' @param title Title of figure
+#'
+#' @return Map of percent change in biomass
+image_bio_diff <- function(rast, subset, title = "") {
+  
+  # range of bio_diff is: -85.67349 103.51214
+  stopifnot(
+    length(subset) == 1 # this function can only work with one raster layer
+  )
+  
+
+  # for now hard coding breaks and colors
+  truebks <- sort(c(-(2^(1:7)), 0, 2^(1:7)))
+  cols <-  cols_map_bio_d
+  
+  # run a check on whether truebks are excluding values
+  vec <- values(subset(rast, subset = subset))
+  min <- min(vec, na.rm = TRUE)
+  max <- max(vec, na.rm = TRUE)
+  if(min < min(truebks) | max > max(truebks)) {
+    stop("Raster contains data outside of the range of the breaks")
+  }
+
+  
+  # main figure
+  image(rast, 
+        y = subset, # the layer to be plotted
+        col = cols, 
+        breaks = truebks, 
+        ylim = c(30, 49),
+        xlim = c(-125, -102.7), useRaster = T,
+        xlab = "", ylab ="",
+        bty = "n", xaxt = "n",yaxt="n")
+  mtext(title, side = 3, line = 0, adj = 0, cex=1)
+  maps::map("state", interior = T, add = T)
+  
+  # Color bar/legend at the bottom
+  polygon(x = c(-117,-117,-109,-109), y = c(32,34.5,34.5,32),col = "white",border = "white")
+  polygon(x = c(-125,-125,-102.7,-102.7), y = c(30,33.5,33.5,30),border = "white", col = "white")
+  
+  # creating mini polygons for each legend color
+  axisat <- seq(-125, -102.7, length.out = length(cols) + 1)
+  for (i in 1:length(cols)){
+    polygon(x = c(axisat[i],axisat[i],axisat[i+1],axisat[i+1]), 
+            y = c(31.75,32.5,32.5,31.75),border = cols[i], col = cols[i])
+    
+  }
+  # black outline of color bar
+  polygon(x = c(-125, -125, -102.7 ,-102.7), y = c(31.75, 32.5, 32.5, 31.75), 
+          lwd = 1.5)
+  mtext(expression(paste("", Delta, " Biomass (%)")), side = 1, line = -0.49, cex = 0.7)
+  axis(side = 1, pos = 31.75, at = seq(-125,-102.7, length.out = 15),
+       cex.axis = 0.9, labels = truebks)
+  
+}
+
 

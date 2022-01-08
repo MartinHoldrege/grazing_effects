@@ -26,9 +26,9 @@ cols_graze <- c("Light" = "#fdcc8a",
 
 # Create color ramp that represents the proportional changes in biomass...
 cols_map_bio_d <- c(rev(c("#ffeda0","#fed976","#feb24c","#fd8d3c","#fc4e2a","#e31a1c",
-                "#bd0026","#800026")),
-          "darkgrey", "#deebf7","#c6dbef","#9ecae1","#6baed6","#4292c6",
-          "#2171b5","#08519c","#08306b")
+                "#bd0026")),
+          "#deebf7","#c6dbef","#9ecae1","#6baed6","#4292c6",
+          "#08519c","#08306b")
 
 # Standard color ramp for current biomass:
 cols_map_bio <- colorRampPalette(c("#f7fcb9","#d9f0a3","#addd8e","#78c679","#41ab5d",

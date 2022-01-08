@@ -41,11 +41,6 @@ names_df <- tibble(id2 = r_names,
            into = c("PFT", "type", "RCP", "years", "graze"),
            sep = "_")
 
-# biomass maps ------------------------------------------------------------
-
-
-# biomass diff maps -------------------------------------------------------
-
 
 
 # sample set of figures ---------------------------------------------------
@@ -59,7 +54,7 @@ layout(layout.matrix, widths = rep(1,3), heights = rep(1,2))
 # testing
 image_bio(rast1, subset = 1, title = "test")
 
-
+image_bio_diff(rast1, subset =150, title = "test2")
 
 
 
