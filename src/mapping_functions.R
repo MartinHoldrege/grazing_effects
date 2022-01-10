@@ -114,15 +114,14 @@ image_bio <- function(rast, subset, title = "", vec = NULL) {
   b <- create_breaks_cols(x = vec, n_breaks = 17)
   
   # main figure
-  image(rast, 
-        y = subset, # the layer to be plotted
+  image(subset(rast, subset = subset), # the layer to be plotted
         col = b$truecols, 
         breaks = b$truebks, 
         ylim = c(30, 49),
-        xlim = c(-125, -102.7), useRaster = T,
+        xlim = c(-125, -102.7), useRaster = TRUE,
         xlab = "", ylab ="",
         bty = "n", xaxt = "n",yaxt="n")
-  mtext(title, side = 3, line = 0, adj = 0, cex=1)
+  mtext(title, side = 3, line = 0, adj = 0, cex=0.7)
   maps::map("state", interior = T, add = T)
   
   # Legend for zero values
@@ -179,15 +178,14 @@ image_bio_diff <- function(rast, subset, title = "") {
 
   
   # main figure
-  image(rast, 
-        y = subset, # the layer to be plotted
+  image(subset(rast, subset = subset), # the layer to be plotted
         col = cols, 
         breaks = truebks, 
         ylim = c(30, 49),
         xlim = c(-125, -102.7), useRaster = T,
         xlab = "", ylab ="",
         bty = "n", xaxt = "n",yaxt="n")
-  mtext(title, side = 3, line = 0, adj = 0, cex=1)
+  mtext(title, side = 3, line = 0, adj = 0, cex= 0.7)
   maps::map("state", interior = T, add = T)
   
   # Color bar/legend at the bottom
