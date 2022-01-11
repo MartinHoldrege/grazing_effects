@@ -132,29 +132,49 @@ pft5_factor <- function(x) {
 #' @param var the name of the column that taking the difference of (a string),
 #' default is biomass
 #' @param by --variables to group by when calculating max current biomass
+#' @param percent logical, if TRUE, calculates the scaled percent change,
+#' otherwise calculates the actual change (raw difference)
 #'
 #' @return dataframe of percent change in biomass from current conditions,
 #' scaled by maximum current biomass
-scaled_change <- function(df, var = "biomass", by = c("PFT", "graze")) {
+scaled_change <- function(df, var = "biomass", by = c("PFT", "graze"),
+                          percent = TRUE) {
   stopifnot(
     is_grouped_df(df),# should be already grouped
     c("RCP", "years", "graze") %in% names(df)
     )
   
-  current_mean <- df %>% 
+  current <- df %>% 
+    filter(RCP == "Current") %>% 
     ungroup() %>% 
     group_by(across(all_of(by))) %>% 
-    filter(RCP == "Current") %>% 
-    summarize(max_value = max(.data[[var]], na.rm = TRUE),
+    mutate(current = .data[[var]])
+    
+    
+  current_max <- current %>% 
+    summarize(max_value = max(current, na.rm = TRUE),
               .groups = "drop")
   
+ 
   diff_var <- paste0(var,"_diff")
-  out <- left_join(df, current_mean, by = by) %>% 
+  out <- left_join(df, current_max, by = by) %>%
+    # joining in current so making sure are subtracting site by site
+    left_join(current[, c(by, "site", "current")]) %>% 
+    filter(RCP != "Current") %>% 
     # percent change scaled by max biomass across sites
-    mutate(!!diff_var := (.data[[var]] - .data[[var]][.data$RCP == "Current"])/
-              max_value*100) %>% 
-    select(-max_value) %>% 
-    filter(RCP != "Current")
+    # or if percent is FALSE, then just the actual difference
+    ungroup() %>% 
+    # note useing ifelse() instead of if() here caused problems--
+    mutate(!!diff_var := 
+             if(percent) { 
+               # % scaled change
+               (.data[[var]] - .data$current)/.data$max_value*100
+               } else {
+                 # raw change
+                 .data[[var]] - .data$current
+                 }
+                                ) %>% 
+    select(-max_value) 
   
   # checks
   n_current <- sum(df$RCP == "Current")

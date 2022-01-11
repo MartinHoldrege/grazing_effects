@@ -35,6 +35,7 @@ cols_map_bio <- colorRampPalette(c("#f7fcb9","#d9f0a3","#addd8e","#78c679","#41a
                            "#238443","#005a32"), interpolate = "spline")
 
 # axis labels -------------------------------------------------------------
+# meaning of endings: 0= raw value, 1 = raw change, 2 = % change
 
 lab_yrs <- "Time period"
 
@@ -46,6 +47,9 @@ lab_bio2 <- "Scaled % change in biomass" # 2 will denote the vers of label that 
 # RCP
 lab_rcp <- "Scenario"
 
+#fire
+lab_fire0 <- "Fire return interval (years)"
+lab_fire1 <- "Change in fire return interval (years)"
 # functions ---------------------------------------------------------------
 
 # from 'id' column get the label to use for time period in boxplots

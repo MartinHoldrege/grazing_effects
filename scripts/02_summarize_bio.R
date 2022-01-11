@@ -88,6 +88,9 @@ pft5_bio_d2 <- pft5_bio_d1 %>%
 
 # wildfire ----------------------------------------------------------------
 
+# * return interval -------------------------------------------------------
+
+
 fire1 <- bio4 %>% 
   # fire return interval. WildFire is the mean number of fires in a given year
   # across 200 iterations
@@ -100,10 +103,21 @@ fire1 <- bio4 %>%
   # if no fires occurred then set fire return interval to NA
   mutate(fire_return = ifelse(is.infinite(fire_return), NA, fire_return))
 
-# change in fire return interval
+
+# * change in interval ----------------------------------------------------
+
+# Calculated change as absolute difference (not scaled % change),
+# due to extreme max values
 fire_d1 <- fire1 %>% 
   group_by(graze) %>% 
-  # warning here is ok
-  scaled_change(var = "fire_return", by = "graze")
+  # warning here is ok, calculating the actual (absolute) change, not % change
+  scaled_change(var = "fire_return", by = "graze",
+                percent = FALSE) %>% 
+  arrange(RCP, years) %>% # for creating ordered factor
+  # id variable grazing removed
+  mutate(id2 = str_replace(id, "_[A-z]+$", ""),
+         id2 = factor(id2, levels = unique(id2)))
+
+
 
 
