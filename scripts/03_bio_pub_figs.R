@@ -12,7 +12,7 @@ library(tidyverse)
 library(lemon) # for facet_rep_wrap function
 source("scripts/02_summarize_bio.R")
 source("src/fig_params.R")
-
+source("src/fig_functions.R") # box_ann function defined here
 
 # params ------------------------------------------------------------------
 
@@ -21,20 +21,14 @@ theme_update(strip.background = element_blank())
 line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
 
 outlier.size = 0.5
+
+
+
 # boxplots ----------------------------------------------------------------
 
 # * absolute biomass ------------------------------------------------------
 # This figure meant to be analogous to M.E.'s thesis figure 9.
 # biomass by pft, rcp, time period, and grazing intensity
-
-# dataframe of annotation for grazing levels in fig
-graze_anno1 <- pft5_bio1 %>% 
-  group_by(PFT, graze) %>% 
-  # adding small 2.5% so the text fits over the main body of the figure
-  summarize(y = max(biomass) + (max(biomass) - min(biomass))*0.025,
-            x = median(as.numeric(id)),
-            .groups = "drop_last") %>% 
-  mutate(y = max(y)) # so all text is at same level in a given panel
 
 jpeg("figures/biomass/pub_qual/pft5_bio_boxplot.jpeg",
      res = 600, height = 8, width = 5, units = "in")
@@ -44,7 +38,8 @@ pft5_bio2 %>%
   mutate(biomass = ifelse(biomass == 0, NA, biomass)) %>% 
   ggplot(aes(x = id, y = biomass, fill = RCP)) +
   # first plotting text, so it doesn't overplot data
-  geom_text(data = graze_anno1, 
+  geom_text(data = ~box_anno(., var = "biomass", group_by = c("PFT", "graze"),
+                             mult = 0.05),
             aes(x, y, label = graze, fill = NULL),
             size = 2.5) +
   geom_boxplot(outlier.size = outlier.size) + # not showing outliers as points
@@ -58,6 +53,7 @@ pft5_bio2 %>%
        y = lab_bio0)
 dev.off()
 
+
 # * biomass change -------------------------------------------------------
 
 # ** pft5 ------------------------------------------------------------------
@@ -65,21 +61,14 @@ dev.off()
 # boxplot of change in biomass (scaled percent), for each of the 5 main
 # PFTs, by, RCP, grazing treatment and time period
 
-# dataframe for geom_text
-rcp_anno1 <- pft5_bio_d2 %>% 
-  group_by(PFT, RCP) %>% 
-  summarise(x = median(as.numeric(id2)),
-            y = max(bio_diff) + (max(bio_diff) - min(bio_diff))*0.05) %>%
-  group_by(PFT) %>% 
-  mutate(y = max(y))
-
 jpeg("figures/biomass/pub_qual/pft5_bio_diff_boxplot.jpeg",
      res = 600, height = 8, width = 5, units = "in")
 
 ggplot(pft5_bio_d2, aes(id2, bio_diff, fill = graze)) +
-  geom_text(data = rcp_anno1, 
+  geom_text(data = ~box_anno(., var = "bio_diff", group_by = c("PFT", "RCP"),
+                             id = "id2", mult = 0.05),
             aes(x, y, label = RCP, fill = NULL),
-            size = 2.5, vjust = "top", lineheight = .7) +
+            size = 2.5) +
   geom_boxplot(position = "dodge",
                outlier.size = outlier.size) +
   facet_rep_wrap(~PFT, scales = "free", ncol = 2) +
