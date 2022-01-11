@@ -3,7 +3,7 @@
 # Script started 1/6/2022
 
 # Purpose--to create figures of biomass data from simulations, that are 
-# good quality (i.e. goal is for them to be 'publication quality').
+# good quality 
 # This script does not create maps of the interpolated data. 
 
 # Note--many of these boxplots have repeated code, some of that could be 
