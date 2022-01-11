@@ -6,6 +6,9 @@
 # csv(s) created in the 01_query_db.R script
 # this script will then be sourced by later scripts to create figures etc.
 
+# Notes:
+# Consider calculating agreement metrics (proportion of
+# GCMs that 'agree' on the direction of change for a given site)
 
 # dependencies ------------------------------------------------------------
 
@@ -82,5 +85,25 @@ pft5_bio_d2 <- pft5_bio_d1 %>%
   # id variable grazing removed
   mutate(id2 = str_replace(id, "_[A-z]+$", ""),
          id2 = factor(id2, levels = unique(id2)))
+
+# wildfire ----------------------------------------------------------------
+
+fire1 <- bio4 %>% 
+  # fire return interval. WildFire is the mean number of fires in a given year
+  # across 200 iterations
+  mutate(fire_return = 1/(WildFire/200)) %>% 
+  # taking average for each plot (otherwise value is repeated for each PFT)
+  group_by(across(all_of(group_cols[group_cols != "PFT"]))) %>% 
+  summarize(fire_return = mean(fire_return), .groups = "drop_last") %>% 
+  # median across GCMs
+  summarize(fire_return = median(fire_return, na.rm = TRUE), .groups = "drop") %>% 
+  # if no fires occurred then set fire return interval to NA
+  mutate(fire_return = ifelse(is.infinite(fire_return), NA, fire_return))
+
+# change in fire return interval
+fire_d1 <- fire1 %>% 
+  group_by(graze) %>% 
+  # warning here is ok
+  scaled_change(var = "fire_return", by = "graze")
 
 

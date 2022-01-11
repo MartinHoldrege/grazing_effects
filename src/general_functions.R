@@ -129,26 +129,31 @@ pft5_factor <- function(x) {
 #' Calculate scaled percent change in biomass
 #'
 #' @param df --grouped dataframe
+#' @param var the name of the column that taking the difference of (a string),
+#' default is biomass
 #' @param by --variables to group by when calculating max current biomass
 #'
 #' @return dataframe of percent change in biomass from current conditions,
 #' scaled by maximum current biomass
-scaled_change <- function(df,  by = c("PFT", "graze")) {
+scaled_change <- function(df, var = "biomass", by = c("PFT", "graze")) {
   stopifnot(
     is_grouped_df(df),# should be already grouped
-    c("biomass", "RCP", "years", "PFT", "graze") %in% names(df)
+    c("RCP", "years", "graze") %in% names(df)
     )
+  
   current_mean <- df %>% 
     ungroup() %>% 
     group_by(across(all_of(by))) %>% 
     filter(RCP == "Current") %>% 
-    summarize(max_biomass = max(biomass),
+    summarize(max_value = max(.data[[var]], na.rm = TRUE),
               .groups = "drop")
   
+  diff_var <- paste0(var,"_diff")
   out <- left_join(df, current_mean, by = by) %>% 
     # percent change scaled by max biomass across sites
-    mutate(bio_diff = (biomass - biomass[RCP == "Current"])/max_biomass*100) %>% 
-    select(-max_biomass) %>% 
+    mutate(!!diff_var := (.data[[var]] - .data[[var]][.data$RCP == "Current"])/
+              max_value*100) %>% 
+    select(-max_value) %>% 
     filter(RCP != "Current")
   
   # checks
@@ -158,12 +163,17 @@ scaled_change <- function(df,  by = c("PFT", "graze")) {
   }
   # if this warning is thrown, consider updating function (e.g. Nan, is caused
   # by dividing by 0 so maybe replace the percent diff with 100)
-  if(any(is.nan(out$bio_diff) | is.na(out$bio_diff))) {
-    warning("Some bio diff are NA or NaN, consider fixing output")
+  if(any(is.nan(out[[diff_var]]) | is.na(out[[diff_var]]))) {
+    warning("Some diffs are NA or NaN, consider fixing output")
+  }
+  
+  # shortening name for reverse compatibility
+  if("biomass_diff" %in% names(out)) {
+    out <- out %>% 
+      rename(bio_diff = biomass_diff)
   }
   
   out
 
 }
-
 
