@@ -42,6 +42,16 @@ bio4 <- bio3 %>%
 # note: when 0 biomass is simulated the PFT still shows up, but just with 
 # 0 biomass
 
+
+# climate -----------------------------------------------------------------
+# current climate
+
+clim1 <- bio4 %>% 
+  # arbitrarily filtering for one graze and PFT, so rows aren't duplicated
+  filter(years == "Current", graze == "Light", PFT == "sagebrush") %>% 
+  select(site, PPT, Temp)
+
+
 # total biomass by PFT ----------------------------------------------------
 # creating dataframes where biomass is grouped into PFT's of interest
 
@@ -61,7 +71,8 @@ pft5_bio1 <- bio4 %>%
 pft5_bio2 <- pft5_bio1 %>% 
   # median across GCMs
   summarise(biomass = median(biomass),
-            .groups = "drop")
+            .groups = "drop")%>% 
+  left_join(clim1, by = "site") # adding current climate
 
 # % change in biomass by PFT ----------------------------------------------
 
@@ -85,7 +96,7 @@ pft5_bio_d2 <- pft5_bio_d1 %>%
   arrange(RCP, years) %>% # for creating ordered factor
   # id variable grazing removed
   mutate(id2 = str_replace(id, "_[A-z]+$", ""),
-         id2 = factor(id2, levels = unique(id2)))
+         id2 = factor(id2, levels = unique(id2))) 
 
 
 # ** change relative to reference graze ------------------------------------
@@ -103,7 +114,7 @@ pft5_d_grefs <- map(levs_graze, function(x) {
     arrange(RCP, years) %>% # for creating ordered factor
     # adding id variable that doesn't include graze
     mutate(id2 = str_replace(id, "_[A-z]+$", ""),
-           id2 = factor(id2, levels = unique(id2)))
+           id2 = factor(id2, levels = unique(id2))) 
   out
 })
 

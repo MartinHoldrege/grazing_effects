@@ -4,8 +4,7 @@
 # here that might be useful across a couple of different scripts going forward
 
 
-
-# funs that creat dfs ------------------------------------------------------
+# funs that create dfs ------------------------------------------------------
 
 
 # function for summarizing df output for adding annotations to boxplot.

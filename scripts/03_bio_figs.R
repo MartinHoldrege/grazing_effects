@@ -25,11 +25,32 @@ line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
 
 outlier.size = 0.5
 
-# boxplots ----------------------------------------------------------------
 
-# * absolute biomass ------------------------------------------------------
+# functions ---------------------------------------------------------------
+
+# given a ggplot (g) create scatter plots y ~ MAP and y ~ MAT
+climate_scatter <- function(g) {
+  out <- list()
+  # vs MAP
+  out[["MAP"]] <- g +
+    geom_point(aes(x = PPT)) +
+    geom_smooth(aes(x = PPT), method = "loess", se = FALSE) +
+    labs(x = lab_map)
+  
+  # vs MAT
+  out[["MAT"]] <- g +
+    geom_point(aes(x = Temp)) +
+    geom_smooth(aes(x = Temp), method = "loess", se = FALSE) +
+    labs(x = lab_mat)
+  out
+}
+
+# absolute biomass ------------------------------------------------------
 # This figure meant to be analogous to M.E.'s thesis figure 9.
 # biomass by pft, rcp, time period, and grazing intensity
+
+
+# * boxplot ---------------------------------------------------------------
 
 jpeg("figures/biomass/pub_qual/pft5_bio_boxplot.jpeg",
      res = 600, height = 8, width = 5, units = "in")
@@ -54,10 +75,54 @@ pft5_bio2 %>%
        y = lab_bio0)
 dev.off()
 
+# * scatterplot (vs climate) ----------------------------------------------
 
-# * biomass change -------------------------------------------------------
+# facets are RCP/year combinations, colors are grazing
+levs_pft <- levels(pft5_bio2$PFT)
 
-# ** change relative to same graze ------------------------------------
+pdf("figures/biomass/bio_vs_climate_v1.pdf",
+    width = 6, height = 5)
+
+map(levs_pft, function(pft) {
+  g <- pft5_bio2 %>% 
+    filter(PFT == pft) %>% 
+    ggplot(aes(y = biomass, color = graze)) +
+
+    facet_rep_wrap(~RCP + years) +
+    scale_color_manual(values = cols_graze,
+                       name = "Grazing") +
+    labs(y = lab_bio0,
+         subtitle = paste(pft, "biomass")) +
+    theme(legend.position = c(0.85, 0.15),
+          axis.text = element_text(size = 7))
+  
+  climate_scatter(g)
+  
+})
+
+# facets are grazing level, colors are RCP
+map(levs_pft, function(pft) {
+  g <- pft5_bio2 %>% 
+    filter(PFT == pft,
+           years != "2030-2060") %>% 
+    ggplot(aes(y = biomass, color = RCP)) +
+    facet_rep_wrap(~graze) +
+    scale_color_manual(values = cols_rcp) +
+    labs(y = lab_bio0,
+         subtitle = paste(pft, "biomass"),
+         caption = "Only showing 2070-2100 for RCP 4.5 & 8.5") +
+    theme(legend.position = "top",
+          axis.text = element_text(size = 7))
+  
+  climate_scatter(g)
+  
+})
+
+dev.off()
+
+# biomass change -------------------------------------------------------
+
+# * change relative to same graze ------------------------------------
 
 # boxplot of change in biomass (scaled percent), for each of the 5 main
 # PFTs, by, RCP, grazing treatment and time period
@@ -84,9 +149,12 @@ ggplot(pft5_bio_d2, aes(id2, bio_diff, fill = graze)) +
 
 dev.off()
 
-# ** change relative to reference graze ------------------------------------
+# * change relative to reference graze ------------------------------------
 # boxplots showing change in biomass relative to current time period and
 # given grazing intensity
+
+
+# ** boxplot ---------------------------------------------------------------
 
 pdf("figures/biomass/pft5_bio_diff_gref_boxplots.pdf", 
     height = 6.5, width = 5)
@@ -119,6 +187,37 @@ g
 })
 dev.off()
 
+
+# ** scatterplot (vs climate) ----------------------------------------------
+
+
+
+pdf("figures/biomass/bio-diff_vs_climate_v1.pdf",
+    width = 6, height = 5)
+
+# bio-diff vs MAP and MAT, for for ref class of light grazing, for
+# each RCP/time period and PFT
+
+map(levs_pft, function(pft) {
+  # using Light grazing as reference class
+  g <- pft5_d_grefs[["Light"]] %>% 
+    filter(PFT == pft) %>% 
+    ggplot(aes(y = bio_diff, color = graze)) +
+    geom_hline(yintercept = 0, linetype = 2) +
+    facet_rep_wrap(~RCP + years) +
+    scale_color_manual(values = cols_graze,
+                       name = "Grazing") +
+    labs(y = lab_bio2,
+         caption = "Reference class is light grazing under current conditions",
+         subtitle = paste("Change in", pft, "biomass")) +
+    theme(legend.position = c(0.85, 0.15),
+          axis.text = element_text(size = 7))
+  
+  climate_scatter(g)
+  
+})
+
+dev.off()
 
 # fire --------------------------------------------------------------------
 

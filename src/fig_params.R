@@ -51,5 +51,7 @@ lab_rcp <- "Scenario"
 lab_fire0 <- "Fire return interval (years)"
 lab_fire1 <- "Change in fire return interval (years)"
 
-
+# climate
+lab_map <- "MAP (mm)"
+lab_mat <- expression("MAT ("*degree*C*")")
 
