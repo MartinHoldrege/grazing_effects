@@ -126,26 +126,48 @@ pft5_factor <- function(x) {
 
 # calculate percent change ------------------------------------------------
 
-#' Calculate scaled percent change in biomass
+#' Calculate scaled percent change in biomass relative to current conditions
+#' 
+#' @description By default this function compares change relative to Current
+#'  conditions for the same grazing treatment. However, a specific level of grazing
+#'  can be chosen to take the difference from. 
+#'  This function could be updated to change the reference condition
+#'  to any given time period and 
 #'
 #' @param df --grouped dataframe
 #' @param var the name of the column that taking the difference of (a string),
 #' default is biomass
 #' @param by --variables to group by when calculating max current biomass
+#' @param ref_graze character string of the value of graze column to compare
+#' to (if NULL then differences are made within grazing levels)
 #' @param percent logical, if TRUE, calculates the scaled percent change,
 #' otherwise calculates the actual change (raw difference)
 #'
 #' @return dataframe of percent change in biomass from current conditions,
 #' scaled by maximum current biomass
-scaled_change <- function(df, var = "biomass", by = c("PFT", "graze"),
+scaled_change <- function(df, 
+                          var = "biomass", 
+                          by = c("PFT", "graze"),
+                          ref_graze = NULL,
                           percent = TRUE) {
   stopifnot(
-    is_grouped_df(df),# should be already grouped
-    c("RCP", "years", "graze") %in% names(df)
+    is.data.frame(df),
+    c("RCP", "years", "graze", by) %in% names(df)
     )
   
-  current <- df %>% 
-    filter(RCP == "Current") %>% 
+  if(is.null(ref_graze)) {
+    current <- df %>% 
+      filter(RCP == "Current")
+  } else if (is.character(ref_graze) & length(ref_graze) == 1 &
+             ! "graze" %in% by) {
+    current <- df %>% 
+      filter(RCP == "Current" & graze == ref_graze)
+  } else {
+    stop("ref_graze arg must be null or character string, and if not null
+         'by' arg must not include 'graze'")
+  }
+  
+  current <- current %>% 
     ungroup() %>% 
     group_by(across(all_of(by))) %>% 
     mutate(current = .data[[var]])
@@ -160,11 +182,10 @@ scaled_change <- function(df, var = "biomass", by = c("PFT", "graze"),
   out <- left_join(df, current_max, by = by) %>%
     # joining in current so making sure are subtracting site by site
     left_join(current[, c(by, "site", "current")]) %>% 
-    filter(RCP != "Current") %>% 
     # percent change scaled by max biomass across sites
     # or if percent is FALSE, then just the actual difference
     ungroup() %>% 
-    # note useing ifelse() instead of if() here caused problems--
+    # note using ifelse() instead of if() here caused problems--
     mutate(!!diff_var := 
              if(percent) { 
                # % scaled change
@@ -173,14 +194,31 @@ scaled_change <- function(df, var = "biomass", by = c("PFT", "graze"),
                  # raw change
                  .data[[var]] - .data$current
                  }
-                                ) %>% 
+           ) %>% 
     select(-max_value) 
   
-  # checks
-  n_current <- sum(df$RCP == "Current")
+  # removing rows for reference group
+  if(is.null(ref_graze)) {
+    out <- out %>% 
+      filter(RCP != "Current")
+  } else {
+    out <- out %>% 
+      filter(!(RCP == "Current" & .data$graze == ref_graze))
+  }
+    
+
+  
+  # checking for expected number of rows
+  n_current <- if (is.null(ref_graze)) {
+    sum(df$RCP == "Current") 
+  } else {
+    sum(df$RCP == "Current" & df$graze == ref_graze) 
+    }
+  
   if(nrow(df) - n_current != nrow(out)) {
     stop("Output of function has in incorrect number of rows")
   }
+  
   # if this warning is thrown, consider updating function (e.g. Nan, is caused
   # by dividing by 0 so maybe replace the percent diff with 100)
   if(any(is.nan(out[[diff_var]]) | is.na(out[[diff_var]]))) {

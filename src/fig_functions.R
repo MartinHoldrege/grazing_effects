@@ -25,3 +25,22 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05){
               .groups = "drop_last") %>%
     mutate(y = max(y))
 }
+
+
+
+# axis functions ----------------------------------------------------------
+
+# from 'id' column get the label to use for time period in boxplots
+years2lab <- function(x) {
+  # x--id (character vector), that includes the time period in it
+  # returns--character vector of letter designations of the time period
+  out <- case_when(
+    str_detect(x, "Current") ~ "C",
+    str_detect(x, "_2030-2060") ~ "M",
+    str_detect(x, "_2070-2100") ~ "E"
+  )
+  if(any(is.na(out))) {
+    warning("Not all time periods matched")
+  }
+  out
+}

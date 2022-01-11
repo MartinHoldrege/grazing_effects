@@ -42,7 +42,7 @@ lab_yrs <- "Time period"
 
 # biomass
 lab_bio0 <- expression("Biomass ("*gm^-2*")")
-lab_bio2 <- "Scaled % change in biomass" # 2 will denote the vers of label that is % change
+lab_bio2 <- expression(~Delta*" Biomass (scaled %)")
 
 # RCP
 lab_rcp <- "Scenario"
@@ -50,21 +50,6 @@ lab_rcp <- "Scenario"
 #fire
 lab_fire0 <- "Fire return interval (years)"
 lab_fire1 <- "Change in fire return interval (years)"
-# functions ---------------------------------------------------------------
 
-# from 'id' column get the label to use for time period in boxplots
-years2lab <- function(x) {
-  # x--id (character vector), that includes the time period in it
-  # returns--character vector of letter designations of the time period
-  out <- case_when(
-    str_detect(x, "_Current_") ~ "C",
-    str_detect(x, "_2030-2060") ~ "M",
-    str_detect(x, "_2070-2100") ~ "E"
-  )
-  if(any(is.na(out))) {
-    warning("Not all time periods matched")
-  }
-  out
-}
 
 

@@ -47,6 +47,7 @@ bio4 <- bio3 %>%
 
 # GCM--needs to be listed last for sequential grouping below
 group_cols <- c('years', 'RCP', 'graze', 'site', "PFT", "id", 'GCM')
+
 # * pft5 ------------------------------------------------------------------
 
 # 5 main pft categories
@@ -64,14 +65,14 @@ pft5_bio2 <- pft5_bio1 %>%
 
 # % change in biomass by PFT ----------------------------------------------
 
-# * pft5 ------------------------------------------------------------------
+
+# ** change relative same grazing trmt -----------------------------------
 
 # d stands for 'difference'
 # % change in biomass from current conditions ,
 # scaled by maximum biomass under current conditions(for a given grazing trmt)
 
 pft5_bio_d1 <-  pft5_bio1 %>% 
-  group_by(site, PFT, graze) %>%  
   scaled_change(by = c("PFT", "graze")) %>% 
   # median across GCMs
   group_by(site, years, RCP, PFT, graze, id) %>% 
@@ -85,6 +86,27 @@ pft5_bio_d2 <- pft5_bio_d1 %>%
   # id variable grazing removed
   mutate(id2 = str_replace(id, "_[A-z]+$", ""),
          id2 = factor(id2, levels = unique(id2)))
+
+
+# ** change relative to reference graze ------------------------------------
+# comparing all grazing treatments and RCPs/time periods to a given reference 
+# grazing scenario (e.g. current light grazing). For now these are all
+# scaled % changes
+
+levs_graze <- levels(pft5_bio1$graze)
+names(levs_graze) <- levs_graze
+
+# naming here: d== difference, grefs = different grazing references used
+pft5_d_grefs <- map(levs_graze, function(x) {
+  out <-  pft5_bio2 %>% # using data already summarized across GCMs
+    scaled_change(by = "PFT", ref_graze = x) %>% 
+    arrange(RCP, years) %>% # for creating ordered factor
+    # adding id variable that doesn't include graze
+    mutate(id2 = str_replace(id, "_[A-z]+$", ""),
+           id2 = factor(id2, levels = unique(id2)))
+  out
+})
+
 
 # wildfire ----------------------------------------------------------------
 
@@ -109,7 +131,6 @@ fire1 <- bio4 %>%
 # Calculated change as absolute difference (not scaled % change),
 # due to extreme max values
 fire_d1 <- fire1 %>% 
-  group_by(graze) %>% 
   # warning here is ok, calculating the actual (absolute) change, not % change
   scaled_change(var = "fire_return", by = "graze",
                 percent = FALSE) %>% 

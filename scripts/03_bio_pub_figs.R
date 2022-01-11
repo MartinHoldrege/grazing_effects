@@ -6,6 +6,9 @@
 # good quality (i.e. goal is for them to be 'publication quality').
 # This script does not create maps of the interpolated data. 
 
+# Note--many of these boxplots have repeated code, some of that could be 
+# consolidated into functions
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -54,7 +57,7 @@ dev.off()
 
 # * biomass change -------------------------------------------------------
 
-# ** pft5 ------------------------------------------------------------------
+# ** change relative to same graze ------------------------------------
 
 # boxplot of change in biomass (scaled percent), for each of the 5 main
 # PFTs, by, RCP, grazing treatment and time period
@@ -80,6 +83,42 @@ ggplot(pft5_bio_d2, aes(id2, bio_diff, fill = graze)) +
        x = lab_yrs)
 
 dev.off()
+
+# ** change relative to reference graze ------------------------------------
+# boxplots showing change in biomass relative to current time period and
+# given grazing intensity
+
+pdf("figures/biomass/pft5_bio_diff_gref_boxplots.pdf", 
+    height = 6.5, width = 5)
+
+map2(pft5_d_grefs, names(pft5_d_grefs), function(df, ref_graze){
+
+  # at this point it is not possible to show the unused grazing level in ggplot
+  # for the current rcp (https://github.com/tidyverse/ggplot2/issues/3345)
+  g <- ggplot(df, aes(id2, bio_diff, fill = graze)) +
+    geom_text(data = ~box_anno(., var = "bio_diff", 
+                               group_by = c("PFT", "RCP"),
+                               id = "id2", mult = 0.05),
+              aes(x, y, label = RCP, fill = NULL),
+              size = 2.5) +
+    geom_hline(yintercept = 0, alpha = 0.3, linetype = 1) +
+    geom_boxplot(position = position_dodge(preserve = "single"),
+                 outlier.size = outlier.size) +
+    facet_rep_wrap(~PFT, scales = "free", ncol = 2) +
+    scale_fill_manual(values = cols_graze, 
+                      name = "Grazing Treatment") +
+    # so just display the RCP
+    scale_x_discrete(labels = years2lab) +
+    theme(legend.position = c(0.75, 0.15)) +
+    geom_vline(xintercept = c(1.5, 3.5), linetype = 2) +
+    labs(y = lab_bio2,
+         x = lab_yrs,
+         subtitle = paste("Change in biomass relative to", tolower(ref_graze), 
+                          "grazing \n under current conditions"))
+g
+})
+dev.off()
+
 
 # fire --------------------------------------------------------------------
 
