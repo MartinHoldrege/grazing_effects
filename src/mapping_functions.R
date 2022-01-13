@@ -82,6 +82,32 @@ create_breaks_cols <- function(x,
 }
 
 
+# operations on rasters ---------------------------------------------------
+
+#' Scaled percent change, between two rasters
+#' 
+#' @description Calculates the percent change  of a target
+#' layer relative to a reference layer (scaled by the max). 
+#'
+#' @param rast A SpatRast (terra) object with multiple layers
+#' @param ref_layer Character (name) or number of the reference layer. 
+#' @param target_layer Character (name) or number of the target layer
+#'
+#' @return SpatRast object (with 1 layer)
+rast_diff <- function(rast, ref_layer, target_layer) {
+  
+  # maximum value in the reference layer
+  vec <- values(rast[[ref_layer]]) # this code is inefficient
+  max <- max(vec, na.rm = TRUE)
+  
+  r_ref <- rast[[ref_layer]] # reference layer
+  r_target <- rast[[target_layer]] # target layer (i.e. layer you want
+  # to know how much it changed)
+  
+  out <- (r_target - r_ref)/max*100 # scaled percent change
+}
+
+
 # maps --------------------------------------------------------------------
 
 #' Create map of biomass data in western states

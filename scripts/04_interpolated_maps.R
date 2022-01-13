@@ -63,6 +63,7 @@ names_plot_rcp4.5 <- names_df %>%
 # in both cases)
 names_plot1 <- bind_rows(names_plot_rcp4.5, names_plot_rcp8.5)
 
+
 # sample set of figures ---------------------------------------------------
 
 ## Set parameters and layout:
@@ -76,8 +77,6 @@ layout(layout.matrix, widths = rep(1,3), heights = rep(1,2))
 image_bio(rast1, subset = names(rast1)[1], title = "test")
 
 image_bio_diff(rast1, subset = 150, title = "test2")
-
-
 
 
 # diff from current, same grazing level -----------------------------------
@@ -122,3 +121,85 @@ for (i in 1:nrow(names_plot1)) {
 dev.off()
 
 
+# bio diff from light grazing -------------------------------------------------
+
+# * current only ----------------------------------------------------------
+# Scaled % change relative to current biomass under light grazing, for current
+# conditions (e.g. % change going from light to moderate grazing, under
+# current conditions)
+
+
+# ** names of layers to compare -------------------------------------------
+
+levs_pft <- levels(names_df$PFT)
+
+names_current <- names_df %>% 
+  filter(type == "biomass", RCP == "Current") %>% 
+  arrange(PFT, graze) # arranging for figure creation
+
+# information sets of layers that will be compared
+lyrs_current <- map(levs_pft, function(pft) {
+  
+  out <- list()
+  out$PFT <- pft
+  df_pft <- names_current %>% 
+    filter(PFT == pft)
+  
+  # name of reference layers
+  out$ref_layer <- df_pft %>% 
+    filter(graze == "Light") %>% 
+    pull(id)
+  
+  stopifnot(length(out$ref_layer) == 1)
+  
+  target_rows <- df_pft %>% 
+    filter(graze != "Light")
+  
+  out$graze <- target_rows$graze # grazing levels of non light grazing layers
+  
+  # ids of the non-light grazing layers
+  out$target_layers <- target_rows$id
+  
+  out
+})
+
+
+# ** maps -----------------------------------------------------------------
+# creates sets of 4 maps for each PFT
+# Actual biomass (light grazing), and delta biomass for moderate,
+# heavy and very heavy grazing
+
+pdf("figures/biomass_maps/bio_current-light_and_delta-current_by_graze_v1.pdf",
+    width = 9, height = 6)
+
+
+# 'looping' over PFT's
+map(lyrs_current, function(x) {
+  par( mar = c(1,1,2,1), mgp = c(3,0.3,0))
+  layout.matrix <- matrix(c(1,2,3,4,5,6),nrow = 2, ncol = 3, byrow = T)
+  layout(layout.matrix, widths = rep(1,3), heights = rep(1,2))
+
+  # current biomass, light grazing
+  ctitle <- paste("Current", x$PFT, "biomass, light grazing")
+  
+  image_bio(rast = rast1, subset = x$ref_layer, title = ctitle)
+    
+  #  delta biomass under other grazing scenario ('looping' over grazing 
+  # levels)
+  map2(x$graze, x$target_layers, function(graze, target_layer) {
+    title <- substitute(paste(Delta, " ", PFT,  ", current ", 
+                               graze, " grazing"),
+                         list(PFT = as.character(x$PFT), 
+                              graze = as.character(graze)))
+    
+    # create raster of % scaled change
+    r <- rast_diff(rast1, ref_layer = x$ref_layer, 
+                   target_layer = target_layer)
+    
+    # r only has one layer
+    image_bio_diff(rast = r, subset = 1, title = title)
+  })
+
+})
+
+dev.off()
