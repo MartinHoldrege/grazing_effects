@@ -43,3 +43,20 @@ years2lab <- function(x) {
   }
   out
 }
+
+
+# label functions ---------------------------------------------------------
+
+# function to create description based on which model simulation is being used
+c4on_off_lab <- function(x) {
+  stopifnot(length(x) == 1)
+  
+  out <- if (x == "c4on") {
+    "Data from (normal) simulation where C4Pgrass site suitability functionality on."
+  } else if (x == "c4off") {
+    "Data from simulation where C4Pgrass restricted to 102 sites where it is currently present."
+  } else {
+    stop("Input incorrect")
+  }
+  out
+}

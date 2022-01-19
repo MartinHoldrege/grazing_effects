@@ -22,7 +22,6 @@ source("src/general_functions.R")
 bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT.csv",
                  show_col_types = FALSE)
 
-
 # parse -------------------------------------------------------------------
 # Convert columns to useful factors
 
@@ -42,13 +41,23 @@ bio4 <- bio3 %>%
 # note: when 0 biomass is simulated the PFT still shows up, but just with 
 # 0 biomass
 
+# sites where no c4 is simulated under current conditions (or any conditions
+# for the c4off simulation)
+sites_noc4 <- bio4 %>% 
+  filter(c4 == "c4off", biomass == 0, PFT == "p.warm.grass", RCP == "Current") %>%
+  pull(site) %>% 
+  unique()
+
+
+stopifnot(length(sites_noc4) == 98)
 
 # climate -----------------------------------------------------------------
 # current climate
 
 clim1 <- bio4 %>% 
   # arbitrarily filtering for one graze and PFT, so rows aren't duplicated
-  filter(years == "Current", graze == "Light", PFT == "sagebrush") %>% 
+  filter(years == "Current", graze == "Light", PFT == "sagebrush",
+         c4 == "c4on") %>% 
   select(site, PPT, Temp)
 
 
@@ -56,7 +65,7 @@ clim1 <- bio4 %>%
 # creating dataframes where biomass is grouped into PFT's of interest
 
 # GCM--needs to be listed last for sequential grouping below
-group_cols <- c('years', 'RCP', 'graze', 'site', "PFT", "id", 'GCM')
+group_cols <- c("c4", 'years', 'RCP', 'graze', 'site', "PFT", "id", 'GCM')
 
 # * pft5 ------------------------------------------------------------------
 
@@ -74,6 +83,23 @@ pft5_bio2 <- pft5_bio1 %>%
             .groups = "drop")%>% 
   left_join(clim1, by = "site") # adding current climate
 
+
+# ** c4 on vs off ---------------------------------------------------------
+
+# wide format, of biomass w/ c4 on vs off only for sites were c4 not 
+# simulated under current conditions
+pft5_c4on_v_off <- pft5_bio2 %>% 
+  pivot_wider(names_from = "c4",
+              values_from = "biomass") %>% 
+  filter(site %in% sites_noc4)
+
+# check all 0's for c4 grass
+stopifnot(with(pft5_c4on_v_off,
+               c4off[PFT == "C4Pgrass"] == 0))
+
+pft5_c4on_v_off <- pft5_c4on_v_off %>% 
+  filter(PFT != "C4Pgrass")
+
 # % change in biomass by PFT ----------------------------------------------
 
 
@@ -84,9 +110,9 @@ pft5_bio2 <- pft5_bio1 %>%
 # scaled by maximum biomass under current conditions(for a given grazing trmt)
 
 pft5_bio_d1 <-  pft5_bio1 %>% 
-  scaled_change(by = c("PFT", "graze")) %>% 
+  scaled_change(by = c("c4", "PFT", "graze")) %>% 
   # median across GCMs
-  group_by(site, years, RCP, PFT, graze, id) %>% 
+  group_by(c4, site, years, RCP, PFT, graze, id) %>% 
   summarise(biomass = median(biomass),
             bio_diff = median(bio_diff),
             .groups = "drop") 
@@ -110,7 +136,7 @@ names(levs_graze) <- levs_graze
 # naming here: d== difference, grefs = different grazing references used
 pft5_d_grefs <- map(levs_graze, function(x) {
   out <-  pft5_bio2 %>% # using data already summarized across GCMs
-    scaled_change(by = "PFT", ref_graze = x) %>% 
+    scaled_change(by = c("c4", "PFT"), ref_graze = x) %>% 
     arrange(RCP, years) %>% # for creating ordered factor
     # adding id variable that doesn't include graze
     mutate(id2 = str_replace(id, "_[A-z]+$", ""),
@@ -143,7 +169,7 @@ fire1 <- bio4 %>%
 # due to extreme max values
 fire_d1 <- fire1 %>% 
   # warning here is ok, calculating the actual (absolute) change, not % change
-  scaled_change(var = "fire_return", by = "graze",
+  scaled_change(var = "fire_return", by = c("c4", "graze"),
                 percent = FALSE) %>% 
   arrange(RCP, years) %>% # for creating ordered factor
   # id variable grazing removed

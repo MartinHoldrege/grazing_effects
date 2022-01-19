@@ -43,6 +43,9 @@ lab_yrs <- "Time period"
 # biomass
 lab_bio0 <- expression("Biomass ("*gm^-2*")")
 lab_bio2 <- expression(~Delta*" Biomass (scaled %)")
+lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
+lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
+
 
 # RCP
 lab_rcp <- "Scenario"

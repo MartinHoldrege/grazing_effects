@@ -104,6 +104,7 @@ if(nrow(sc1) != 200 | any(duplicated(sc1$site_id))) {
 # converting to wide format (w stands for 'wide'), 
 # for using with interpolationPoints function below
 pft5_bio_w1 <- pft5_bio2 %>% 
+  filter(c4 == "c4on") %>% # for now just using c4 on simulations
   mutate(id = paste(PFT, "biomass", id, sep = "_")) %>% 
   dplyr::select(site, id, biomass) %>% 
   pivot_wider(id_cols = "site",

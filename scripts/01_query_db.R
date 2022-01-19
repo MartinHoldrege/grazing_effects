@@ -17,23 +17,33 @@ library(DBI)
 
 # connect to db -----------------------------------------------------------
 
-db_path <- "data_raw/Output.biomass.200sites.grazing.cheatgrass.Nov2021.sqlite"
+db_paths <- c(
+  # simulation run for 98 sites that don't have c4 grasses under current conditions
+  # and the ability of c4 grasses to move to 'new' sites is turned off
+  "data_raw/Output.biomass.200sites.grazing.cheatgrass.c4grassesoff.Nov2021.sqlite",
+  # regular simulation run
+  "data_raw/Output.biomass.200sites.grazing.cheatgrass.Nov2021.sqlite")
+              
+names(db_paths) <- c("c4off", "c4on")
 
-db_connects <- dbConnect(RSQLite::SQLite(), db_path)
+db_connects <- map(db_paths, function(x) dbConnect(RSQLite::SQLite(), x))
 
 # understand db structure -------------------------------------------------
 
 # db only contains one table
-table <- dbListTables(db_connects)
-table
+tables <- map(db_connects, dbListTables)
+tables
 
 # code needs to be adjusted if multiple tables in db
-stopifnot(length(table) == 1) 
+stopifnot(map_dbl(tables, length) == 1) 
 
 # list columns
-cols <- dbListFields(db_connects, table)
+cols <- map2(db_connects, tables, dbListFields)
 
 cols
+
+stopifnot(cols[[1]] == cols[[2]]) # the two tables should have exactly the same
+# structure
 
 # db queries --------------------------------------------------------------
 
@@ -43,15 +53,31 @@ q1 <- paste("SELECT *",
             "FROM BIOMASS",
             "WHERE Year > 100;")
 
-bio1 <- dbGetQuery(db_connects, q1)
+# separately querying the two tables
+bio1 <- map(db_connects, dbGetQuery, statement = q1)
 
 # summarize biomass -------------------------------------------------------
 
-names(bio1)
-str(bio1)
+# add in sites that were not included in the c4off run because they contain
+# c4 grasses under current conditions
+sites <- unique(bio1$c4on$site)
 
-bio2 <- bio1 %>% 
+stopifnot(sites %in% 1:200) # check
+
+c4sites <- sites[!sites %in% bio1$c4off$site]
+stopifnot(length(c4sites) == 102)
+
+bio1a <- bio1
+bio1a$c4off <- bind_rows(bio1$c4off, bio1$c4on[bio1$c4on$site %in% c4sites, ])
+
+# now should have complete set of sites
+stopifnot(sort(unique(bio1a$c4off$site)) == sites) 
+
+
+# now creating single df from the c4 on and c4 off simulation runs
+bio2 <- bind_rows(bio1a, .id = "c4")%>% 
   as_tibble()
+
 
 # character cols with > 1 unique value (i.e. to help 
 # understand what will need to group by)
@@ -65,7 +91,7 @@ bio2 %>%
 # additionally RgroupTreatment col is redundant to the [grazing]] intensity
 # column
 
-group_cols <- c('GCM', 'years', 'RCP', 'intensity', 'site')
+group_cols <- c("c4", 'GCM', 'years', 'RCP', 'intensity', 'site')
 map(bio2[, group_cols], unique)
 
 # * avg across years --------------------------------------------------------
@@ -105,3 +131,4 @@ bio3$n <- NULL
 write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT.csv")
 
 
+dbDisconnect()
