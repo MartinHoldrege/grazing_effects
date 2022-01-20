@@ -14,17 +14,18 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05){
   # df--dataframe
   # var--variable of interest (string),
   # id--name of id variable (string)
-  # group_by--variables to group by
+  # group_by--variables to group by, PFT should come first in this vector
   # mult--how much above max y to put the text (in proportion of range)
   df %>% 
+    # when calculating effect size it is sometimes infinite
+    mutate(y = ifelse(is.infinite(.data[[var]]), NA_real_, .data[[var]])) %>% 
     group_by(across(all_of(group_by))) %>% 
-    
-    summarise(# when calculating effect size it is sometimes infinite
-              y = ifelse(is.infinite(.data[[var]]), NA_real_, .data[[var]]),
-              x = median(as.numeric(.data[[id]])),
+    summarise(x = median(as.numeric(.data[[id]])),
               y = max(y, na.rm = TRUE) + 
                 (max(y, na.rm = TRUE) - min(y, na.rm = TRUE))*mult,
-              .groups = "drop_last") %>%
+              .groups = "drop_last") %>% 
+    # for this to work group_by needs to be in the correct order (PFT first
+    # followed by the 2nd variable of interest)
     mutate(y = max(y))
 }
 

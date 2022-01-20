@@ -34,6 +34,15 @@ scale_fill_graze <- function() {
   scale_fill_manual(values = cols_graze, name = "Grazing")
 }
 
+# width of figs
+wfig_box1 <- 8 # width of boxplots in inches
+
+# location of legends in boxplots
+legend_pos_box1 <- "top"
+
+# number of columns of panels in boxplots
+ncol_box <- 3
+
 # * vectors/dfs for 'looping' ---------------------------------------------
 # for looping
 levs_pft <- levels(pft5_bio2$PFT)
@@ -82,14 +91,14 @@ box1 <- function() {
   list(
     geom_text(data = ~box_anno(., var = "biomass", group_by = c("PFT", "graze"),
                            mult = 0.05),
-          aes(x, y, label = graze, fill = NULL),
+          aes(x, y, label = graze, fill = NULL), 
           size = 2.5),
     geom_boxplot(outlier.size = outlier.size), # not showing outliers as points
-    facet_rep_wrap(~ PFT, scales = "free", ncol = 2), 
+    facet_rep_wrap(~ PFT, scales = "free", ncol = ncol_box), 
     scale_fill_manual(values = cols_rcp, name = "Scenario"),
     scale_x_discrete(labels = years2lab),
     geom_vline(xintercept = line_loc, linetype = 2),
-    theme(legend.position = c(0.75, 0.15),
+    theme(legend.position = legend_pos_box1,
           axis.text = element_text(size = 7)),
     labs(x = lab_yrs,
          y = lab_bio0)
@@ -97,7 +106,7 @@ box1 <- function() {
   }
 
 jpeg("figures/biomass/pub_qual/pft5_bio_boxplot_c4on.jpeg",
-     res = 600, height = 8, width = 5, units = "in")
+     res = 600, height = 8, width = wfig_box1, units = "in")
 
 pft5_bio2 %>% 
   filter(c4 == "c4on") %>% 
@@ -109,7 +118,7 @@ pft5_bio2 %>%
 dev.off()
 
 jpeg("figures/biomass/pub_qual/pft5_bio_boxplot_c4off.jpeg",
-     res = 600, height = 8, width = 5, units = "in")
+     res = 600, height = 8, width = wfig_box1, units = "in")
 
 pft5_bio2 %>% 
   filter(c4 == "c4off") %>% 
@@ -211,11 +220,11 @@ box2 <- function(axis_data, var = "bio_diff", mult = 0.05,
   list(
     geom_boxplot(position = "dodge",
                  outlier.size = outlier.size),
-    facet_rep_wrap(~PFT, scales = "free_y", ncol = 2),
+    facet_rep_wrap(~PFT, scales = "free_y", ncol = ncol_box),
     scale_fill_graze(),
     # so just display the RCP
     scale_x_discrete(labels = years2lab),
-    theme(legend.position = c(0.75, 0.15)),
+    theme(legend.position = legend_pos_box1),
     geom_vline(xintercept = xintercept, linetype = 2),
     labs(x = lab_yrs, subtitle = subtitle),
     # text and empty points based on a different dataframe, so that
@@ -231,7 +240,7 @@ box2 <- function(axis_data, var = "bio_diff", mult = 0.05,
 }
 
 pdf("figures/biomass/pft5_bio_diff_boxplots_v1.pdf",
-    height = 8, width = 5)
+    height = 8, width = wfig_box1)
 
 # % change
 map(levs_c4, function(lev_c4) {
@@ -273,11 +282,11 @@ box3 <- function(axis_data, var = "bio_diff") {
       geom_hline(yintercept = 0, alpha = 0.3, linetype = 1),
       geom_boxplot(position = position_dodge(preserve = "single"),
                    outlier.size = outlier.size),
-      facet_rep_wrap(~PFT, scales = "free", ncol = 2),
+      facet_rep_wrap(~PFT, scales = "free", ncol = ncol_box),
       scale_fill_graze(),
       # so just display the RCP
       scale_x_discrete(labels = years2lab),
-      theme(legend.position = c(0.75, 0.15)),
+      theme(legend.position = legend_pos_box1),
       geom_vline(xintercept = line_loc2, linetype = 2),
       labs(x = lab_yrs),
       geom_text(data = ~box_anno(axis_data, var = var, 
@@ -290,7 +299,7 @@ box3 <- function(axis_data, var = "bio_diff") {
 }
 
 pdf("figures/biomass/pft5_bio_diff_gref_boxplots_v1.pdf", 
-    height = 6.5, width = 5)
+    height = 6.5, width = wfig_box1)
 
 # % change
 # 'loop' over reference class (reference grazing level) and c4 on or off
@@ -407,7 +416,7 @@ dev.off()
 # ** boxplots -------------------------------------------------------------
 
 pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v1.pdf", 
-    height = 6.5, width = 5)
+    height = 6.5, width = wfig_box1)
 
 # % change
 map(levs_c4, function(x){

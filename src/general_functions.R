@@ -85,17 +85,26 @@ rcp2factor <- function(x) {
   out
 }
 
+
+
+# * PFTs ------------------------------------------------------------------
+
 # Rename plant functional types into the 5 main categories used in M.E.'s 
 # chapter 2
 
-pft5_factor <- function(x) {
+pft5_factor <- function(x, return_levels = FALSE) {
   # x --character vector of plant functional types
+  # return_levels--logical, set to true if want function to just return
+  # a vector of the 5 pft's
   
   levels <- c("Sagebrush", 
               "C3Pgrass",
               "C4Pgrass",
               "Cheatgrass",
               "Pforb")
+  if(return_levels) {
+    return(levels)
+  }
   
   # using this if statement so can also have the input of this function
   # be the correct characters, but still what to convert it to an ordered
@@ -123,6 +132,86 @@ pft5_factor <- function(x) {
   out
 }
 
+# 3 big pft groups (excluding cheatgrass)
+# especially useful when combining df based on these factor levels,
+# with other df's that have other PFTs
+pft3_factor <- function(x) {
+  # x --character vector of plant functional types
+  
+  levels <- c("Shrub", 
+              "Pherb",
+              "Aforb")
+  
+
+  
+  # using this if statement so can also have the input of this function
+  # be the correct characters, but still what to convert it to an ordered
+  # factor
+  if(all(x %in% levels)) {
+    out <- x
+    
+  } else {
+    out <- case_when(
+      x %in% c("shrub", "sagebrush") ~ "Shrub",
+      x %in% c("p.cool.grass", "p.warm.grass",
+               "p.cool.forb", "p.warm.forb") ~ "Pherb",
+      x == "a.warm.forb" ~ "Aforb",
+      TRUE ~ NA_character_
+    )
+  }
+  
+  out <- factor(out,levels = levels)
+  
+  if (!all(levels %in% out)) {
+    warning("Some PFT levels are missing")
+  }
+  
+  out
+}
+
+Pgrass_factor <- function(x) {
+  # x --character vector of plant functional types
+  
+  levels <- "Pgrass"
+  
+  # using this if statement so can also have the input of this function
+  # be the correct characters, but still what to convert it to an ordered
+  # factor
+  if(all(x %in% levels)) {
+    out <- x
+    
+  } else {
+    out <- case_when(
+      x %in% c("p.cool.grass", "p.warm.grass") ~ "Pgrass",
+      TRUE ~ NA_character_
+    )
+  }
+  
+  out <- factor(out,levels = levels)
+  
+  if (!all(levels %in% out)) {
+    warning("Some PFT levels are missing")
+  }
+  out
+}
+
+# turning all pft levels into a factor (after they have already been
+# combined based on the functions above)
+pft_all_factor <- function(x) {
+  levels <-  c("Sagebrush", 
+              "C3Pgrass",
+              "C4Pgrass",
+              "Cheatgrass",
+              "Pforb",
+              "Shrub", 
+              "Pgrass",
+              "Pherb",
+              "Aforb")
+  
+  stopifnot(x %in% levels)
+  
+  out <- factor(x, levels = levels)
+}
 
 # create new variables ----------------------------------------------------
 

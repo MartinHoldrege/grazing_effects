@@ -68,14 +68,29 @@ clim1 <- bio4 %>%
 group_cols <- c("c4", 'years', 'RCP', 'graze', 'site', "PFT", "id", 'GCM')
 
 # * pft5 ------------------------------------------------------------------
+# for historical code reasons this is called pft5 (the main 5 pfts), but
+# now this includes all PFT groupings, including pft5
 
-# 5 main pft categories
-pft5_bio1 <- bio4 %>% 
-  mutate(PFT = pft5_factor(PFT)) %>%
-  group_by(across(all_of(group_cols))) %>% 
-  # b/some PFTs combined
-  summarize(biomass = sum(biomass), .groups = "drop_last") %>% 
-  dplyr::filter(!is.na(PFT))
+# functions that label PFTs into various groupings
+factor_funs <- list(pft5_factor, pft3_factor, Pgrass_factor)
+
+pft5_bio0 <- map(factor_funs, function(f) {
+  out <- bio4 %>% 
+    # create factor
+    mutate(PFT = f(PFT)) %>%
+    group_by(across(all_of(group_cols))) %>% 
+    # b/some PFTs combined
+    summarize(biomass = sum(biomass), .groups = "drop_last") %>% 
+    dplyr::filter(!is.na(PFT))
+  out
+})
+
+# examine PFT levels created
+map(pft5_bio0, function(df) unique(df$PFT))
+
+pft5_bio1 <- bind_rows(pft5_bio0) %>% 
+  # order PFTs into a factor
+  mutate(PFT = pft_all_factor(PFT))
 
 pft5_bio2 <- pft5_bio1 %>% 
   # median across GCMs
@@ -226,4 +241,18 @@ fire_d1 <- fire1 %>%
 
 
 
+# misc --------------------------------------------------------------------
 
+# examining the difference between sagebrush and total shrub categories:
+
+# x1 <- pft5_bio1 %>% 
+#   filter(PFT == "Sagebrush")
+# 
+# x2 <- pft5_bio1 %>% 
+#   filter(PFT == "Shrub")
+# names(x2)
+# 
+# inner_join(x1, x2, by = c("c4", "years", "RCP", "graze","site", "id", "GCM")) %>% 
+#   mutate(diff = biomass.y - biomass.x) %>% 
+#   pull(diff) %>% 
+#   hist()
