@@ -22,7 +22,7 @@ source("src/fig_functions.R") # box_ann function defined here
 theme_set(theme_classic())
 theme_update(strip.background = element_blank())
 line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
-
+line_loc2 <- c(1.5, 3.5) # for figures w/ 2 vertical lines
 outlier.size = 0.5
 
 # colors
@@ -205,7 +205,9 @@ dev.off()
 # for each of the 5 main
 # PFTs, by, RCP, grazing treatment and time period
 
-box2 <- function(axis_data, var = "bio_diff", mult = 0.05){
+box2 <- function(axis_data, var = "bio_diff", mult = 0.05,
+                 subtitle = "Comparing to current conditions within a grazing level",
+                 xintercept = 2.5){
   list(
     geom_boxplot(position = "dodge",
                  outlier.size = outlier.size),
@@ -214,9 +216,8 @@ box2 <- function(axis_data, var = "bio_diff", mult = 0.05){
     # so just display the RCP
     scale_x_discrete(labels = years2lab),
     theme(legend.position = c(0.75, 0.15)),
-    geom_vline(xintercept = 2.5, linetype = 2),
-    labs(x = lab_yrs,
-         subtitle = "Comparing to current conditions within a grazing level"),
+    geom_vline(xintercept = xintercept, linetype = 2),
+    labs(x = lab_yrs, subtitle = subtitle),
     # text and empty points based on a different dataframe, so that
     # axis limits amongst multiple figures can be the same
     geom_text(data = box_anno(axis_data, var = var, 
@@ -277,7 +278,7 @@ box3 <- function(axis_data, var = "bio_diff") {
       # so just display the RCP
       scale_x_discrete(labels = years2lab),
       theme(legend.position = c(0.75, 0.15)),
-      geom_vline(xintercept = c(1.5, 3.5), linetype = 2),
+      geom_vline(xintercept = line_loc2, linetype = 2),
       labs(x = lab_yrs),
       geom_text(data = ~box_anno(axis_data, var = var, 
                                  group_by = c("PFT", "RCP"),
@@ -396,6 +397,43 @@ map_depth(c(l1, l2), .depth = 1, .f = `[`, "MAP") # all MAP figs
 dev.off()
 
 
+# * change w/ in a scenario ----------------------------------------------
+
+# change in biomass going from light grazing, to some other grazing level,
+# for a given scenario (e.g. light grazing RCP 8.5 end century to heavy graze
+# RCP 8.5 end century)
+
+
+# ** boxplots -------------------------------------------------------------
+
+pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v1.pdf", 
+    height = 6.5, width = 5)
+
+# % change
+map(levs_c4, function(x){
+  
+  pft5_d_wgcm %>% 
+    filter(c4 == x) %>% 
+    ggplot(aes(id2, bio_diff, fill = graze)) +
+    box2(axis_data = pft5_d_wgcm, xintercept = line_loc2,
+         subtitle = "Reference group is light grazing for the given climate scenario") +
+    labs(y = lab_bio2,
+         caption = c4on_off_lab(x))
+  
+})
+
+map(levs_c4, function(x){
+ 
+   pft5_es_wgcm %>% 
+    filter(c4 == x) %>% 
+    ggplot(aes(id2, bio_es, fill = graze)) +
+    box2(axis_data = pft5_es_wgcm, var = "bio_es", xintercept = line_loc2,
+         subtitle = "Reference group is light grazing for the given climate scenario") +
+    labs(y = lab_es0,
+         caption = c4on_off_lab(x))
+})
+
+dev.off()
 # fire --------------------------------------------------------------------
 
 # boxplot of fire return interval by RCP, and grazing intensity

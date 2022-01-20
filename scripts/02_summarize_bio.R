@@ -166,11 +166,24 @@ pft5_es_grefs <- map(levs_graze, function(x) {
 
 # ** change relative to light grazing of same gcm -------------------------
 
-# naming es = effects size wgcm = within gcm comparison
+
 # e.g. this shows the effects size of going from light grazing, to heavy
 # grazing for RCP 8.5 end of century
+
+# naming" d = difference, wgcm = within gcm comparison
+pft5_d_wgcm <- pft5_bio1 %>% 
+  scaled_change(by = c("c4", "PFT", "RCP", "GCM", "years"), 
+                ref_graze = "Light", percent = TRUE, effect_size = FALSE,
+                within_GCM = TRUE) %>% 
+  # median across GCMs
+  group_by(c4, site, years, RCP, PFT, graze, id) %>% 
+  summarise(biomass = median(biomass),
+            bio_diff = median(bio_diff, na.rm = TRUE),
+            .groups = "drop") %>% 
+  create_id2()
+
+# naming es = effects size wgcm = within gcm comparison
 pft5_es_wgcm <- pft5_bio1 %>% 
-  # warning here is ok
   scaled_change(by = c("c4", "PFT", "RCP", "GCM", "years"), 
                 ref_graze = "Light", percent = FALSE, effect_size = TRUE,
                 within_GCM = TRUE) %>% 
@@ -178,7 +191,8 @@ pft5_es_wgcm <- pft5_bio1 %>%
   group_by(c4, site, years, RCP, PFT, graze, id) %>% 
   summarise(biomass = median(biomass),
             bio_es = median(bio_es, na.rm = TRUE),
-            .groups = "drop") 
+            .groups = "drop") %>% 
+  create_id2()
 
 
 # wildfire ----------------------------------------------------------------
