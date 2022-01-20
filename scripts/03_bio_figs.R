@@ -25,6 +25,16 @@ line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
 
 outlier.size = 0.5
 
+# colors
+scale_color_graze <- function() {
+  scale_color_manual(values = cols_graze, name = "Grazing")
+}
+
+scale_fill_graze <- function() {
+  scale_fill_manual(values = cols_graze, name = "Grazing")
+}
+
+# * vectors/dfs for 'looping' ---------------------------------------------
 # for looping
 levs_pft <- levels(pft5_bio2$PFT)
 
@@ -35,14 +45,8 @@ levs_pft_c4 <- expand_grid(pft = factor(levs_pft, levs_pft),
 levs_c4 <- unique(levs_pft_c4$levs_c4) %>% 
   sort(., decreasing = TRUE)
 
-# colors
-scale_color_graze <- function() {
-  scale_color_manual(values = cols_graze, name = "Grazing")
-}
-
-scale_fill_graze <- function() {
-  scale_fill_manual(values = cols_graze, name = "Grazing")
-}
+levs_grefs_c4 <- expand_grid(ref_graze = names(pft5_d_grefs), 
+                             levs_c4 = levs_c4)
 
 # functions ---------------------------------------------------------------
 
@@ -197,124 +201,197 @@ dev.off()
 
 # * change relative to same graze ------------------------------------
 
-# boxplot of change in biomass (scaled percent), for each of the 5 main
+# boxplot of change in biomass (scaled percent and effect size), 
+# for each of the 5 main
 # PFTs, by, RCP, grazing treatment and time period
 
-box2 <- function(){
+box2 <- function(axis_data, var = "bio_diff", mult = 0.05){
   list(
-    geom_text(data = ~box_anno(., var = "bio_diff", group_by = c("PFT", "RCP"),
-                               id = "id2", mult = 0.05),
-              aes(x, y, label = RCP, fill = NULL),
-              size = 2.5),
     geom_boxplot(position = "dodge",
                  outlier.size = outlier.size),
-    facet_rep_wrap(~PFT, scales = "free", ncol = 2),
-    scale_fill_manual(values = cols_graze, 
-                      name = "Grazing Treatment"),
+    facet_rep_wrap(~PFT, scales = "free_y", ncol = 2),
+    scale_fill_graze(),
     # so just display the RCP
     scale_x_discrete(labels = years2lab),
     theme(legend.position = c(0.75, 0.15)),
     geom_vline(xintercept = 2.5, linetype = 2),
-    labs(y = lab_bio2,
-         x = lab_yrs)
+    labs(x = lab_yrs,
+         subtitle = "Comparing to current conditions within a grazing level"),
+    # text and empty points based on a different dataframe, so that
+    # axis limits amongst multiple figures can be the same
+    geom_text(data = box_anno(axis_data, var = var, 
+                               group_by = c("PFT", "RCP"),
+                               id = "id2", mult = mult),
+              aes(x, y, label = RCP, fill = NULL),
+              size = 2.5),
+    geom_point(data = axis_data, color = NA)
     
   )
 }
 
-jpeg("figures/biomass/pub_qual/pft5_bio_diff_boxplot_c4on.jpeg",
-     res = 600, height = 8, width = 5, units = "in")
+pdf("figures/biomass/pft5_bio_diff_boxplots_v1.pdf",
+    height = 8, width = 5)
 
-pft5_bio_d2 %>% 
-  filter(c4 == "c4on") %>% 
-  ggplot(aes(id2, bio_diff, fill = graze)) +
-  box2()
+# % change
+map(levs_c4, function(lev_c4) {
 
-dev.off()
+  pft5_bio_d2 %>% 
+    filter(c4 == lev_c4) %>% 
+    ggplot(aes(id2, bio_diff, fill = graze)) +
+    box2(axis_data = pft5_bio_d2) +
+    labs(y = lab_bio2,
+         caption = c4on_off_lab(lev_c4))
 
-jpeg("figures/biomass/pub_qual/pft5_bio_diff_boxplot_c4off.jpeg",
-     res = 600, height = 8, width = 5, units = "in")
+})
 
-pft5_bio_d2 %>% 
-  filter(c4 == "c4off") %>% 
-  ggplot(aes(id2, bio_diff, fill = graze)) +
-  box2()
+# effect size
+map(levs_c4, function(lev_c4) {
+
+  pft5_bio_es1 %>% 
+    filter(c4 == lev_c4) %>% 
+    ggplot(aes(id2, bio_es, fill = graze)) +
+    # color = white so this text doesn't show up
+    box2(axis_data = pft5_bio_es1, 
+         var = "bio_es") +
+    labs(y = lab_es0,
+         caption = c4on_off_lab(lev_c4))
+
+})
 
 dev.off()
 
 # * change relative to reference graze ------------------------------------
-# boxplots showing change in biomass relative to current time period and
-# given grazing intensity
 
 
 # ** boxplot ---------------------------------------------------------------
+# boxplots showing change in biomass (and effect size) relative to current time 
+# period and a given grazing intensity ('reference class')
 
-pdf("figures/biomass/pft5_bio_diff_gref_boxplots.pdf", 
+box3 <- function(axis_data, var = "bio_diff") {
+  list(
+      geom_hline(yintercept = 0, alpha = 0.3, linetype = 1),
+      geom_boxplot(position = position_dodge(preserve = "single"),
+                   outlier.size = outlier.size),
+      facet_rep_wrap(~PFT, scales = "free", ncol = 2),
+      scale_fill_graze(),
+      # so just display the RCP
+      scale_x_discrete(labels = years2lab),
+      theme(legend.position = c(0.75, 0.15)),
+      geom_vline(xintercept = c(1.5, 3.5), linetype = 2),
+      labs(x = lab_yrs),
+      geom_text(data = ~box_anno(axis_data, var = var, 
+                                 group_by = c("PFT", "RCP"),
+                                 id = "id2"),
+                aes(x, y, label = RCP, fill = NULL),
+                size = 2.5),
+      geom_point(data = axis_data, color = NA)
+  )
+}
+
+pdf("figures/biomass/pft5_bio_diff_gref_boxplots_v1.pdf", 
     height = 6.5, width = 5)
 
-# 'loop' over referenc class
-map2(pft5_d_grefs, names(pft5_d_grefs), function(df, ref_graze){
+# % change
+# 'loop' over reference class (reference grazing level) and c4 on or off
+pmap(levs_grefs_c4, function(ref_graze, levs_c4){
   
-  # 'loop' over c4 levs
-  map(levs_c4, function(lev_c4){
+  df0 <- pft5_d_grefs[[ref_graze]]
   
-    df <- df %>% 
-    # just c4 on for now, adjust the line and change file name to run for c4off
-    filter(c4 == lev_c4)
+  df <- df0 %>% 
+    filter(c4 == levs_c4) 
 
   # at this point it is not possible to show the unused grazing level in ggplot
   # for the current rcp (https://github.com/tidyverse/ggplot2/issues/3345)
-  g <- ggplot(df, aes(id2, bio_diff, fill = graze)) +
-    geom_text(data = ~box_anno(., var = "bio_diff", 
-                               group_by = c("PFT", "RCP"),
-                               id = "id2", mult = 0.05),
-              aes(x, y, label = RCP, fill = NULL),
-              size = 2.5) +
-    geom_hline(yintercept = 0, alpha = 0.3, linetype = 1) +
-    geom_boxplot(position = position_dodge(preserve = "single"),
-                 outlier.size = outlier.size) +
-    facet_rep_wrap(~PFT, scales = "free", ncol = 2) +
-    scale_fill_graze() +
-    # so just display the RCP
-    scale_x_discrete(labels = years2lab) +
-    theme(legend.position = c(0.75, 0.15)) +
-    geom_vline(xintercept = c(1.5, 3.5), linetype = 2) +
+  ggplot(df, aes(id2, bio_diff, fill = graze)) +
+    # keeping axes the same between the c4 on and off figures
+    box3(axis_data = df0) +
     labs(y = lab_bio2,
-         x = lab_yrs,
          subtitle = paste("Change in biomass relative to", tolower(ref_graze), 
                           "grazing \n under current conditions"),
-         caption = c4on_off_lab(lev_c4))
-g
+         caption = c4on_off_lab(levs_c4))
 })
+
+# effect size
+pmap(levs_grefs_c4, function(ref_graze, levs_c4){
+  
+  df0 <- pft5_es_grefs[[ref_graze]]
+  
+  df <- df0 %>% 
+    filter(c4 == levs_c4) 
+  
+  ggplot(df, aes(id2, bio_es, fill = graze)) +
+    box3(axis_data = df0, var = "bio_es") +
+    labs(y = lab_es0,
+         subtitle = paste("Change in biomass relative to", tolower(ref_graze), 
+                          "grazing \n under current conditions"),
+         caption = c4on_off_lab(levs_c4))
 })
+
+
 dev.off()
 
 
 # ** scatterplot (vs climate) ----------------------------------------------
 
+scatter1 <- function(pft, levs_c4, axis_data) {
+  list(
+    geom_hline(yintercept = 0, linetype = 2),
+    facet_rep_wrap(~RCP + years),
+    scale_color_graze(),
+    labs(caption = paste(c4on_off_lab(levs_c4),
+                         "\nReference class is light grazing under current",
+                         "conditions"),
+         subtitle = paste("Change in", pft, "biomass")),
+    theme(legend.position = c(0.85, 0.15),
+          axis.text = element_text(size = 7)),
+    # for setting axis limits based on bigger data frame, so multiple
+    # figs can have same y axis lims
+    geom_point(data = axis_data,
+               x = NA)
+  )
+}
+
 pdf("figures/biomass/bio-diff_vs_climate_v1.pdf",
     width = 6, height = 5)
 
-# bio-diff vs MAP and MAT, for for ref class of light grazing, for
+# bio-diff and effect size vs MAP and MAT, for for ref class of light grazing, for
 # each RCP/time period and PFT
 
-pmap(levs_pft_c4, function(pft, levs_c4) {
+# %change
+l1 <- pmap(levs_pft_c4, function(pft, levs_c4) {
   # using Light grazing as reference class
-  g <- pft5_d_grefs[["Light"]] %>% 
-    filter(PFT == pft, c4 == levs_c4) %>% 
+  df <- pft5_d_grefs[["Light"]] %>% 
+    filter(PFT == pft)
+  
+  g <- df %>% 
+    filter(c4 == levs_c4) %>% 
     ggplot(aes(y = bio_diff, color = graze)) +
-    geom_hline(yintercept = 0, linetype = 2) +
-    facet_rep_wrap(~RCP + years) +
-    scale_color_graze() +
-    labs(y = lab_bio2,
-         caption = paste(c4on_off_lab(levs_c4),
-           "\nReference class is light grazing under current conditions"),
-         subtitle = paste("Change in", pft, "biomass")) +
-    theme(legend.position = c(0.85, 0.15),
-          axis.text = element_text(size = 7))
+    scatter1(pft, levs_c4, axis_data = df) +
+    labs(y = lab_bio2)
   
   climate_scatter(g)
   
 })
+
+
+# effect size
+l2 <- pmap(levs_pft_c4, function(pft, levs_c4) {
+  # using Light grazing as reference class
+  df <- pft5_es_grefs[["Light"]] %>% 
+    filter(PFT == pft)
+  
+  g <- df %>% 
+    filter(c4 == levs_c4) %>% 
+    ggplot(aes(y = bio_es, color = graze)) +
+    scatter1(pft, levs_c4, axis_data = df) +
+    labs(y = lab_es0)
+  
+  climate_scatter(g)
+  
+})
+
+map_depth(c(l1, l2), .depth = 1, .f = `[`, "MAT") # all MAT figs
+map_depth(c(l1, l2), .depth = 1, .f = `[`, "MAP") # all MAP figs
 
 dev.off()
 

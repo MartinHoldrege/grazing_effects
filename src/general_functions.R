@@ -124,6 +124,28 @@ pft5_factor <- function(x) {
 }
 
 
+# create new variables ----------------------------------------------------
+
+#' create id2 variable from id variable
+#'
+#' @param df a dataframe
+#'
+#' @return a dataframe with a new column id2 (a factor), which is the id variable 
+#' but with grazing removed from the string
+create_id2 <- function(df) {
+  stopifnot(
+    is.data.frame(df),
+    c("RCP", "years", "id") %in% names(df)
+  )
+  out <- df %>% 
+    arrange(RCP, years) %>% # for creating ordered factor
+    # id variable grazing removed
+    mutate(id2 = str_replace(id, "_[A-z]+$", ""),
+           id2 = factor(id2, levels = unique(id2))) 
+  out
+}
+
+
 # calculate percent change ------------------------------------------------
 
 #' Calculate scaled percent change in biomass relative to current conditions
@@ -142,6 +164,12 @@ pft5_factor <- function(x) {
 #' to (if NULL then differences are made within grazing levels)
 #' @param percent logical, if TRUE, calculates the scaled percent change,
 #' otherwise calculates the actual change (raw difference)
+#' @param effect_size logical, whether the response variable calculated
+#' is effect size instead of change (or percent change), currently calculated as 
+#' ln(trmt/ctrl)
+#' @param within_GCM logical, if TRUE comparisons will be made within a GCM, e.g.
+#' comparing heavy to light grazing, within a GCM/RCP/years. ref_graze must be 
+#' specified if set to TRUE
 #'
 #' @return dataframe of percent change in biomass from current conditions,
 #' scaled by maximum current biomass
@@ -149,13 +177,37 @@ scaled_change <- function(df,
                           var = "biomass", 
                           by = c("PFT", "graze"),
                           ref_graze = NULL,
-                          percent = TRUE) {
+                          percent = TRUE,
+                          effect_size = FALSE, 
+                          within_GCM = FALSE) {
+  
+  # checking arguments
   stopifnot(
     is.data.frame(df),
     c("RCP", "years", "graze", by) %in% names(df)
     )
   
-  if(is.null(ref_graze)) {
+  if(percent & effect_size) {
+    stop("percent and effect_size args can't both be TRUE")
+  }
+  
+  if(within_GCM & ! all(c("GCM", "RCP", "years") %in% by)) {
+    stop("if within_GCM is TRUE the by arg needs to include GCM, RCP and years")
+  }
+  
+  if(within_GCM & is.null(ref_graze)) {
+    stop("if within_GCM is TRUE ref_graze must be provided")
+  }
+  if(within_GCM & "graze" %in% by) {
+    stop("if within_GCM is TRUE 'by' should not included graze")
+  }
+  
+    # creating the df that is the reference class (usually current conditions)
+  if(within_GCM) {
+    # comparing within GCM
+    current <- df %>% 
+      filter(graze == ref_graze)
+  } else if (is.null(ref_graze)) {
     current <- df %>% 
       filter(RCP == "Current")
   } else if (is.character(ref_graze) & length(ref_graze) == 1 &
@@ -177,8 +229,13 @@ scaled_change <- function(df,
     summarize(max_value = max(current, na.rm = TRUE),
               .groups = "drop")
   
+  if (effect_size) {
+    diff_var <- paste0(var,"_es") # 'es' for effect size
+  } else {
+    diff_var <- paste0(var,"_diff")
+  }
  
-  diff_var <- paste0(var,"_diff")
+  
   out <- left_join(df, current_max, by = by) %>%
     # joining in current so making sure are subtracting site by site
     left_join(current[, c(by, "site", "current")]) %>% 
@@ -190,15 +247,21 @@ scaled_change <- function(df,
              if(percent) { 
                # % scaled change
                (.data[[var]] - .data$current)/.data$max_value*100
-               } else {
-                 # raw change
-                 .data[[var]] - .data$current
-                 }
+             } else if (effect_size) {
+               # log response ratio
+               log(.data[[var]]/.data$current)
+             }  else {
+               # raw change
+               .data[[var]] - .data$current
+              }
            ) %>% 
     select(-max_value) 
   
   # removing rows for reference group
-  if(is.null(ref_graze)) {
+  if(within_GCM) {
+    out <- out %>% 
+      filter(.data$graze != ref_graze)
+  } else if (is.null(ref_graze)) {
     out <- out %>% 
       filter(RCP != "Current")
   } else {
@@ -206,14 +269,15 @@ scaled_change <- function(df,
       filter(!(RCP == "Current" & .data$graze == ref_graze))
   }
     
-
   
   # checking for expected number of rows
-  n_current <- if (is.null(ref_graze)) {
+  n_current <- if (within_GCM) {
+    sum(df$graze == ref_graze)
+  } else if (is.null(ref_graze)) {
     sum(df$RCP == "Current") 
   } else {
     sum(df$RCP == "Current" & df$graze == ref_graze) 
-    }
+  }
   
   if(nrow(df) - n_current != nrow(out)) {
     stop("Output of function has in incorrect number of rows")
@@ -221,7 +285,9 @@ scaled_change <- function(df,
   
   # if this warning is thrown, consider updating function (e.g. Nan, is caused
   # by dividing by 0 so maybe replace the percent diff with 100)
-  if(any(is.nan(out[[diff_var]]) | is.na(out[[diff_var]]))) {
+  # don't want warning for if effect_size = TRUE, b/ inevitable with effect
+  # size calculations when current is 0
+  if(any(is.nan(out[[diff_var]]) | is.na(out[[diff_var]])) & !effect_size) {
     warning("Some diffs are NA or NaN, consider fixing output")
   }
   
@@ -229,6 +295,9 @@ scaled_change <- function(df,
   if("biomass_diff" %in% names(out)) {
     out <- out %>% 
       rename(bio_diff = biomass_diff)
+  } else if ("biomass_es" %in% names(out)) {
+    out <- out %>% 
+      rename(bio_es = biomass_es)
   }
   
   out

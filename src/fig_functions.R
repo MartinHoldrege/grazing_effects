@@ -18,9 +18,12 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05){
   # mult--how much above max y to put the text (in proportion of range)
   df %>% 
     group_by(across(all_of(group_by))) %>% 
-    summarise(x = median(as.numeric(.data[[id]])),
-              y = max(.data[[var]], na.rm = TRUE) + 
-                (max(.data[[var]], na.rm = TRUE) - min(.data[[var]], na.rm = TRUE))*mult,
+    
+    summarise(# when calculating effect size it is sometimes infinite
+              y = ifelse(is.infinite(.data[[var]]), NA_real_, .data[[var]]),
+              x = median(as.numeric(.data[[id]])),
+              y = max(y, na.rm = TRUE) + 
+                (max(y, na.rm = TRUE) - min(y, na.rm = TRUE))*mult,
               .groups = "drop_last") %>%
     mutate(y = max(y))
 }

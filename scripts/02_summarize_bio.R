@@ -103,46 +103,82 @@ pft5_c4on_v_off <- pft5_c4on_v_off %>%
 # % change in biomass by PFT ----------------------------------------------
 
 
-# ** change relative same grazing trmt -----------------------------------
+# ** change relative to same grazing trmt -----------------------------------
 
 # d stands for 'difference'
 # % change in biomass from current conditions ,
 # scaled by maximum biomass under current conditions(for a given grazing trmt)
 
-pft5_bio_d1 <-  pft5_bio1 %>% 
+pft5_bio_d2 <-  pft5_bio1 %>% 
   scaled_change(by = c("c4", "PFT", "graze")) %>% 
   # median across GCMs
   group_by(c4, site, years, RCP, PFT, graze, id) %>% 
   summarise(biomass = median(biomass),
             bio_diff = median(bio_diff),
-            .groups = "drop") 
+            .groups = "drop") %>% 
+  create_id2() # adding another id variable
 
-#adding another id variable
-pft5_bio_d2 <- pft5_bio_d1 %>% 
-  arrange(RCP, years) %>% # for creating ordered factor
-  # id variable grazing removed
-  mutate(id2 = str_replace(id, "_[A-z]+$", ""),
-         id2 = factor(id2, levels = unique(id2))) 
+
+# effect size; es = ln(biomass scenario of interest/biomass references group)
+# effect size compared to current scenario of the given grazing scenario
+pft5_bio_es1 <- pft5_bio1 %>% 
+  # warning here is ok
+  scaled_change(by = c("c4", "PFT", "graze"), percent = FALSE,
+                effect_size = TRUE) %>% 
+  # median across GCMs
+  group_by(c4, site, years, RCP, PFT, graze, id) %>% 
+  summarise(biomass = median(biomass),
+            bio_es = median(bio_es, na.rm = TRUE),
+            .groups = "drop") %>% 
+  create_id2() %>% 
+  mutate(bio_es = ifelse(is.finite(bio_es), bio_es, NA_real_))
 
 
 # ** change relative to reference graze ------------------------------------
 # comparing all grazing treatments and RCPs/time periods to a given reference 
-# grazing scenario (e.g. current light grazing). For now these are all
-# scaled % changes
+# grazing scenario (e.g. current light grazing). 
+# here using pft5_bio2 (already median across GCMs), because in all cases
+# comparing to current conditions so calculating % change or effect size
+# for each GCM then taking the median would yield the same answer
 
 levs_graze <- levels(pft5_bio1$graze)
 names(levs_graze) <- levs_graze
 
+# scaled % changes
 # naming here: d== difference, grefs = different grazing references used
 pft5_d_grefs <- map(levs_graze, function(x) {
   out <-  pft5_bio2 %>% # using data already summarized across GCMs
     scaled_change(by = c("c4", "PFT"), ref_graze = x) %>% 
-    arrange(RCP, years) %>% # for creating ordered factor
     # adding id variable that doesn't include graze
-    mutate(id2 = str_replace(id, "_[A-z]+$", ""),
-           id2 = factor(id2, levels = unique(id2))) 
+    create_id2()
   out
 })
+
+# effect sizes
+pft5_es_grefs <- map(levs_graze, function(x) {
+  out <-  pft5_bio2 %>% # using data already summarized across GCMs
+    scaled_change(by = c("c4", "PFT"), ref_graze = x, percent = FALSE,
+                  effect_size = TRUE) %>% 
+    create_id2()
+  out
+})
+
+
+# ** change relative to light grazing of same gcm -------------------------
+
+# naming es = effects size wgcm = within gcm comparison
+# e.g. this shows the effects size of going from light grazing, to heavy
+# grazing for RCP 8.5 end of century
+pft5_es_wgcm <- pft5_bio1 %>% 
+  # warning here is ok
+  scaled_change(by = c("c4", "PFT", "RCP", "GCM", "years"), 
+                ref_graze = "Light", percent = FALSE, effect_size = TRUE,
+                within_GCM = TRUE) %>% 
+  # median across GCMs
+  group_by(c4, site, years, RCP, PFT, graze, id) %>% 
+  summarise(biomass = median(biomass),
+            bio_es = median(bio_es, na.rm = TRUE),
+            .groups = "drop") 
 
 
 # wildfire ----------------------------------------------------------------
@@ -171,10 +207,8 @@ fire_d1 <- fire1 %>%
   # warning here is ok, calculating the actual (absolute) change, not % change
   scaled_change(var = "fire_return", by = c("c4", "graze"),
                 percent = FALSE) %>% 
-  arrange(RCP, years) %>% # for creating ordered factor
-  # id variable grazing removed
-  mutate(id2 = str_replace(id, "_[A-z]+$", ""),
-         id2 = factor(id2, levels = unique(id2)))
+  # adding id variable that doesn't include graze
+  create_id2()
 
 
 

@@ -58,3 +58,7 @@ lab_fire1 <- "Change in fire return interval (years)"
 lab_map <- "MAP (mm)"
 lab_mat <- expression("MAT ("*degree*C*")")
 
+# effect size
+lab_es0 <- expression("ln("*frac(biomass, reference~group~biomass)*")")
+
+
