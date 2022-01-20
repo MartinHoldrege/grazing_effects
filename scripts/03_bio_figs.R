@@ -35,7 +35,7 @@ scale_fill_graze <- function() {
 }
 
 # width of figs
-wfig_box1 <- 8 # width of boxplots in inches
+wfig_box1 <- 9 # width of boxplots in inches
 
 # location of legends in boxplots
 legend_pos_box1 <- "top"
@@ -76,6 +76,11 @@ climate_scatter <- function(g) {
   out
 }
 
+# for adding a second y axis to effect size figures, that shows % change
+add_sec_axis <- function() {
+  scale_y_continuous(sec.axis = sec_axis(trans = es2pchange, 
+                                         name = "% Change")) 
+}
 
 # absolute biomass ------------------------------------------------------
 # This figure meant to be analogous to M.E.'s thesis figure 9.
@@ -104,6 +109,7 @@ box1 <- function() {
          y = lab_bio0)
   )
   }
+
 
 jpeg("figures/biomass/pub_qual/pft5_bio_boxplot_c4on.jpeg",
      res = 600, height = 8, width = wfig_box1, units = "in")
@@ -216,11 +222,13 @@ dev.off()
 
 box2 <- function(axis_data, var = "bio_diff", mult = 0.05,
                  subtitle = "Comparing to current conditions within a grazing level",
-                 xintercept = 2.5){
+                 xintercept = 2.5,
+                 repeat.tick.labels = FALSE){
   list(
     geom_boxplot(position = "dodge",
                  outlier.size = outlier.size),
-    facet_rep_wrap(~PFT, scales = "free_y", ncol = ncol_box),
+    facet_rep_wrap(~PFT, scales = "free_y", ncol = ncol_box,
+                   repeat.tick.labels = repeat.tick.labels),
     scale_fill_graze(),
     # so just display the RCP
     scale_x_discrete(labels = years2lab),
@@ -238,6 +246,7 @@ box2 <- function(axis_data, var = "bio_diff", mult = 0.05,
     
   )
 }
+
 
 pdf("figures/biomass/pft5_bio_diff_boxplots_v1.pdf",
     height = 8, width = wfig_box1)
@@ -260,12 +269,12 @@ map(levs_c4, function(lev_c4) {
   pft5_bio_es1 %>% 
     filter(c4 == lev_c4) %>% 
     ggplot(aes(id2, bio_es, fill = graze)) +
-    # color = white so this text doesn't show up
     box2(axis_data = pft5_bio_es1, 
-         var = "bio_es") +
+         var = "bio_es", repeat.tick.labels = "y") +
+    add_sec_axis() +
     labs(y = lab_es0,
          caption = c4on_off_lab(lev_c4))
-
+  
 })
 
 dev.off()
@@ -331,6 +340,7 @@ pmap(levs_grefs_c4, function(ref_graze, levs_c4){
   
   ggplot(df, aes(id2, bio_es, fill = graze)) +
     box3(axis_data = df0, var = "bio_es") +
+    add_sec_axis() +
     labs(y = lab_es0,
          subtitle = paste("Change in biomass relative to", tolower(ref_graze), 
                           "grazing \n under current conditions"),
@@ -438,6 +448,7 @@ map(levs_c4, function(x){
     ggplot(aes(id2, bio_es, fill = graze)) +
     box2(axis_data = pft5_es_wgcm, var = "bio_es", xintercept = line_loc2,
          subtitle = "Reference group is light grazing for the given climate scenario") +
+    add_sec_axis() +
     labs(y = lab_es0,
          caption = c4on_off_lab(x))
 })

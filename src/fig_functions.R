@@ -64,3 +64,25 @@ c4on_off_lab <- function(x) {
   }
   out
 }
+
+# convert effect size to percent change
+# assumes effect size, was calculated as ln(trmt/ctrl). For use to create
+# secondary y axis.
+es2pchange <- function(x, round = FALSE, digits = 0) {
+  out <- (exp(x) - 1)*100
+  
+  if(round) {
+    out <- round(out, digits = digits)
+  }
+  
+  out
+}
+
+# testing es2pchange fun
+if (FALSE){
+  trmt <- 1:10
+  ctrl <- trmt - 0.5
+  pchange <- (trmt - ctrl)/ctrl *100 # % change
+  es <- log(trmt/ctrl) # effect size
+  all.equal(pchange, es2pchange(es, round = FALSE)) # should be TRUE if function working
+}
