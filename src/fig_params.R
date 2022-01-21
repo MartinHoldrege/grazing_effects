@@ -46,6 +46,8 @@ lab_bio2 <- expression(~Delta*" Biomass (scaled %)")
 lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
 lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
 
+# biomass threshold
+lab_below0 <- "% of sites above threshold"
 
 # RCP
 lab_rcp <- "Scenario"

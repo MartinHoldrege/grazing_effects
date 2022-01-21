@@ -91,10 +91,10 @@ add_sec_axis <- function() {
 
 
 # base of the next two figures
-box1 <- function() {
+box1 <- function(var = "biomass") {
   # first plotting text, so it doesn't overplot data
   list(
-    geom_text(data = ~box_anno(., var = "biomass", group_by = c("PFT", "graze"),
+    geom_text(data = ~box_anno(., var = var, group_by = c("PFT", "graze"),
                            mult = 0.05),
           aes(x, y, label = graze, fill = NULL), 
           size = 2.5),
@@ -109,6 +109,7 @@ box1 <- function() {
          y = lab_bio0)
   )
   }
+
 
 
 jpeg("figures/biomass/pub_qual/pft5_bio_boxplot_c4on.jpeg",
@@ -475,6 +476,39 @@ map(levs_c4, function(x){
     add_sec_axis() +
     labs(y = lab_es0,
          caption = c4on_off_lab(x))
+})
+
+dev.off()
+
+# % below threshold ------------------------------------------------------
+
+pdf("figures/biomass/threshold_dotplots_v1.pdf", 
+    height = 6.5, width = wfig_box1)
+
+map(levs_c4, function(lev_c4) {
+  
+threshold1 %>% 
+  filter(c4 == lev_c4) %>% 
+  ggplot(aes(x = id, y = pcent_above)) +
+  geom_text(data = ~box_anno(., var = "pcent_above",
+                             group_by = c("PFT", "graze"),
+                             y = 110),
+            aes(x, y, label = graze, fill = NULL),
+            size = 2.5) +
+  # line at the threshold
+  geom_hline(yintercept = (1 - pcent)*100, alpha = 0.5) +
+  geom_point(aes(color = RCP)) +
+  facet_rep_wrap(~ PFT, ncol = ncol_box) +
+  scale_color_manual(values = cols_rcp, name = "Scenario") +
+  scale_x_discrete(labels = years2lab) +
+  geom_vline(xintercept = line_loc, linetype = 2) +
+  theme(legend.position = legend_pos_box1,
+        axis.text = element_text(size = 7)) +
+  labs(x = lab_yrs,
+       y = lab_below0,
+       subtitle = "% of sites with biomass above current light grazing 5th percentile",
+       caption = c4on_off_lab(lev_c4))
+  
 })
 
 dev.off()

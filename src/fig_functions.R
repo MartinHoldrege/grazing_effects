@@ -10,13 +10,15 @@
 # function for summarizing df output for adding annotations to boxplot.
 # this function is passed to the data argument of the geom_text() function
 # in ggplot
-box_anno <- function(df, var, group_by, id = "id",   mult = 0.05){
+box_anno <- function(df, var, group_by, id = "id",   mult = 0.05, y = NULL){
   # df--dataframe
   # var--variable of interest (string),
   # id--name of id variable (string)
   # group_by--variables to group by, PFT should come first in this vector
   # mult--how much above max y to put the text (in proportion of range)
-  df %>% 
+  # y--number to specify the y coordinate of the text (usually you 
+  # just let the data decide that)
+  out <- df %>% 
     # when calculating effect size it is sometimes infinite
     mutate(y = ifelse(is.infinite(.data[[var]]), NA_real_, .data[[var]])) %>% 
     group_by(across(all_of(group_by))) %>% 
@@ -27,6 +29,11 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05){
     # for this to work group_by needs to be in the correct order (PFT first
     # followed by the 2nd variable of interest)
     mutate(y = max(y))
+  
+  if(!is.null(y)){
+    out$y = y
+  }
+  out
 }
 
 
