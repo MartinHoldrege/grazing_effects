@@ -1,0 +1,149 @@
+---
+title: "Biomass models"
+date: "`r lubridate::today()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Dependencies
+
+Sourcing the script that creates the needed dataframes.
+
+```{r message = FALSE, warning = FALSE}
+# note--knit directory set to project directory
+source("scripts/02_summarize_bio.R")
+library(knitr)
+library(lme4)
+```
+
+# Data prep
+
+
+```{r}
+
+bio_a <- pft5_bio2 %>% 
+  filter(c4 == "c4on") %>%  # for now just fitting models with c4on simulation data
+  mutate(RCP_years = paste(RCP, years, sep = "_")) %>% 
+  split(.$PFT) # separate df for each PFT
+
+
+```
+
+# Models
+
+## LM
+
+Fitting OLS linear models (ANOVAs), not accounting for repeated measures
+of the same plot.
+
+
+```{r}
+form_lm <- as.formula("biomass ~ RCP_years*graze")
+
+# fit lm for each PFT
+lm_l <- map(bio_a, function(df) {
+  lm(formula = form_lm, data = df)
+})
+
+```
+
+Putting together the model table
+
+```{r}
+
+# combining anova tables (made tidy)
+df_lm1 <- map_dfr(lm_l, 
+                 function(x) broom::tidy(anova(x)),
+                 .id = "PFT")
+
+df_lm2 <- df_lm1 %>% 
+  group_by(PFT) %>% 
+  mutate(SST = sum(sumsq), # total sum of squares
+         # proportion of total sum of squares for that term
+         `SS/SST` = sumsq/SST,
+         SSM = SST - sumsq[term == "Residuals"], # SS model
+         `SS/SSM` = sumsq/SSM, # proportion of SSM for that variable
+         `SS/SSM` = ifelse(term == "Residuals", NA, `SS/SSM`)) %>% 
+  select(-SST, - SSM)
+
+round_vec <- c(0, 0, 0, 0, 0, 0, 2, 3, 3) # how much to round each col
+
+kable(df_lm2,
+     digits = round_vec,
+     caption = "Results from ANOVAs for each PFT, showing proportion of
+     SST contributed by each term, and proportion of SSM contributed by 
+     each term.")
+
+df_lm2 %>% 
+  filter(term == "RCP_years:graze") %>% 
+  arrange(desc(`SS/SSM`)) %>% 
+  kable(digits = round_vec,
+        caption = "Models ordered by relative importance of the interaction term")
+  
+```
+
+
+## LMM
+
+Linear mixed models where site is a random effect (just a random intercept for
+now)
+
+Fit the model 
+
+```{r}
+form_lmm <- as.formula("biomass ~ RCP_years*graze + (1 | site)")
+
+# fit lm for each PFT
+lmm_l <- map(bio_a, function(df) {
+  lmer(formula = form_lmm, data = df)
+})
+
+
+```
+
+Create model tables. Note SS/SSM is the same as when just fitting the 
+simple linear model. 
+
+```{r warning = FALSE}
+
+# combining anova tables (made tidy)
+df_lmm1 <- map_dfr(lmm_l, 
+                 function(x) broom::tidy(anova(x)),
+                 .id = "PFT")
+
+df_lmm2 <- df_lmm1 %>% 
+  group_by(PFT) %>% 
+  mutate(SSM = sum(sumsq), # the lmm doesn't give residual ss, so summing
+         # give SSM
+         # proportion of total sum of squares for that term
+         `SS/SSM` = sumsq/SSM # proportion of SSM for that variable
+         ) %>% 
+  select(-SSM)
+
+round_vec2 <- c(0, 0, 0, 0, 0, 0, 3)
+
+kable(df_lmm2,
+     digits = round_vec2,
+     caption = "Results from mixed models for each PFT, showing 
+     proportion of SSM contributed by 
+     each term.")
+
+df_lmm2 %>% 
+  filter(term == "RCP_years:graze") %>% 
+  arrange(desc(`SS/SSM`)) %>% 
+  kable(digits = round_vec2,
+        caption = "Models ordered by relative importance of the interaction term")
+  
+
+```
+
+
+
+
