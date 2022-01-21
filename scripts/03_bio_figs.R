@@ -183,6 +183,30 @@ pmap(levs_pft_c4, function(pft, levs_c4) {
 dev.off()
 
 
+# * cheat light vs heavy graze --------------------------------------------
+# comparing cheatgrass light vs heavy grazing, to help determine why some
+# sites have such large % changes in cheatgrass (it appears it is the
+# group of sites with low cheat biomass)
+
+cheat_df <- pft5_bio2 %>% 
+  filter(PFT == "Cheatgrass", RCP %in% c("Current", "RCP8.5")) %>% 
+  select(c4, years, RCP, graze, site, biomass)
+
+pdf("figures/biomass/light_vs_heavy_graze_scatterplot.pdf",
+    width = 6, height = 6)
+cheat_df %>% 
+  filter(graze == "Light") %>% 
+  left_join(filter(cheat_df, graze == "Heavy"),
+            by = c("c4", "RCP", "years", "site"),
+            suffix = c("_light", "_heavy")) %>% 
+  ggplot(aes(biomass_light, biomass_heavy)) +
+  geom_point() +
+  facet_rep_wrap(~RCP + years, ncol = 2) +
+  geom_abline(slope = 1) +
+  labs(x = "Biomass (light grazing)",
+       y = "Biomass (heavy grazing)",
+       subtitle = "Cheatgrass biomass under light vs heavy grazing")
+dev.off()
 # * c4 on vs off biomass ----------------------------------------------------
 
 pdf("figures/biomass/bio_c4on_vs_off_v1.pdf",
