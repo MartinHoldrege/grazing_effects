@@ -45,7 +45,7 @@ ncol_box <- 3
 
 # * vectors/dfs for 'looping' ---------------------------------------------
 # for looping
-levs_pft <- levels(pft5_bio2$PFT)
+levs_pft <- levels(pft5_bio2$PFT) # all pft levels in the main datafile
 
 levs_pft_c4 <- expand_grid(pft = factor(levs_pft, levs_pft), 
                            levs_c4 = unique(pft5_bio2$c4)) %>% 
@@ -56,6 +56,12 @@ levs_c4 <- unique(levs_pft_c4$levs_c4) %>%
 
 levs_grefs_c4 <- expand_grid(ref_graze = names(pft5_d_grefs), 
                              levs_c4 = levs_c4)
+
+# list of pfts
+levs_pft_l <- list(pft5 = pft5_factor(x = NULL, return_levels = TRUE)) # the main 5
+
+# other pfts
+levs_pft_l$other = levs_pft[!levs_pft %in% levs_pft_l$pft5]
 
 # functions ---------------------------------------------------------------
 
@@ -82,6 +88,14 @@ add_sec_axis <- function() {
                                          name = "% Change")) 
 }
 
+
+# prep data ---------------------------------------------------------------
+
+# data frame to be used for boxplots
+pft5_bio_b <- pft5_bio2 # %>% 
+  # consider removing 0s so boxplot doesn't show sites with 0 biomass
+ mutate(biomass = ifelse(biomass == 0, NA, biomass))
+
 # absolute biomass ------------------------------------------------------
 # This figure meant to be analogous to M.E.'s thesis figure 9.
 # biomass by pft, rcp, time period, and grazing intensity
@@ -90,16 +104,16 @@ add_sec_axis <- function() {
 # * boxplot ---------------------------------------------------------------
 
 
+
 # base of the next two figures
-box1 <- function(var = "biomass") {
+box1 <- function(var = "biomass", add_facet_wrap = TRUE) {
   # first plotting text, so it doesn't overplot data
-  list(
+  out <- list(
     geom_text(data = ~box_anno(., var = var, group_by = c("PFT", "graze"),
                            mult = 0.05),
           aes(x, y, label = graze, fill = NULL), 
           size = 2.5),
     geom_boxplot(outlier.size = outlier.size), # not showing outliers as points
-    facet_rep_wrap(~ PFT, scales = "free", ncol = ncol_box), 
     scale_fill_manual(values = cols_rcp, name = "Scenario"),
     scale_x_discrete(labels = years2lab),
     geom_vline(xintercept = line_loc, linetype = 2),
@@ -108,17 +122,19 @@ box1 <- function(var = "biomass") {
     labs(x = lab_yrs,
          y = lab_bio0)
   )
+  
+  if(add_facet_wrap) {
+    out[["wrap"]] <- facet_rep_wrap(~ PFT, scales = "free", ncol = ncol_box)
   }
-
+  out
+  }
 
 
 jpeg("figures/biomass/pub_qual/pft5_bio_boxplot_c4on.jpeg",
      res = 600, height = 8, width = wfig_box1, units = "in")
 
-pft5_bio2 %>% 
+pft5_bio_b %>% 
   filter(c4 == "c4on") %>% 
-  # so boxplot doesn't show sites with 0 biomass
-  mutate(biomass = ifelse(biomass == 0, NA, biomass)) %>% 
   ggplot(aes(x = id, y = biomass, fill = RCP)) +
   box1()
 
@@ -127,12 +143,36 @@ dev.off()
 jpeg("figures/biomass/pub_qual/pft5_bio_boxplot_c4off.jpeg",
      res = 600, height = 8, width = wfig_box1, units = "in")
 
-pft5_bio2 %>% 
+pft5_bio_b %>% 
   filter(c4 == "c4off") %>% 
-  # so boxplot doesn't show sites with 0 biomass
-  mutate(biomass = ifelse(biomass == 0, NA, biomass)) %>% 
   ggplot(aes(x = id, y = biomass, fill = RCP)) +
   box1()
+
+dev.off()
+
+# c4 on and off in side by side panels 
+# for each pft
+pdf("figures/biomass/bio_boxplot_c4off_and_on.pdf",
+     height = 9, width = 6)
+
+map(levs_pft_l, function(x) {
+  df <- pft5_bio2 %>% 
+    filter(PFT %in% x)
+  out <- list()
+  out[[1]] <- df %>%  # removing 0s
+    mutate(biomass = ifelse(biomass == 0, NA, biomass)) %>% 
+    ggplot(aes(x = id, y = biomass, fill = RCP)) +
+    box1(add_facet_wrap = FALSE) +
+    facet_rep_grid(PFT ~ c4, scales = "free_y") +
+    labs(caption = "Note: 0 biomass values not shown")
+  
+  # showing 0s
+  out[[2]] <- ggplot(df, aes(x = id, y = biomass, fill = RCP)) +
+    box1(add_facet_wrap = FALSE) +
+    facet_rep_grid(PFT ~ c4, scales = "free_y") +
+    labs(caption = "Note: 0 biomass values are shown")
+  out
+})
 
 dev.off()
 
