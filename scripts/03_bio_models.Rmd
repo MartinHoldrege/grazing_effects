@@ -54,7 +54,11 @@ lm_l <- map(bio_a, function(df) {
 
 ```
 
-Putting together the model table
+Putting together the model table.
+
+Note when model table was created for c4off instead. results were similar
+but SS/SSM for interaction in C4Pgrass model was lower (0.004), highest was 
+sagebrush (0.007)
 
 ```{r}
 

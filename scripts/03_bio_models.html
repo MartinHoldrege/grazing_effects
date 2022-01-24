@@ -10,7 +10,7 @@
 
 
 
-<meta name="date" content="2022-01-21" />
+<meta name="date" content="2022-01-24" />
 
 <title>Biomass models</title>
 
@@ -247,7 +247,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Biomass models</h1>
-<h4 class="date">2022-01-21</h4>
+<h4 class="date">2022-01-24</h4>
 
 </div>
 
@@ -278,7 +278,8 @@ library(lme4)</code></pre>
 lm_l &lt;- map(bio_a, function(df) {
   lm(formula = form_lm, data = df)
 })</code></pre>
-<p>Putting together the model table</p>
+<p>Putting together the model table.</p>
+<p>Note when model table was created for c4off instead. results were similar but SS/SSM for interaction in C4Pgrass model was lower (0.004), highest was sagebrush (0.007)</p>
 <pre class="r"><code># combining anova tables (made tidy)
 df_lm1 &lt;- map_dfr(lm_l, 
                  function(x) broom::tidy(anova(x)),
