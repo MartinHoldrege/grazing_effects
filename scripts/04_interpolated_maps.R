@@ -31,6 +31,27 @@ bio_d_files <- list.files("data_processed/interpolated_rasters/bio_diff/",
 rast1 <- terra::rast(c(bio_files, bio_d_files)) # class SpatRast
 
 
+# * AIM -------------------------------------------------------------------
+
+# 2011-2015 AIM vegetation data that Rachel Renne has compiled
+aim1 <- read_csv("data_raw/AIM/LMF_ALL.data.2011-2015.FINAL_v2.csv")
+
+
+# params ------------------------------------------------------------------
+
+# parameters used for layout
+mar <- c(1,1,2,1)
+mgp = c(3,0.3,0)
+
+# parameters specific to 6 paneled figures
+layout.matrix6 <- matrix(c(1,2,3,4,5,6), nrow = 2, ncol = 3, 
+                         byrow = TRUE) # for 6 paneled figs
+widths6 <- rep(1, 3)
+heights6 = rep(1, 2)
+
+wfig6 <- 9 # width of 9 figure panels (inches)
+hfig6 <- 6 # height of 9 figure panels
+
 # names of layers --------------------------------------------------
 # descriptions of layers of raster stack
 r_names <- names(rast1)
@@ -67,9 +88,8 @@ names_plot1 <- bind_rows(names_plot_rcp4.5, names_plot_rcp8.5)
 # sample set of figures ---------------------------------------------------
 
 ## Set parameters and layout:
-par( mar = c(1,1,2,1), mgp = c(3,0.3,0))
-layout.matrix <- matrix(c(1,2,3,4,5,6),nrow = 2, ncol = 3, byrow = T)
-layout(layout.matrix, widths = rep(1,3), heights = rep(1,2))
+par(mar = mar, mgp = mgp)
+layout(layout.matrix6, widths = widths6, heights = heights6)
 
 
 # testing
@@ -87,13 +107,11 @@ image_bio_diff(rast1, subset = 150, title = "test2")
 # RCP 4.5 and 8.5 shown seperately
 
 pdf("figures/biomass_maps/bio_current_vs_delta_by_graze_v1.pdf",
-  width = 9, height = 6)
+  width = wfig6, height = hfig6)
 
 
-par( mar = c(1,1,2,1), mgp = c(3,0.3,0))
-layout.matrix <- matrix(c(1,2,3,4,5,6),nrow = 2, ncol = 3, byrow = T)
-layout(layout.matrix, widths = rep(1,3), heights = rep(1,2))
-
+par(mar = mar, mgp = mgp)
+layout(layout.matrix6, widths = widths6, heights = heights6)
 
 for (i in 1:nrow(names_plot1)) {
   row <- names_plot1[i, ]
@@ -170,14 +188,13 @@ lyrs_current <- map(levs_pft, function(pft) {
 # heavy and very heavy grazing
 
 pdf("figures/biomass_maps/bio_current-light_and_delta-current_by_graze_v1.pdf",
-    width = 9, height = 6)
+    width = wfig6, height = hfig6)
 
 
 # 'looping' over PFT's
 map(lyrs_current, function(x) {
-  par( mar = c(1,1,2,1), mgp = c(3,0.3,0))
-  layout.matrix <- matrix(c(1,2,3,4,5,6),nrow = 2, ncol = 3, byrow = T)
-  layout(layout.matrix, widths = rep(1,3), heights = rep(1,2))
+  par(mar = mar, mgp = mgp)
+  layout(layout.matrix6, widths = widths6, heights = heights6)
 
   # current biomass, light grazing
   ctitle <- paste("Current", x$PFT, "biomass, light grazing")
@@ -201,5 +218,61 @@ map(lyrs_current, function(x) {
   })
 
 })
+
+dev.off()
+
+
+# AIM data maps -----------------------------------------------------------
+# map(s) showing AIM C4Pgrass occurrence on top of interpolated STEPWAT2 
+# C4Pgrass biomass data
+
+# * process ---------------------------------------------------------------
+
+# the WBG and WRG columns are c4 perennial bunch grasses and c4 perennial 
+# rhizomatous grasses, respectively. 
+
+aim2 <- aim1 %>% 
+  select(PLOTKEY, latitude, longitude, WBG, WRG) %>% 
+  # are C4 P grasses present?
+  mutate(C4Pgrass = ifelse(WBG > 0 | WRG > 0, "present", "absent")) 
+
+mean(aim2$C4Pgrass == "present") * 100 # % of sites w/ c4pgrass present
+
+
+# creating a SpatVector (terra package)
+# for some reason logical data column gets converted to character,
+# C4Pgrass needed to be numeric
+aim_sv1 <- vect(aim2, geom = c("longitude", "latitude"))
+
+
+# * maps ------------------------------------------------------------------
+
+# Next--separate maps showing the 200 sites, and c4 presence/absence
+pdf("figures/biomass_maps/C4Pgrass-bio_AIMC4-Pgrass-presence.pdf",
+    width = wfig6, height = hfig6)
+
+pch1 <- 16
+cex1 <- 0.6
+
+par(mar = mar, mgp = mgp)
+layout(layout.matrix6, widths = widths6, heights = heights6)
+
+c4layer <- "C4Pgrass_biomass_Current_Current_Light" # Layer to plot
+image_bio(rast1, subset = c4layer, title = "Current C4Pgrass, light grazing")
+
+image_bio(rast1, subset = c4layer, title = "AIM plots where C4Pgrass absent (black points)")
+plot(subset(aim_sv1, subset = aim_sv1$C4Pgrass == "absent"), 
+     col = cols_c4present["absent"], 
+     add = TRUE, pch = pch1, cex = cex1)
+
+image_bio(rast1, subset = c4layer, title = "AIM plots where C4Pgrass present (blue points)")
+plot(subset(aim_sv1, subset = aim_sv1$C4Pgrass == "present"), 
+     col = cols_c4present["present"], 
+     add = TRUE, pch = pch1, cex = cex1)
+
+image_bio(rast1, subset = c4layer, title = "All AIM plots")
+plot(aim_sv1, 
+     col = cols_c4present[aim_sv1$C4Pgrass], 
+     add = TRUE, pch = pch1, cex = cex1)
 
 dev.off()

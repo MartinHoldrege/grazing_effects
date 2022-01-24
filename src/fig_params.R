@@ -21,6 +21,8 @@ cols_graze <- c("Light" = "#fdcc8a",
                 "Heavy" = "#e34a33",
                 "Very Heavy" = "#b30000")
 
+# color for whether c4 present at a given point location
+cols_c4present <- c("absent" = "black", "present" = "#377eb8")
 
 # * for maps --------------------------------------------------------------
 
