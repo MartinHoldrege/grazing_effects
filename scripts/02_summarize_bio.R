@@ -85,6 +85,8 @@ pft5_bio0 <- map(factor_funs, function(f) {
   out
 })
 
+
+
 # examine PFT levels created
 map(pft5_bio0, function(df) unique(df$PFT))
 
@@ -98,14 +100,23 @@ pft5_bio2 <- pft5_bio1 %>%
             .groups = "drop")%>% 
   left_join(clim1, by = "site") # adding current climate
 
+# for now we're exluding succulents--is that warranted?--it appears so,
+# they have very limited biomass
+x <- bio4 %>% filter(PFT == "succulents") %>% pull(biomass)
+mean(x > 0) # proportion sites w/ some succulents
+mean(x[x>0]) 
+max(x)
+mean(x)
 
 # ** c4 on vs off ---------------------------------------------------------
 
 # wide format, of biomass w/ c4 on vs off only for sites were c4 not 
 # simulated under current conditions
-pft5_c4on_v_off <- pft5_bio2 %>% 
+pft5_c4on_v_off0 <- pft5_bio2 %>% 
   pivot_wider(names_from = "c4",
-              values_from = "biomass") %>% 
+              values_from = "biomass")
+
+pft5_c4on_v_off <- pft5_c4on_v_off0 %>% 
   filter(site %in% sites_noc4)
 
 # check all 0's for c4 grass
@@ -114,6 +125,24 @@ stopifnot(with(pft5_c4on_v_off,
 
 pft5_c4on_v_off <- pft5_c4on_v_off %>% 
   filter(PFT != "C4Pgrass")
+
+# % change of going from c4on to c4off
+c4on_v_off_diff <- pft5_c4on_v_off0 %>% 
+  mutate(bio_diff = (c4off -c4on)/c4on*100, # % change
+         bio_es = log(c4off/c4on),# effect size
+         bio_es = ifelse(is.finite(bio_es), bio_es, NA))
+
+# C3/Pgrass ---------------------------------------------------------------
+
+# proportion of Pgrass biomass that is C3Pgrass
+C3_Pgrass_ratio <- pft5_bio1 %>% 
+  filter(PFT %in% c("C3Pgrass", "Pgrass")) %>% 
+  pivot_wider(names_from = "PFT",
+              values_from = "biomass") %>% 
+  mutate(C3_Pgrass_ratio = C3Pgrass/Pgrass) %>% 
+  # median across GCMs
+  group_by(across(all_of(group_cols[group_cols != "PFT"]))) %>% 
+  summarise(C3_Pgrass_ratio = median(C3_Pgrass_ratio))
 
 # % change in biomass by PFT ----------------------------------------------
 

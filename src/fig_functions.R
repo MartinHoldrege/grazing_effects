@@ -4,7 +4,7 @@
 # here that might be useful across a couple of different scripts going forward
 
 
-# funs that create dfs ------------------------------------------------------
+# funs that misc create dfs ------------------------------------------------------
 
 
 # function for summarizing df output for adding annotations to boxplot.
@@ -27,8 +27,10 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05, y = NULL,
     mutate(y = ifelse(is.infinite(.data[[var]]), NA_real_, .data[[var]])) %>% 
     group_by(across(all_of(group_by))) %>% 
     summarise(x = median(as.numeric(.data[[id]])),
-              y = max(y, na.rm = TRUE) + 
-                (max(y, na.rm = TRUE) - min(y, na.rm = TRUE))*mult,
+              range = max(y, na.rm = TRUE) - min(y, na.rm = TRUE),
+              y = max(y, na.rm = TRUE) +  range*mult,
+              # add fixed amount in case all points are of one value
+              y = ifelse(range == 0, y + 0.05, y),
               .groups = "drop_last") %>% 
     # for this to work group_by needs to be in the correct order (PFT first
     # followed by the 2nd variable of interest)
@@ -46,6 +48,9 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05, y = NULL,
   }
   out
 }
+
+
+# funs for boxplots -------------------------------------------------------
 
 
 #' compute boxplot statistics
@@ -82,6 +87,13 @@ boxplot_stats_long <- function(df) {
                  values_to = "y")
 }
 
+# for when creating boxplots based on compute_boxplot_stats() output
+geom_boxplot_identity <- function(...) {
+  geom_boxplot(stat = "identity", 
+               aes(lower=lower, upper=upper, middle=middle, 
+                   ymin=ymin, ymax=ymax),
+               ...)
+}
 
 # axis functions ----------------------------------------------------------
 
@@ -100,6 +112,12 @@ years2lab <- function(x) {
   out
 }
 
+# for adding a second y axis to effect size figures, that shows % change
+add_sec_axis <- function(...) {
+  scale_y_continuous(sec.axis = sec_axis(trans = es2pchange, 
+                                         name = "% Change",
+                                         ...)) 
+}
 
 # label functions ---------------------------------------------------------
 
@@ -108,9 +126,9 @@ c4on_off_lab <- function(x) {
   stopifnot(length(x) == 1)
   
   out <- if (x == "c4on") {
-    "Data from (normal) simulation where C4Pgrass site suitability functionality on."
+    "Data from (normal) simulation where C4Pgrass expansion on."
   } else if (x == "c4off") {
-    "Data from simulation where C4Pgrass restricted to 102 sites where it is currently present."
+    "Data from simulation where C4Pgrass expansion off"
   } else {
     stop("Input incorrect")
   }

@@ -48,6 +48,9 @@ lab_bio2 <- expression(~Delta*" Biomass (scaled %)")
 lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
 lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
 
+# C3Pgrass/Pgrass
+lab_C3_Pgrass_ratio <- expression(frac(C3Pgrass~biomass, Pgrass~biomass))
+
 # biomass threshold
 lab_below0 <- "% of sites above threshold"
 
@@ -64,5 +67,6 @@ lab_mat <- expression("MAT ("*degree*C*")")
 
 # effect size
 lab_es0 <- expression("ln("*frac(biomass, reference~group~biomass)*")")
+lab_es_on_off <- expression("ln("*frac(biomass~C4off, biomass~C4on)*")")
 
 

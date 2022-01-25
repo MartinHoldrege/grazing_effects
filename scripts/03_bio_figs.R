@@ -63,6 +63,7 @@ levs_pft_l <- list(pft5 = pft5_factor(x = NULL, return_levels = TRUE)) # the mai
 levs_pft_l$other = levs_pft[!levs_pft %in% levs_pft_l$pft5]
 
 # functions ---------------------------------------------------------------
+# very specific functions unlikely to be useful in other scripts
 
 # given a ggplot (g) create scatter plots y ~ MAP and y ~ MAT
 climate_scatter <- function(g) {
@@ -81,20 +82,13 @@ climate_scatter <- function(g) {
   out
 }
 
-# for adding a second y axis to effect size figures, that shows % change
-add_sec_axis <- function(...) {
-  scale_y_continuous(sec.axis = sec_axis(trans = es2pchange, 
-                                         name = "% Change",
-                                         ...)) 
-}
-
-
 
 # base of absolute biomass boxplots 
-box1 <- function(var = "biomass", add_facet_wrap = TRUE) {
+box1 <- function(var = "biomass", y = lab_bio0, add_facet_wrap = TRUE,
+                 group_by = c("PFT", "graze")) {
   # first plotting text, so it doesn't overplot data
   out <- list(
-    geom_text(data = ~box_anno(., var = var, group_by = c("PFT", "graze"),
+    geom_text(data = ~box_anno(., var = var, group_by = group_by,
                                mult = 0.05),
               aes(x, y, label = graze, fill = NULL), 
               size = 2.5),
@@ -105,7 +99,7 @@ box1 <- function(var = "biomass", add_facet_wrap = TRUE) {
     theme(legend.position = legend_pos_box1,
           axis.text = element_text(size = 7)),
     labs(x = lab_yrs,
-         y = lab_bio0)
+         y = y)
   )
   
   if(add_facet_wrap) {
@@ -144,7 +138,7 @@ box2 <- function(axis_data, # axis data can be a different data frame than
     geom_vline(xintercept = xintercept, linetype = 2),
     labs(x = lab_yrs, subtitle = subtitle),
     # text and empty points based on a different dataframe, so that
-    # axis limits amongst multiple figures can be the same
+    # axis limits among multiple figures can be the same
     geom_text(data = box_anno(axis_data, var = var, 
                               group_by = c("PFT", "RCP"),
                               id = "id2", mult = mult,
@@ -156,10 +150,7 @@ box2 <- function(axis_data, # axis data can be a different data frame than
   
   # create the boxplot using stat 'identity instead
   if(box_identity) {
-    out$box <- geom_boxplot(stat = "identity", 
-                            aes(lower=lower, upper=upper, middle=middle, 
-                                ymin=ymin, ymax=ymax),
-                            position = "dodge")
+    out$box <- geom_boxplot_identity(position = "dodge")
     # identity = boxplot (i.e. regular data input)
   } else {
     out$box <- geom_boxplot(position = "dodge",
@@ -324,10 +315,14 @@ cheat_df %>%
        y = "Biomass (heavy grazing)",
        subtitle = "Cheatgrass biomass under light vs heavy grazing")
 dev.off()
-# * c4 on vs off biomass ----------------------------------------------------
+# c4 on vs off biomass ----------------------------------------------------
 
 pdf("figures/biomass/bio_c4on_vs_off_v1.pdf",
-    width = 9, height = 6)
+    width = 9, height = 7)
+
+
+# * absolute biomass ------------------------------------------------------
+
 map(levs_pft[levs_pft != "C4Pgrass"], function(x) {
   pft5_c4on_v_off %>% 
     filter(PFT == x) %>% 
@@ -351,7 +346,51 @@ map(levs_pft[levs_pft != "C4Pgrass"], function(x) {
     scale_color_graze() +
     theme(legend.position = c(0.85, 0.15))
 })
+
+
+# * on vs off %change ----------------------------------------------------
+# boxplot of % change of going from c4 on to c4 off
+c4on_v_off_diff %>% 
+  #filter(PFT != "C4Pgrass") %>% 
+  group_by(years, RCP, graze, PFT, id) %>% 
+  compute_boxplot_stats(var = "bio_es") %>% 
+  ggplot(aes(x = id, fill = RCP)) +
+  geom_text(data = ~box_anno(boxplot_stats_long(.), 
+                             var = "y", group_by = c("PFT", "graze"),
+                             mult = 0.05),
+            aes(x, y, label = graze, fill = NULL), 
+            size = 2.5) +
+  geom_boxplot_identity() +
+  scale_fill_manual(values = cols_rcp, name = "Scenario") +
+  scale_x_discrete(labels = years2lab) +
+  geom_vline(xintercept = line_loc, linetype = 2) +
+  theme(legend.position = legend_pos_box1,
+        axis.text = element_text(size = 7)) +
+  facet_rep_wrap(~ PFT, scales = "free", ncol = ncol_box,
+                 repeat.tick.labels = TRUE) +
+  add_sec_axis() +
+  labs(x = lab_yrs,
+       y = lab_es_on_off,
+       caption = "Outliers not shown. 
+       Not showing points where biomass was 0 for on or off",
+       subtitle = "Change in biomass when C4 expansion is turned off 
+       in a given climate scenario and grazing level") 
+
+
 dev.off()
+
+# C3Pgrass/Pgrass ---------------------------------------------------------
+
+g <- ggplot(C3_Pgrass_ratio, aes(id, C3_Pgrass_ratio, fill = RCP)) +
+  box1(add_facet_wrap = FALSE, var = "C3_Pgrass_ratio",
+       group_by = c("c4", "graze"),
+       y = lab_C3_Pgrass_ratio) +
+  facet_rep_wrap(~c4) +
+  labs(subtitle = "Ratio of C3Pgrass biomass to total Pgrass biomass",
+       caption = "Separately showing data from simulations with C4 expansion on and off") 
+
+ggsave("figures/biomass/C3_Pgrass_ratio.jpeg", g, 
+       width = 6, height = 4)
 
 # biomass change -------------------------------------------------------
 
