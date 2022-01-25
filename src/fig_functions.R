@@ -18,6 +18,7 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05, y = NULL){
   # mult--how much above max y to put the text (in proportion of range)
   # y--number to specify the y coordinate of the text (usually you 
   # just let the data decide that)
+  
   out <- df %>% 
     # when calculating effect size it is sometimes infinite
     mutate(y = ifelse(is.infinite(.data[[var]]), NA_real_, .data[[var]])) %>% 
@@ -36,6 +37,40 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05, y = NULL){
   out
 }
 
+
+#' compute boxplot statistics
+#'
+#' @param df dataframe, usually grouped
+#'
+#' @return dataframe with the grouping variables, and values needed to 
+#' draw a boxplot. This is useful for correctly plotting a boxplot w/o
+#' showing the outliers
+compute_boxplot_stats <- function(df, var) {
+  df %>% 
+    summarise(
+      # boxplot stats
+      # this returns 5 values
+      .s = boxplot.stats(.data[[var]])$stats,
+      .groups = "keep") %>% 
+    # .s is a vector of length 5 for each grouping, so extracting
+    # the necessary parts
+    summarise(
+      ymin = .s[1],
+      lower = .s[2],
+      middle = .s[3],
+      upper = .s[4],
+      ymax = .s[5],
+      .groups = "drop")
+}
+
+# function for converting compute boxplot statistics() output
+# into long for use in box_anno
+boxplot_stats_long <- function(df) {
+  df %>% 
+    pivot_longer(cols = c("ymin", "lower", "middle", "upper", "ymax"),
+                 names_to = "stat",
+                 values_to = "y")
+}
 
 
 # axis functions ----------------------------------------------------------
@@ -93,3 +128,5 @@ if (FALSE){
   es <- log(trmt/ctrl) # effect size
   all.equal(pchange, es2pchange(es, round = FALSE)) # should be TRUE if function working
 }
+
+

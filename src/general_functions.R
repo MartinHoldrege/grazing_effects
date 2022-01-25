@@ -393,3 +393,32 @@ scaled_change <- function(df,
 
 }
 
+
+# outliers ----------------------------------------------------------------
+
+#' remove outliers (mostly for plotting boxplots)
+#'
+#' @param df dataframe, function most useful for grouped dataframes
+#' @param var string, name of column to remove outliers from
+#'
+#' @return Data with outliers (just removed those points that would be 
+#' considered outliers in a boxplot--so this isn't a rigorous outlier
+#' remover, mostly for plotting), the problem is that a boxplot
+#' made after outliers removed will no longer have the right quartiles
+#' (especially if many outliers have been removed)
+remove_outliers <- function(df, var) {
+  
+  stopifnot(is.data.frame(df))
+  
+  out <- df %>% 
+    mutate(.ymax = boxplot.stats(.data[[var]])$stats[5],
+           .ymin = boxplot.stats(.data[[var]])$stats[1],
+           !!var := ifelse(.data[[var]] <= .ymax & .data[[var]] >= .ymin,
+                           .data[[var]], NA_real_)) %>% 
+    select(-.ymax, -.ymin)
+  out
+}
+
+
+
+

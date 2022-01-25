@@ -83,9 +83,10 @@ climate_scatter <- function(g) {
 }
 
 # for adding a second y axis to effect size figures, that shows % change
-add_sec_axis <- function() {
+add_sec_axis <- function(...) {
   scale_y_continuous(sec.axis = sec_axis(trans = es2pchange, 
-                                         name = "% Change")) 
+                                         name = "% Change",
+                                         ...)) 
 }
 
 
@@ -285,13 +286,20 @@ dev.off()
 # for each of the 5 main
 # PFTs, by, RCP, grazing treatment and time period
 
-box2 <- function(axis_data, var = "bio_diff", mult = 0.05,
+box2 <- function(axis_data, # axis data can be a different data frame than
+                 # is plotted, and that way axes can be constant across 
+                 # multiple figures
+                 var = "bio_diff", # y variable
+                 mult = 0.05,
+                 box_identity = FALSE, # should stat = identity be used to make 
+                 # the figure
                  subtitle = "Comparing to current conditions within a grazing level",
                  xintercept = 2.5,
-                 repeat.tick.labels = FALSE){
-  list(
-    geom_boxplot(position = "dodge",
-                 outlier.size = outlier.size),
+                 repeat.tick.labels = FALSE,
+                 ...){
+  
+
+  out <- list(
     facet_rep_wrap(~PFT, scales = "free_y", ncol = ncol_box,
                    repeat.tick.labels = repeat.tick.labels),
     scale_fill_graze(),
@@ -307,9 +315,22 @@ box2 <- function(axis_data, var = "bio_diff", mult = 0.05,
                                id = "id2", mult = mult),
               aes(x, y, label = RCP, fill = NULL),
               size = 2.5),
-    geom_point(data = axis_data, color = NA)
-    
+    geom_point(data = axis_data, aes_string(y = var), color = NA)
   )
+  
+  # create the boxplot using stat 'identity instead
+  if(box_identity) {
+    out$box <- geom_boxplot(stat = "identity", 
+                            aes(lower=lower, upper=upper, middle=middle, 
+                                ymin=ymin, ymax=ymax),
+                            position = "dodge")
+    # identity = boxplot (i.e. regular data input)
+  } else {
+    out$box <- geom_boxplot(position = "dodge",
+                         outlier.size = outlier.size,
+                         ...)
+  }
+  out
 }
 
 
@@ -481,17 +502,17 @@ map_depth(c(l1, l2), .depth = 1, .f = `[`, "MAP") # all MAP figs
 dev.off()
 
 
-# * change w/ in a scenario ----------------------------------------------
+# * wgcm ----------------------------------------------
 
 # change in biomass going from light grazing, to some other grazing level,
-# for a given scenario (e.g. light grazing RCP 8.5 end century to heavy graze
-# RCP 8.5 end century)
+# for a given scenario, ie. change within a gcm/climate scenario
+# (e.g. light grazing RCP 8.5 end century to heavy graze, RCP 8.5 end century)
 
 
 # ** boxplots -------------------------------------------------------------
 
 pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v1.pdf", 
-    height = 6.5, width = wfig_box1)
+    height = 8, width = wfig_box1)
 
 # % change
 map(levs_c4, function(x){
@@ -506,21 +527,57 @@ map(levs_c4, function(x){
   
 })
 
+# effect size
 map(levs_c4, function(x){
  
-   pft5_es_wgcm %>% 
+  out <- list()
+  # w/outliers
+   out[[1]] <- pft5_es_wgcm %>% 
     filter(c4 == x) %>% 
     ggplot(aes(id2, bio_es, fill = graze)) +
-    box2(axis_data = pft5_es_wgcm, var = "bio_es", xintercept = line_loc2,
-         subtitle = "Reference group is light grazing for the given climate scenario") +
+    box2(axis_data = pft5_es_wgcm, 
+         var = "bio_es", xintercept = line_loc2,
+         subtitle = "Reference group is light grazing for the given climate scenario",
+         repeat.tick.labels = TRUE) +
     add_sec_axis() +
     labs(y = lab_es0,
-         caption = c4on_off_lab(x))
+         caption = paste0("All data shown\n", c4on_off_lab(x))) +
+    theme(axis.text.y.right = element_text(size = 5)) 
+  
+  # boxplot outliers removed
+   df <-  pft5_es_wgcm %>% 
+     group_by(id2, PFT, RCP, graze, years, c4) %>% 
+     compute_boxplot_stats(var = "bio_es")
+  
+  out[[2]] <- df %>% 
+    filter(c4 == x) %>% 
+    ggplot(aes(x = id2, fill = graze)) +
+    box2(axis_data = boxplot_stats_long(df), var = "y", xintercept = line_loc2,
+         box_identity = TRUE, 
+         subtitle = "Reference group is light grazing for the given climate scenario",
+         repeat.tick.labels = TRUE
+         )  +
+    add_sec_axis() +
+    labs(y = lab_es0,
+         caption = paste0("Outliers removed\n", c4on_off_lab(x)))
+  
+  # same figure but with fixed scales
+  out[[3]] <- out[[2]] +
+    facet_rep_wrap(~PFT, scales = "fixed", ncol = ncol_box,
+                   repeat.tick.labels = TRUE)
+    
+    
+  out
 })
 
 dev.off()
 
+
+
 # % below threshold ------------------------------------------------------
+
+ref_threshold2 <- ref_threshold %>% 
+  mutate(string = paste(round(threshold, 0), "g/m^2"))
 
 pdf("figures/biomass/threshold_dotplots_v1.pdf", 
     height = 6.5, width = wfig_box1)
@@ -535,6 +592,10 @@ threshold1 %>%
                              y = 110),
             aes(x, y, label = graze, fill = NULL),
             size = 2.5) +
+  # printing the value of the threshold on each panel
+  geom_text(data = filter(ref_threshold2, c4 == lev_c4),
+            aes(x = 3, y = 10, label = string),
+                size = 2.5) +
   # line at the threshold
   geom_hline(yintercept = (1 - pcent)*100, alpha = 0.5) +
   geom_point(aes(color = RCP)) +
@@ -547,7 +608,8 @@ threshold1 %>%
   labs(x = lab_yrs,
        y = lab_below0,
        subtitle = "% of sites with biomass above current light grazing 5th percentile",
-       caption = c4on_off_lab(lev_c4))
+       caption = paste0(c4on_off_lab(lev_c4),
+                       "\nValue of threshold provided in each panel"))
   
 })
 
@@ -560,6 +622,8 @@ map(levs_c4, function(lev_c4) {
   g1 <- fire1 %>% 
     filter(c4 == lev_c4) %>% 
     group_by(id) %>% 
+    # note--this method of filtering before drawing boxplot 
+    # creates biased boxplots
     mutate(ylim = boxplot.stats(fire_return)$stats[5]) %>% 
     filter(fire_return <= ylim) %>% 
     ggplot(aes(x = id, y = fire_return, fill = RCP)) +
@@ -583,11 +647,9 @@ map(levs_c4, function(lev_c4) {
     group_by(id) %>% 
     # removing outliers (extreme outliers make the body of the boxplot
     # hard to see)
-    mutate(ymax = boxplot.stats(fire_return_diff)$stats[5],
-           ymin = boxplot.stats(fire_return_diff)$stats[1],
-           fire_return_diff = ifelse(fire_return_diff <= ymax &
-                                       fire_return_diff >= ymin,
-                                     fire_return_diff, NA_real_)) %>%
+    # NOTE--should update code to use 
+    # compute_boxplot_stats() and stat = "identity" instead of remove_outliers()
+    remove_outliers(var = "fire_return_diff") %>% 
     ggplot(aes(id2, fire_return_diff, fill = graze)) +
     geom_text(data = ~box_anno(., var = "fire_return_diff", 
                                group_by = c("RCP"), id = "id2"),
