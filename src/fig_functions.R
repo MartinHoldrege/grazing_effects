@@ -10,7 +10,8 @@
 # function for summarizing df output for adding annotations to boxplot.
 # this function is passed to the data argument of the geom_text() function
 # in ggplot
-box_anno <- function(df, var, group_by, id = "id",   mult = 0.05, y = NULL){
+box_anno <- function(df, var, group_by, id = "id",   mult = 0.05, y = NULL,
+                     anno_same_across_panels = FALSE){
   # df--dataframe
   # var--variable of interest (string),
   # id--name of id variable (string)
@@ -18,6 +19,8 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05, y = NULL){
   # mult--how much above max y to put the text (in proportion of range)
   # y--number to specify the y coordinate of the text (usually you 
   # just let the data decide that)
+  # anno_same_across_pft--logical if TRUE annotation will be at the same height 
+  # for all panels
   
   out <- df %>% 
     # when calculating effect size it is sometimes infinite
@@ -30,6 +33,13 @@ box_anno <- function(df, var, group_by, id = "id",   mult = 0.05, y = NULL){
     # for this to work group_by needs to be in the correct order (PFT first
     # followed by the 2nd variable of interest)
     mutate(y = max(y))
+  
+  # so annotation are the same across panels (ie when scales are fixed)
+  if(anno_same_across_panels) {
+    out <- out %>% 
+      ungroup() %>% 
+      mutate(y = max(y))
+  }
   
   if(!is.null(y)){
     out$y = y

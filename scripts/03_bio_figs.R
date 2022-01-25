@@ -2,8 +2,7 @@
 
 # Script started 1/6/2022
 
-# Purpose--to create figures of biomass data from simulations, that are 
-# good quality 
+# Purpose--to create figures of biomass data from simulations
 # This script does not create maps of the interpolated data. 
 
 # Note--many of these boxplots have repeated code, some of that could be 
@@ -90,30 +89,15 @@ add_sec_axis <- function(...) {
 }
 
 
-# prep data ---------------------------------------------------------------
 
-# data frame to be used for boxplots
-pft5_bio_b <- pft5_bio2 # %>% 
-  # consider removing 0s so boxplot doesn't show sites with 0 biomass
- mutate(biomass = ifelse(biomass == 0, NA, biomass))
-
-# absolute biomass ------------------------------------------------------
-# This figure meant to be analogous to M.E.'s thesis figure 9.
-# biomass by pft, rcp, time period, and grazing intensity
-
-
-# * boxplot ---------------------------------------------------------------
-
-
-
-# base of the next two figures
+# base of absolute biomass boxplots 
 box1 <- function(var = "biomass", add_facet_wrap = TRUE) {
   # first plotting text, so it doesn't overplot data
   out <- list(
     geom_text(data = ~box_anno(., var = var, group_by = c("PFT", "graze"),
-                           mult = 0.05),
-          aes(x, y, label = graze, fill = NULL), 
-          size = 2.5),
+                               mult = 0.05),
+              aes(x, y, label = graze, fill = NULL), 
+              size = 2.5),
     geom_boxplot(outlier.size = outlier.size), # not showing outliers as points
     scale_fill_manual(values = cols_rcp, name = "Scenario"),
     scale_x_discrete(labels = years2lab),
@@ -128,8 +112,99 @@ box1 <- function(var = "biomass", add_facet_wrap = TRUE) {
     out[["wrap"]] <- facet_rep_wrap(~ PFT, scales = "free", ncol = ncol_box)
   }
   out
-  }
+}
 
+# boxplot of change in biomass (scaled percent and effect size), 
+# for each of the 5 main
+# PFTs, by, RCP, grazing treatment and time period
+box2 <- function(axis_data, # axis data can be a different data frame than
+                 # is plotted, and that way axes can be constant across 
+                 # multiple figures
+                 var = "bio_diff", # y variable
+                 mult = 0.05,
+                 box_identity = FALSE, # should stat = identity be used to make 
+                 # the figure
+                 subtitle = "Comparing to current conditions within a grazing level",
+                 xintercept = 2.5,
+                 repeat.tick.labels = FALSE,
+                 # whether box_anno annotation should be at the same height for
+                 # all panels (useful if scales are fixed)
+                 anno_same_across_panels = FALSE, 
+                 scales = "free_y",
+                 ...){
+  
+  
+  out <- list(
+    facet_rep_wrap(~PFT, scales = scales, ncol = ncol_box,
+                   repeat.tick.labels = repeat.tick.labels),
+    scale_fill_graze(),
+    # so just display the RCP
+    scale_x_discrete(labels = years2lab),
+    theme(legend.position = legend_pos_box1),
+    geom_vline(xintercept = xintercept, linetype = 2),
+    labs(x = lab_yrs, subtitle = subtitle),
+    # text and empty points based on a different dataframe, so that
+    # axis limits amongst multiple figures can be the same
+    geom_text(data = box_anno(axis_data, var = var, 
+                              group_by = c("PFT", "RCP"),
+                              id = "id2", mult = mult,
+                              anno_same_across_panels = anno_same_across_panels),
+              aes(x, y, label = RCP, fill = NULL),
+              size = 2.5),
+    geom_point(data = axis_data, aes_string(y = var), color = NA)
+  )
+  
+  # create the boxplot using stat 'identity instead
+  if(box_identity) {
+    out$box <- geom_boxplot(stat = "identity", 
+                            aes(lower=lower, upper=upper, middle=middle, 
+                                ymin=ymin, ymax=ymax),
+                            position = "dodge")
+    # identity = boxplot (i.e. regular data input)
+  } else {
+    out$box <- geom_boxplot(position = "dodge",
+                            outlier.size = outlier.size,
+                            ...)
+  }
+  out
+}
+
+# boxplots showing change in biomass (and effect size) relative to current time 
+# period and a given grazing intensity ('reference class')
+box3 <- function(axis_data, var = "bio_diff") {
+  list(
+    geom_hline(yintercept = 0, alpha = 0.3, linetype = 1),
+    geom_boxplot(position = position_dodge(preserve = "single"),
+                 outlier.size = outlier.size),
+    facet_rep_wrap(~PFT, scales = "free", ncol = ncol_box),
+    scale_fill_graze(),
+    # so just display the RCP
+    scale_x_discrete(labels = years2lab),
+    theme(legend.position = legend_pos_box1),
+    geom_vline(xintercept = line_loc2, linetype = 2),
+    labs(x = lab_yrs),
+    geom_text(data = ~box_anno(axis_data, var = var, 
+                               group_by = c("PFT", "RCP"),
+                               id = "id2"),
+              aes(x, y, label = RCP, fill = NULL),
+              size = 2.5),
+    geom_point(data = axis_data, color = NA)
+  )
+}
+
+# prep data ---------------------------------------------------------------
+
+# data frame to be used for boxplots
+pft5_bio_b <- pft5_bio2 # %>% 
+  # consider removing 0s so boxplot doesn't show sites with 0 biomass
+ mutate(biomass = ifelse(biomass == 0, NA, biomass))
+
+# absolute biomass ------------------------------------------------------
+# This figure meant to be analogous to M.E.'s thesis figure 9.
+# biomass by pft, rcp, time period, and grazing intensity
+
+
+# * boxplot ---------------------------------------------------------------
 
 jpeg("figures/biomass/pub_qual/pft5_bio_boxplot_c4on.jpeg",
      res = 600, height = 8, width = wfig_box1, units = "in")
@@ -286,53 +361,6 @@ dev.off()
 # for each of the 5 main
 # PFTs, by, RCP, grazing treatment and time period
 
-box2 <- function(axis_data, # axis data can be a different data frame than
-                 # is plotted, and that way axes can be constant across 
-                 # multiple figures
-                 var = "bio_diff", # y variable
-                 mult = 0.05,
-                 box_identity = FALSE, # should stat = identity be used to make 
-                 # the figure
-                 subtitle = "Comparing to current conditions within a grazing level",
-                 xintercept = 2.5,
-                 repeat.tick.labels = FALSE,
-                 ...){
-  
-
-  out <- list(
-    facet_rep_wrap(~PFT, scales = "free_y", ncol = ncol_box,
-                   repeat.tick.labels = repeat.tick.labels),
-    scale_fill_graze(),
-    # so just display the RCP
-    scale_x_discrete(labels = years2lab),
-    theme(legend.position = legend_pos_box1),
-    geom_vline(xintercept = xintercept, linetype = 2),
-    labs(x = lab_yrs, subtitle = subtitle),
-    # text and empty points based on a different dataframe, so that
-    # axis limits amongst multiple figures can be the same
-    geom_text(data = box_anno(axis_data, var = var, 
-                               group_by = c("PFT", "RCP"),
-                               id = "id2", mult = mult),
-              aes(x, y, label = RCP, fill = NULL),
-              size = 2.5),
-    geom_point(data = axis_data, aes_string(y = var), color = NA)
-  )
-  
-  # create the boxplot using stat 'identity instead
-  if(box_identity) {
-    out$box <- geom_boxplot(stat = "identity", 
-                            aes(lower=lower, upper=upper, middle=middle, 
-                                ymin=ymin, ymax=ymax),
-                            position = "dodge")
-    # identity = boxplot (i.e. regular data input)
-  } else {
-    out$box <- geom_boxplot(position = "dodge",
-                         outlier.size = outlier.size,
-                         ...)
-  }
-  out
-}
-
 
 pdf("figures/biomass/pft5_bio_diff_boxplots_v1.pdf",
     height = 8, width = wfig_box1)
@@ -369,29 +397,9 @@ dev.off()
 
 
 # ** boxplot ---------------------------------------------------------------
+
 # boxplots showing change in biomass (and effect size) relative to current time 
 # period and a given grazing intensity ('reference class')
-
-box3 <- function(axis_data, var = "bio_diff") {
-  list(
-      geom_hline(yintercept = 0, alpha = 0.3, linetype = 1),
-      geom_boxplot(position = position_dodge(preserve = "single"),
-                   outlier.size = outlier.size),
-      facet_rep_wrap(~PFT, scales = "free", ncol = ncol_box),
-      scale_fill_graze(),
-      # so just display the RCP
-      scale_x_discrete(labels = years2lab),
-      theme(legend.position = legend_pos_box1),
-      geom_vline(xintercept = line_loc2, linetype = 2),
-      labs(x = lab_yrs),
-      geom_text(data = ~box_anno(axis_data, var = var, 
-                                 group_by = c("PFT", "RCP"),
-                                 id = "id2"),
-                aes(x, y, label = RCP, fill = NULL),
-                size = 2.5),
-      geom_point(data = axis_data, color = NA)
-  )
-}
 
 pdf("figures/biomass/pft5_bio_diff_gref_boxplots_v1.pdf", 
     height = 6.5, width = wfig_box1)
@@ -549,24 +557,29 @@ map(levs_c4, function(x){
      group_by(id2, PFT, RCP, graze, years, c4) %>% 
      compute_boxplot_stats(var = "bio_es")
   
-  out[[2]] <- df %>% 
-    filter(c4 == x) %>% 
-    ggplot(aes(x = id2, fill = graze)) +
+   g <- df %>% 
+     filter(c4 == x) %>% 
+     ggplot(aes(x = id2, fill = graze)) +
+     add_sec_axis() +
+     labs(y = lab_es0,
+          caption = paste0("Outliers removed\n", c4on_off_lab(x)))
+   
+  out[[2]] <- g +
     box2(axis_data = boxplot_stats_long(df), var = "y", xintercept = line_loc2,
          box_identity = TRUE, 
          subtitle = "Reference group is light grazing for the given climate scenario",
          repeat.tick.labels = TRUE
-         )  +
-    add_sec_axis() +
-    labs(y = lab_es0,
-         caption = paste0("Outliers removed\n", c4on_off_lab(x)))
+         )  
   
   # same figure but with fixed scales
-  out[[3]] <- out[[2]] +
-    facet_rep_wrap(~PFT, scales = "fixed", ncol = ncol_box,
-                   repeat.tick.labels = TRUE)
-    
-    
+  out[[3]] <- g +
+    box2(axis_data = boxplot_stats_long(df), var = "y", xintercept = line_loc2,
+         box_identity = TRUE, 
+         subtitle = "Reference group is light grazing for the given climate scenario",
+         repeat.tick.labels = TRUE,
+         scales = "fixed",
+         anno_same_across_panels = TRUE)
+     
   out
 })
 
