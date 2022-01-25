@@ -15,6 +15,7 @@
 source("scripts/02_summarize_bio.R") # creates dataframes of stepwat2 output
 library(raster)
 library(rMultivariateMatching)
+library(doParallel)
 
 # read in data ------------------------------------------------------------
 
@@ -79,7 +80,7 @@ pts2 <- pts %>%
   rename(cellnumbers = X) %>% 
   mutate(x = round(x, digits = digits),
          y = round(y, digits = digits))
-pts2
+
 site_nums2 <- site_nums %>% 
   mutate(x = round(X_WGS84, digits = digits),
          y = round(Y_WGS84, digits = digits)) %>% 
@@ -103,12 +104,18 @@ if(nrow(sc1) != 200 | any(duplicated(sc1$site_id))) {
 # actual biomass (ie not difference)
 # converting to wide format (w stands for 'wide'), 
 # for using with interpolationPoints function below
-pft5_bio_w1 <- pft5_bio2 %>% 
-  filter(c4 == "c4on", # for now just using c4 on simulations
-         # just the origional pft5
-         PFT %in% pft5_factor(x = NULL, return_levels = TRUE)) %>% 
-  mutate(PFT = pft5_factor(PFT),
-         id = paste(PFT, "biomass", id, sep = "_")) %>% 
+
+# this is every PFT, for all GCMs--i.e. all derived biomass change 
+# variables could be calculated from these values after up-scaling,
+# therefore %change of biomass no longer up-scaled
+pft5_bio_w1 <- pft5_bio1 %>% 
+  ungroup() %>% 
+  # c4off and on are the same for RCP current, so don't want redundant 
+  # up-scaling
+  filter(!(c4 == "c4off" & RCP == "Current")) %>% 
+  # for now excluding RCP 4.5, to save on computation time
+  filter(RCP != "RCP4.5") %>%  
+  mutate(id = paste(c4, PFT, "biomass", id, GCM, sep = "_")) %>% 
   dplyr::select(site, id, biomass) %>% 
   pivot_wider(id_cols = "site",
               names_from = "id",
@@ -124,24 +131,6 @@ rownames(pft5_bio_w2) <- pft5_bio_w2$cellnumbers
 
 stopifnot(nrow(pft5_bio_w2) == 200) # check for join issues
 
-# * biomass difference ----------------------------------------------------
-# % scaled biomass difference
-
-# converting to wide format
-pft5_bio_d_w1 <- pft5_bio_d2 %>% 
-  mutate(id = paste(PFT, "bio-diff", id, sep = "_")) %>% 
-  dplyr::select(site,  id, bio_diff) %>% 
-  pivot_wider(id_cols = "site",
-              names_from = "id",
-              values_from = "bio_diff")
-
-pft5_bio_d_w2 <- sc1[, c("cellnumbers", "site_id")] %>% 
-  rename(site = site_id) %>% 
-  inner_join(pft5_bio_d_w1, by = "site") %>% 
-  dplyr::select(-site)
-
-rownames(pft5_bio_d_w2) <- pft5_bio_d_w2$cellnumbers
-
 # identify matches --------------------------------------------------------
 # ID matches from subset cells for all Target cells (i.e. calculates distance)
 
@@ -151,6 +140,7 @@ if(!all(rownames(sc1 %in% rownames(tc2)))) {
 }
 
 # note--consider saving the figure of matching quality
+# this only takes ~ min to run
 match1 <- multivarmatch(
   matchingvars = tc2,
   # I'm not sure the site ID column is needed/doing anything here
@@ -173,36 +163,55 @@ mean(match1$matching_quality < 1.5) # ~94%
 
 
 # * biomass ---------------------------------------------------------------
+# on my computer to run all PFTs/scenarios/GCMs would take 21.5 hours!, 
+# when run in parallel should take ~6.5 hours, 3.26 hrs if RCP4.5 is not included. It actually took 3 hrs, 40 min, as it is now. 
 
-interpolatePoints(
-  matches = match1,
-  output_results = pft5_bio_w2, 
-  exclude_poor_matches = TRUE,
-  subset_cell_names = "subset_cell",
-  quality_name = "matching_quality",
-  matching_distance = 1.5,
-  raster_template = template,
-  plotraster = FALSE,
-  saveraster = TRUE,
-  filepath = "./data_processed/interpolated_rasters/biomass",
-  overwrite = TRUE
-)
+# I'm using ideas from here:
+# https://nceas.github.io/oss-lessons/parallel-computing-in-r/parallel-computing-in-r.html
+# to run this in parallel
+
+# num cores, this includes logical cores (threads)
+num.cores <- parallel::detectCores() 
+
+registerDoParallel(num.cores)
+
+# making list of columns to use each time through dopar loop
+n <- ncol(pft5_bio_w2)
+by = 50 # each time through loop 50 variables will be up-scaled
+vecs <- seq(from = 2, to = n, by = by)
+vecs_l <- map(vecs, function(x) {
+  to <- x + by - 1
+  
+  # for the last set of columns
+  if(to > n) {
+    to <- n
+  }
+  x:to # column numbers
+})
+
+# check that all columns accounted for
+stopifnot(unlist(vecs_l) == 2:n)
 
 
-# * biomass diff ----------------------------------------------------------
-# scaled % biomass difference
+print(Sys.time())
 
-interpolatePoints(
-  matches = match1,
-  output_results = pft5_bio_d_w2, 
-  exclude_poor_matches = TRUE,
-  subset_cell_names = "subset_cell",
-  quality_name = "matching_quality",
-  matching_distance = 1.5,
-  raster_template = template,
-  plotraster = FALSE,
-  saveraster = TRUE,
-  filepath = "./data_processed/interpolated_rasters/bio_diff",
-  overwrite = TRUE
-)
+# seperately running interpolation on different sets of columns
+foreach (x = vecs_l) %dopar% {
+  rMultivariateMatching::interpolatePoints(
+    matches = match1,
+    output_results = pft5_bio_w2[, c(1, x)], 
+    exclude_poor_matches = TRUE,
+    subset_cell_names = "subset_cell",
+    quality_name = "matching_quality",
+    matching_distance = 1.5,
+    raster_template = template,
+    plotraster = FALSE,
+    saveraster = TRUE,
+    filepath = "./data_processed/interpolated_rasters/biomass",
+    overwrite = TRUE
+  )
+}
+print(Sys.time())
 
+# When you're done, clean up the cluster
+stopImplicitCluster()
