@@ -186,7 +186,7 @@ box3 <- function(axis_data, var = "bio_diff") {
 # prep data ---------------------------------------------------------------
 
 # data frame to be used for boxplots
-pft5_bio_b <- pft5_bio2 # %>% 
+pft5_bio_b <- pft5_bio2 %>% 
   # consider removing 0s so boxplot doesn't show sites with 0 biomass
  mutate(biomass = ifelse(biomass == 0, NA, biomass))
 
