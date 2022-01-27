@@ -19,7 +19,6 @@ source("src/mapping_functions.R")
 
 # Read in data ------------------------------------------------------------
 
-
 # * rasters ---------------------------------------------------------------
 # upscaled stepwat2 output (created in the 03_interpolate.R script),
 # for c4 grasses under current conditions, light grazing.
