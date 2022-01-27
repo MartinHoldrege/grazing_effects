@@ -234,6 +234,32 @@ create_id2 <- function(df) {
   out
 }
 
+#' Create reference id from from id vector
+#' 
+#' @description The purpose is to create an id string that is the reference
+#' class that corresponds to a given id string. At the moment the reference
+#' class created is current, same grazing level. For useful when subsetting vectors
+#'
+#' @param x character vector which is the id, including c4, RCP and years
+#'
+#' @return character vector, same length as x, but c4off changed
+#' to c4on, and scenario changed to current. 
+create_ref_id <- function(x) {
+  # reference group is c4on
+  str_replace(x, "^c4off_", "c4on_") %>% 
+    # both changing RCP and years to current
+    str_replace("_RCP\\d.\\d_\\d{4}-\\d{4}", "_Current_Current")
+}
+
+
+#' Remove c4 designation from id string
+#'
+#' @param x id string with c4on or c4off as part of the string
+#'
+#' @return id string w/ c4on/off removed
+id_remove_c4 <- function(x){
+  str_replace(x, "c4(on|off)_", "")
+}
 
 # calculate percent change ------------------------------------------------
 

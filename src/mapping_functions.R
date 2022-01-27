@@ -90,21 +90,25 @@ create_breaks_cols <- function(x,
 #' layer relative to a reference layer (scaled by the max). 
 #'
 #' @param rast A SpatRast (terra) object with multiple layers
-#' @param ref_layer Character (name) or number of the reference layer. 
+#' @param ref_layer Character (name) or number of the reference layer,
+#' if length > 1, it should be the same length as the target_layer vector
 #' @param target_layer Character (name) or number of the target layer
 #'
-#' @return SpatRast object (with 1 layer)
+#' @return SpatRast object (with as many layers as the length of the
+#' target_layer vector)
 rast_diff <- function(rast, ref_layer, target_layer) {
   
-  # maximum value in the reference layer
-  vec <- values(rast[[ref_layer]]) # this code is inefficient
-  max <- max(vec, na.rm = TRUE)
+  # maximum value in the reference layer(s)
+  max <- global(rast[[ref_layer]], max, na.rm = TRUE)$max
   
-  r_ref <- rast[[ref_layer]] # reference layer
-  r_target <- rast[[target_layer]] # target layer (i.e. layer you want
-  # to know how much it changed)
+  if(nlyr(rast[[ref_layer]]) > 1 & 
+     nlyr(rast[[ref_layer]]) != nlyr(rast[[target_layer]])) {
+    stop("ref_layer needs to have same length as target layer, or have length of 1")
+  }
   
-  out <- (r_target - r_ref)/max*100 # scaled percent change
+   # scaled percent change
+  out <- (rast[[target_layer]] - rast[[ref_layer]])/max*100 
+  out
 }
 
 
@@ -121,9 +125,17 @@ rast_diff <- function(rast, ref_layer, target_layer) {
 #' @param title Title of figure
 #' @param vec Numeric vector (optional), to base the breaks/cut points used
 #' in plotting on. By default it uses the values of the cells in the raster.
+#' @param show0legend logical, if false suppresses the appearance of the 
+#' legend that shows 0 values in grey
+#' @param legend_lab label for the main legend
+#' @param n_breaks number of color bins used
 #'
 #' @return A map of biomass
-image_bio <- function(rast, subset, title = "", vec = NULL) {
+image_bio <- function(rast, subset, title = "", vec = NULL, 
+                      show0legend = TRUE,
+                      legend_lab = expression("Biomass ("*gm^-2*")"),
+                      n_breaks = 17 
+                      ) {
   
   stopifnot(
     length(subset) == 1 # this function can only work with one raster layer
@@ -137,7 +149,7 @@ image_bio <- function(rast, subset, title = "", vec = NULL) {
   }
   
   # create list of colors and break points to use
-  b <- create_breaks_cols(x = vec, n_breaks = 17)
+  b <- create_breaks_cols(x = vec, n_breaks = n_breaks)
   
   # main figure
   image(subset(rast, subset = subset), # the layer to be plotted
@@ -151,7 +163,7 @@ image_bio <- function(rast, subset, title = "", vec = NULL) {
   maps::map("state", interior = T, add = T)
   
   # Legend for zero values
-  if(b$zero) {
+  if(show0legend & b$zero) {
     polygon(x = c(-125,-125,-119,-119), y = c(32,35,35,32),
             col = "white",border = "white")
     legend(x = -120, y = 35.5, xjust = 0.7,
@@ -166,7 +178,7 @@ image_bio <- function(rast, subset, title = "", vec = NULL) {
   rasterImage(t(b$cols), -125, 31.75, -102.7, 32.5)
   polygon(x = c(-125, -125, -102.7 ,-102.7), y = c(31.75, 32.5, 32.5, 31.75), 
           lwd = 1.5)
-  mtext(lab_bio0, side = 1, line = -0.49, cex = 0.7)
+  mtext(legend_lab, side = 1, line = -0.49, cex = 0.7)
   axis(side = 1, pos = 31.75, at = seq(-125,-102.7, length.out = 9),
        cex.axis = 0.9, labels = b$legendbks)
   
