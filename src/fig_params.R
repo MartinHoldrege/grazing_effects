@@ -70,3 +70,17 @@ lab_es0 <- expression("ln("*frac(biomass, reference~group~biomass)*")")
 lab_es_on_off <- expression("ln("*frac(biomass~C4off, biomass~C4on)*")")
 
 
+# mapping figure dimensions ------------------------------------------------
+
+# parameters used for layout
+mar <- c(1,1,2,1)
+mgp = c(3,0.3,0)
+
+# parameters specific to 6 paneled figures
+layout.matrix6 <- matrix(c(1,2,3,4,5,6), nrow = 2, ncol = 3, 
+                         byrow = TRUE) # for 6 paneled figs
+widths6 <- rep(1, 3)
+heights6 = rep(1, 2)
+
+wfig6 <- 9 # width of 9 figure panels (inches)
+hfig6 <- 6 # height of 9 figure panels

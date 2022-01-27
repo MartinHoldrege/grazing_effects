@@ -153,6 +153,11 @@ image_bio <- function(rast, subset, title = "", vec = NULL,
   
   # main figure
   image(subset(rast, subset = subset), # the layer to be plotted
+        # if default used, maps are more pixelated looking, not that with this
+        # higher resolution an error is sometimes thrown the first time the funcion
+        # is called (a similar issue
+        # is documented here: https://github.com/rspatial/terra/issues/30)
+        maxcell = 500000,
         col = b$truecols, 
         breaks = b$truebks, 
         ylim = c(30, 49),
@@ -217,6 +222,8 @@ image_bio_diff <- function(rast, subset, title = "") {
   
   # main figure
   image(subset(rast, subset = subset), # the layer to be plotted
+        # if default used, maps are more pixelated looking
+        maxcell = 500000, 
         col = cols, 
         breaks = truebks, 
         ylim = c(30, 49),

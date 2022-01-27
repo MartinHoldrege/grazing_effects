@@ -37,7 +37,6 @@ site_nums <- read_csv("data_raw/site_locations.csv", show_col_types = FALSE)
 tc1 <- readRDS(file.path(path1, "bioclim_coreARTR_DayMet_trimmed.csv"))
 
 
-
 # Prep data -------------------------------------------------------------
 # prep input data files for interpolation
 
@@ -94,6 +93,23 @@ rownames(sc1) <- sc1$cellnumbers # rownames needed for multivarmatch function
 if(nrow(sc1) != 200 | any(duplicated(sc1$site_id))) {
   warning("Problem with join")
 }
+
+
+# determine w/ sites have c4 grasses --------------------------------------
+# creating a dataframe of where c4 grasses are present under current conditions
+# --this is to be used in a later script
+
+sites_c4_present <- pft5_bio2 %>% 
+  filter(RCP == "Current", graze == "Light", PFT == "C4Pgrass",
+         c4 == "c4on") %>% 
+  mutate(C4Pgrass = ifelse(biomass > 0, "present", "absent")) %>% 
+  dplyr::select(site, C4Pgrass) %>% 
+  inner_join(site_nums2, by = c("site" = "site_id"))
+
+stopifnot(nrow(sites_c4_present) == 200)
+
+write_csv(sites_c4_present, 
+          "data_processed/site-num_C4Pgrass-presence_c4off.csv")
 
 # stepwat2 outputs --------------------------------------------------------
 
