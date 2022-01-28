@@ -142,8 +142,6 @@ pft3_factor <- function(x) {
               "Pherb",
               "Aforb")
   
-
-  
   # using this if statement so can also have the input of this function
   # be the correct characters, but still what to convert it to an ordered
   # factor
@@ -208,9 +206,30 @@ pft_all_factor <- function(x) {
               "Pherb",
               "Aforb")
   
+  # add a 'total' factor level, if the input includes it
+  if("Total" %in% x) {
+    levels <- c(levels, "Total")
+  }
+  
   stopifnot(x %in% levels)
   
   out <- factor(x, levels = levels)
+}
+
+# convert individual PFTs into a total category, useful for calculating
+# total biomass
+pft_total_factor <- function(x) {
+  
+  pft <- c("sagebrush", "a.cool.forb", "a.warm.forb", "p.cool.forb", 
+           "p.warm.forb", "a.cool.grass", "p.cool.grass", "p.warm.grass",
+           "shrub", "succulents")
+  
+  # x must include all these levels, otherwise won't be computing total biomass
+  stopifnot(pft %in% x) 
+  
+  out <- ifelse(x %in% pft, "Total", NA_character_)
+  out <- factor(out, levels = "Total")
+  out
 }
 
 # create new variables ----------------------------------------------------

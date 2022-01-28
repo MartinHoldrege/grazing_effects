@@ -72,7 +72,7 @@ group_cols <- c("c4", 'years', 'RCP', 'graze', 'site', "PFT", "id", 'GCM')
 # now this includes all PFT groupings, including pft5
 
 # functions that label PFTs into various groupings
-factor_funs <- list(pft5_factor, pft3_factor, Pgrass_factor)
+factor_funs <- list(pft5_factor, pft3_factor, Pgrass_factor, pft_total_factor)
 
 pft5_bio0 <- map(factor_funs, function(f) {
   out <- bio4 %>% 
@@ -86,11 +86,16 @@ pft5_bio0 <- map(factor_funs, function(f) {
 })
 
 
-
 # examine PFT levels created
 map(pft5_bio0, function(df) unique(df$PFT))
 
+# includes total biomass as a separate PFT
+pft5_bio1_tot <- bind_rows(pft5_bio0) %>% 
+  mutate(PFT = pft_all_factor(PFT))
+
+# total biomass not included (currently the default for subsequent figures)
 pft5_bio1 <- bind_rows(pft5_bio0) %>% 
+  filter(PFT!= "Total") %>% 
   # order PFTs into a factor
   mutate(PFT = pft_all_factor(PFT))
 
@@ -104,19 +109,17 @@ pft5_bio2 <- pft5_bio1 %>%
 # they have very limited biomass
 x <- bio4 %>% filter(PFT == "succulents") %>% pull(biomass)
 mean(x > 0) # proportion sites w/ some succulents
-mean(x[x>0]) 
+mean(x[x>0]) # mean biomass at sites where present
 max(x)
-mean(x)
+mean(x) # mean succulent biomass
 
 # ** c4 on vs off ---------------------------------------------------------
 
 # wide format, of biomass w/ c4 on vs off only for sites were c4 not 
 # simulated under current conditions
-pft5_c4on_v_off0 <- pft5_bio2 %>% 
+pft5_c4on_v_off <- pft5_bio2 %>% 
   pivot_wider(names_from = "c4",
-              values_from = "biomass")
-
-pft5_c4on_v_off <- pft5_c4on_v_off0 %>% 
+              values_from = "biomass") %>% 
   filter(site %in% sites_noc4)
 
 # check all 0's for c4 grass
@@ -126,11 +129,19 @@ stopifnot(with(pft5_c4on_v_off,
 pft5_c4on_v_off <- pft5_c4on_v_off %>% 
   filter(PFT != "C4Pgrass")
 
-# % change of going from c4on to c4off
-c4on_v_off_diff <- pft5_c4on_v_off0 %>% 
+# % change of going from c4on to c4off, this needs to be calculated
+# at the GCM level first b/ it is not a linear transformation.
+# This df includes total biomass
+c4on_v_off_diff <- pft5_bio1_tot %>% 
+  pivot_wider(names_from = "c4",
+              values_from = "biomass") %>% 
   mutate(bio_diff = (c4off -c4on)/c4on*100, # % change
          bio_es = log(c4off/c4on),# effect size
-         bio_es = ifelse(is.finite(bio_es), bio_es, NA))
+         bio_es = ifelse(is.finite(bio_es), bio_es, NA)) %>% 
+  group_by(across(all_of(group_cols[!group_cols %in% c("c4", "GCM")]))) %>% 
+  summarise(bio_diff = median(bio_diff, na.rm = TRUE),
+            bio_es = median(bio_es, na.rm = TRUE),
+            .groups = "drop")
 
 # C3/Pgrass ---------------------------------------------------------------
 
