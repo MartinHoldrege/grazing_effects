@@ -193,8 +193,11 @@ Pgrass_factor <- function(x) {
   out
 }
 
-# turning all pft levels into a factor (after they have already been
-# combined based on the functions above)
+
+#' convert character character vector of all PFTs to a factor
+#'
+#' @param x character vector
+#' @return ordered factor 
 pft_all_factor <- function(x) {
   levels <-  c("Sagebrush", 
               "C3Pgrass",
@@ -217,12 +220,17 @@ pft_all_factor <- function(x) {
 }
 
 # convert individual PFTs into a total category, useful for calculating
-# total biomass
-pft_total_factor <- function(x) {
+# total biomass, if return_levels = TRUE, just returns the names of the 
+# PFTs that make of total biomass
+pft_total_factor <- function(x, return_levels = FALSE) {
   
   pft <- c("sagebrush", "a.cool.forb", "a.warm.forb", "p.cool.forb", 
            "p.warm.forb", "a.cool.grass", "p.cool.grass", "p.warm.grass",
            "shrub", "succulents")
+  
+  if(return_levels) {
+    return(pft)
+  }
   
   # x must include all these levels, otherwise won't be computing total biomass
   stopifnot(pft %in% x) 
@@ -232,6 +240,31 @@ pft_total_factor <- function(x) {
   out
 }
 
+#' convert 4 letter spp code to PFT
+#'
+#' @param x character vector that includes 4 letter species codes
+#'
+#' @return character vector of PFTs, and NAs for non-matched values
+spp2pft <- function(x) {
+  out <- case_when(
+    x == "artr" ~ "sagebrush",
+    x == "cryp" ~ "a.cool.forb",
+    x == "chen" ~ "a.warm.forb",
+    x == "phho" ~ "p.cool.forb", 
+    x == "arfr"  ~ "p.warm.forb", 
+    x == "brte" ~ "a.cool.grass", 
+    x == "pssp"  ~ "p.cool.grass", 
+    x == "bogr"  ~ "p.warm.grass",
+    x == "chvi" ~ "shrub", 
+    x ==  "oppo" ~ "succulents"
+  )
+
+  # make sure all pft levels were matched
+  all_levels <- pft_total_factor(x = NULL, return_levels = TRUE)
+  stopifnot(all_levels %in% out)
+  
+  out
+}
 # create new variables ----------------------------------------------------
 
 #' create id2 variable from id variable
@@ -389,7 +422,7 @@ scaled_change <- function(df,
                .data[[var]] - .data$current
               }
            ) %>% 
-    select(-max_value) 
+    select(-max_value, -current) 
   
   # removing rows for reference group
   if(within_GCM) {
@@ -438,6 +471,49 @@ scaled_change <- function(df,
 
 }
 
+scaled_change_2var <- function(df, 
+                               vars = c("biomass", "indivs"), 
+                               by = c("PFT", "graze"),
+                               ref_graze = NULL,
+                               percent = TRUE,
+                               effect_size = FALSE, 
+                               within_GCM = FALSE) {
+  
+  stopifnot(length(vars) ==2)
+  if("biomass" == vars[2]) {
+    # this is because biomass variables are renamed
+    stop("if one of vars is biomass, it must be the first")
+  }
+  
+  # scaled change of first variable
+  out <- scaled_change(df = df,
+                       var = vars[1],
+                       by = by,
+                       ref_graze = ref_graze,
+                       percent = percent,
+                       effect_size = effect_size,
+                       within_GCM = within_GCM)
+  
+  # scaled change of 2nd variable
+  df_var2 <- scaled_change(df = df,
+                           var = vars[2],
+                           by = by,
+                           ref_graze = ref_graze,
+                           percent = percent,
+                           effect_size = effect_size,
+                           within_GCM = within_GCM)
+  names <- names(df_var2)
+  diff_var2 <- names[length(names)] # name of the last column
+  
+  # make sure will not be overwriting an existing column
+  stopifnot(!(diff_var2) %in% names(out))
+  
+  # adding 2nd diff var column, to first dataframe
+  out[[diff_var2]] <- df_var2[[diff_var2]]
+  
+  out
+  
+}
 
 # outliers ----------------------------------------------------------------
 
@@ -464,6 +540,57 @@ remove_outliers <- function(df, var) {
   out
 }
 
+# pivoting ----------------------------------------------------------------
+
+#' Pivot c4 column into wider format
+#'
+#' @param df dataframe
+#'
+#' @return dataframe where c4on and c4off columns are created for biomass
+#' and number of individuals, the individuals columns are prefixed
+#' by "indivs"
+pivot_wider_c4 <- function(df) {
+  
+  stopifnot(c("c4", "indivs", "biomass") %in% names(df))
+  
+  out <- df %>% 
+    pivot_wider(names_from = "c4",
+                values_from = c("biomass", "indivs")) %>% 
+      # to keep downstream code working biomass c4on and off columns aren't named
+      # "biomass_"
+      rename(c4on = biomass_c4on,
+             c4off = biomass_c4off)
+  out
+}
 
 
 
+# summarize functions -----------------------------------------------------
+
+#' calculate median of biomass and indivs columns
+#'
+#' @param df dataframe with indivs, biomass and bio_suffix, and indivs_suffix
+#' columns
+#' @param suffix string, the suffix (e.g. _diff, _es), of columns of interest
+#'
+#' @return dataframe, with median values for the biomass and indivs columns
+summarise_bio_indivs <- function(df, suffix = "_diff"){
+  
+  # columns to summarise
+  columns <- c("biomass", "indivs", paste0("bio", suffix), 
+            paste0("indivs", suffix))
+  
+  # using dtplyr because summarise is super slow with across() which is a
+  # known issue: https://github.com/tidyverse/dplyr/issues/4953
+  
+  # note the use of !!columns below, that is a work around a bug in dtplyr
+  # https://github.com/tidyverse/dtplyr/issues/164
+  out <- df %>% 
+    lazy_dt() %>% # i observed up to 30x speed increase by using dtplyr here
+    summarise(across(.cols = all_of(!!columns),
+                     .fns = median, na.rm = TRUE),
+              .groups = "drop") %>% 
+    as_tibble() # convert back to tibble
+  
+  out
+}

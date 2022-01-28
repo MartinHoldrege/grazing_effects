@@ -78,7 +78,7 @@ stopifnot(sort(unique(bio1a$c4off$site)) == sites)
 bio2 <- bind_rows(bio1a, .id = "c4")%>% 
   as_tibble()
 
-
+names(bio2)
 # character cols with > 1 unique value (i.e. to help 
 # understand what will need to group by)
 bio2 %>% 
@@ -100,7 +100,9 @@ map(bio2[, group_cols], unique)
 bio3 <- bio2 %>% 
   select(
     # numeric columns not interested in
-    -matches("_(std)|(Indivs)|(Pfire)|(PRstd)|(PR)|(RSize)$"),
+    # only including biomass and indivs (# of individuals), columns
+    # doesn't look like indivs has standard deviation in this column
+    -matches("_(std)|(Pfire)|(PRstd)|(PR)|(RSize)$"),
     -matches("StdDev"),
     -Year, # will avg across years
     -SpeciesTreatment, # sites have different spp. treatments (i.e. different
@@ -115,9 +117,17 @@ bio3 <- bio2 %>%
             n = n(),
             .groups = "drop") %>% 
   # long format
-  pivot_longer(cols = sagebrush:oppo,
-               names_to = "PFT",
-               values_to = "biomass")
+  pivot_longer(# cols selection needs to be updated as different columns are 
+               # selected above
+               cols = sagebrush:oppo_Indivs) %>% 
+  # determine whether name value belongs to an indivs data or biomass data
+  mutate(PFT = str_replace(name, "_Indivs", ""),
+         # create 
+         type = ifelse(str_detect(name, "Indivs"), "indivs", "biomass")) %>% 
+  select(-name) %>% 
+  # create separate number of individuals (indivs) and biomass columns
+  pivot_wider(names_from = "type")
+
 
 # Check: if grouping above missed a variable,
 # then would expect value other than 50 years, per set of grouping variables
@@ -131,4 +141,4 @@ bio3$n <- NULL
 write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT.csv")
 
 
-dbDisconnect()
+# dbDisconnect()

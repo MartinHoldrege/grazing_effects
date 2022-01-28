@@ -13,6 +13,7 @@
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
+library(dtplyr) # to speed up a couple slow chunks
 source("src/general_functions.R")
 
 # read in files -----------------------------------------------------------
@@ -25,7 +26,7 @@ bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT.csv",
 # parse -------------------------------------------------------------------
 # Convert columns to useful factors
 
-bio4 <- bio3 %>% 
+bio4a <- bio3 %>% 
   mutate(graze = graze2factor(intensity),
          RCP = rcp2factor(RCP),
          years = years2factor(years),
@@ -43,13 +44,33 @@ bio4 <- bio3 %>%
 
 # sites where no c4 is simulated under current conditions (or any conditions
 # for the c4off simulation)
-sites_noc4 <- bio4 %>% 
+sites_noc4 <- bio4a %>% 
   filter(c4 == "c4off", biomass == 0, PFT == "p.warm.grass", RCP == "Current") %>%
   pull(site) %>% 
   unique()
 
-
 stopifnot(length(sites_noc4) == 98)
+
+
+# * deal with indivs column -----------------------------------------------
+# num of individuals is just given for the 4 letter species codes,
+# not the written out functional types they correspond to
+
+# GCM--needs to be listed last for sequential grouping below
+group_cols <- c("c4", 'years', 'RCP', 'graze', 'site', "PFT", "id", 'GCM')
+
+indivs1 <- bio4a %>% 
+  select(-biomass) %>% 
+  filter(!is.na(indivs)) %>% 
+  # convert spp codes to PFT
+  mutate(PFT = spp2pft(PFT)) %>% 
+  select(all_of(group_cols), indivs)
+
+# add indivs back into the main df
+bio4 <- bio4a %>% 
+  select(-indivs) %>% 
+  left_join(indivs1, by = group_cols)
+
 
 # climate -----------------------------------------------------------------
 # current climate
@@ -64,8 +85,6 @@ clim1 <- bio4 %>%
 # total biomass by PFT ----------------------------------------------------
 # creating dataframes where biomass is grouped into PFT's of interest
 
-# GCM--needs to be listed last for sequential grouping below
-group_cols <- c("c4", 'years', 'RCP', 'graze', 'site', "PFT", "id", 'GCM')
 
 # * pft5 ------------------------------------------------------------------
 # for historical code reasons this is called pft5 (the main 5 pfts), but
@@ -80,7 +99,9 @@ pft5_bio0 <- map(factor_funs, function(f) {
     mutate(PFT = f(PFT)) %>%
     group_by(across(all_of(group_cols))) %>% 
     # b/some PFTs combined
-    summarize(biomass = sum(biomass), .groups = "drop_last") %>% 
+    summarize(biomass = sum(biomass), 
+              indivs = sum(indivs),
+              .groups = "drop_last") %>% 
     dplyr::filter(!is.na(PFT))
   out
 })
@@ -102,6 +123,7 @@ pft5_bio1 <- bind_rows(pft5_bio0) %>%
 pft5_bio2 <- pft5_bio1 %>% 
   # median across GCMs
   summarise(biomass = median(biomass),
+            indivs = median(indivs),
             .groups = "drop")%>% 
   left_join(clim1, by = "site") # adding current climate
 
@@ -115,12 +137,12 @@ mean(x) # mean succulent biomass
 
 # ** c4 on vs off ---------------------------------------------------------
 
-# wide format, of biomass w/ c4 on vs off only for sites were c4 not 
+# wide format, of biomass and number of individuals
+# w/ c4 on vs off only for sites were c4 not 
 # simulated under current conditions
 pft5_c4on_v_off <- pft5_bio2 %>% 
-  pivot_wider(names_from = "c4",
-              values_from = "biomass") %>% 
-  filter(site %in% sites_noc4)
+  filter(site %in% sites_noc4) %>% 
+  pivot_wider_c4()
 
 # check all 0's for c4 grass
 stopifnot(with(pft5_c4on_v_off,
@@ -133,15 +155,19 @@ pft5_c4on_v_off <- pft5_c4on_v_off %>%
 # at the GCM level first b/ it is not a linear transformation.
 # This df includes total biomass
 c4on_v_off_diff <- pft5_bio1_tot %>% 
-  pivot_wider(names_from = "c4",
-              values_from = "biomass") %>% 
+  pivot_wider_c4() %>% 
   mutate(bio_diff = (c4off -c4on)/c4on*100, # % change
          bio_es = log(c4off/c4on),# effect size
-         bio_es = ifelse(is.finite(bio_es), bio_es, NA)) %>% 
+         bio_es = ifelse(is.finite(bio_es), bio_es, NA),
+         indivs_diff = (indivs_c4off -indivs_c4on)/indivs_c4on*100, # % change
+         indivs_es = log(indivs_c4off/indivs_c4on),# effect size
+         indivs_es = ifelse(is.finite(indivs_es), indivs_es, NA),) %>% 
   group_by(across(all_of(group_cols[!group_cols %in% c("c4", "GCM")]))) %>% 
-  summarise(bio_diff = median(bio_diff, na.rm = TRUE),
-            bio_es = median(bio_es, na.rm = TRUE),
-            .groups = "drop")
+  lazy_dt() %>%  # for speed
+  summarise(across(.cols = c(bio_diff, bio_es, indivs_diff, indivs_es),
+                   .fns = median, na.rm = TRUE),
+            .groups = "drop") %>% 
+  as_tibble()
 
 # C3/Pgrass ---------------------------------------------------------------
 
@@ -161,32 +187,33 @@ C3_Pgrass_ratio <- pft5_bio1 %>%
 # ** change relative to same grazing trmt -----------------------------------
 
 # d stands for 'difference'
-# % change in biomass from current conditions ,
+# % change in biomass and num individuals from current conditions ,
 # scaled by maximum biomass under current conditions(for a given grazing trmt)
 
+
 pft5_bio_d2 <-  pft5_bio1 %>% 
-  scaled_change(by = c("c4", "PFT", "graze")) %>% 
+  # calculating % scaled change for biomass and individuals
+  scaled_change_2var(by = c("c4", "PFT", "graze")) %>% 
   # median across GCMs
   group_by(c4, site, years, RCP, PFT, graze, id) %>% 
-  summarise(biomass = median(biomass),
-            bio_diff = median(bio_diff),
-            .groups = "drop") %>% 
+  summarise_bio_indivs(suffix = "_diff") %>% 
   create_id2() # adding another id variable
 
 
 # effect size; es = ln(biomass scenario of interest/biomass references group)
 # effect size compared to current scenario of the given grazing scenario
+
 pft5_bio_es1 <- pft5_bio1 %>% 
   # warning here is ok
-  scaled_change(by = c("c4", "PFT", "graze"), percent = FALSE,
+  scaled_change_2var(by = c("c4", "PFT", "graze"), percent = FALSE,
                 effect_size = TRUE) %>% 
   # median across GCMs
   group_by(c4, site, years, RCP, PFT, graze, id) %>% 
-  summarise(biomass = median(biomass),
-            bio_es = median(bio_es, na.rm = TRUE),
-            .groups = "drop") %>% 
+  lazy_dt() %>% # so next line run by dtpyr (for speed)
+  summarise_bio_indivs(suffix = "_es") %>% 
   create_id2() %>% 
-  mutate(bio_es = ifelse(is.finite(bio_es), bio_es, NA_real_))
+  mutate(bio_es = ifelse(is.finite(bio_es), bio_es, NA_real_),
+         indivs_es = ifelse(is.finite(indivs_es), indivs_es, NA_real_))
 
 
 # ** change relative to reference graze ------------------------------------
@@ -203,7 +230,7 @@ names(levs_graze) <- levs_graze
 # naming here: d== difference, grefs = different grazing references used
 pft5_d_grefs <- map(levs_graze, function(x) {
   out <-  pft5_bio2 %>% # using data already summarized across GCMs
-    scaled_change(by = c("c4", "PFT"), ref_graze = x) %>% 
+    scaled_change_2var(by = c("c4", "PFT"), ref_graze = x) %>% 
     # adding id variable that doesn't include graze
     create_id2()
   out
@@ -212,7 +239,7 @@ pft5_d_grefs <- map(levs_graze, function(x) {
 # effect sizes
 pft5_es_grefs <- map(levs_graze, function(x) {
   out <-  pft5_bio2 %>% # using data already summarized across GCMs
-    scaled_change(by = c("c4", "PFT"), ref_graze = x, percent = FALSE,
+    scaled_change_2var(by = c("c4", "PFT"), ref_graze = x, percent = FALSE,
                   effect_size = TRUE) %>% 
     create_id2()
   out
@@ -227,26 +254,22 @@ pft5_es_grefs <- map(levs_graze, function(x) {
 
 # naming" d = difference, wgcm = within gcm comparison
 pft5_d_wgcm <- pft5_bio1 %>% 
-  scaled_change(by = c("c4", "PFT", "RCP", "GCM", "years"), 
+  scaled_change_2var(by = c("c4", "PFT", "RCP", "GCM", "years"), 
                 ref_graze = "Light", percent = TRUE, effect_size = FALSE,
                 within_GCM = TRUE) %>% 
   # median across GCMs
   group_by(c4, site, years, RCP, PFT, graze, id) %>% 
-  summarise(biomass = median(biomass),
-            bio_diff = median(bio_diff, na.rm = TRUE),
-            .groups = "drop") %>% 
+  summarise_bio_indivs(suffix = "_diff") %>% 
   create_id2()
 
 # naming es = effects size wgcm = within gcm comparison
 pft5_es_wgcm <- pft5_bio1 %>% 
-  scaled_change(by = c("c4", "PFT", "RCP", "GCM", "years"), 
+  scaled_change_2var(by = c("c4", "PFT", "RCP", "GCM", "years"), 
                 ref_graze = "Light", percent = FALSE, effect_size = TRUE,
                 within_GCM = TRUE) %>% 
   # median across GCMs
   group_by(c4, site, years, RCP, PFT, graze, id) %>% 
-  summarise(biomass = median(biomass),
-            bio_es = median(bio_es, na.rm = TRUE),
-            .groups = "drop") %>% 
+  summarise_bio_indivs(suffix = "_es") %>% 
   create_id2()
 
 
@@ -304,7 +327,6 @@ fire_d1 <- fire1 %>%
                 percent = FALSE) %>% 
   # adding id variable that doesn't include graze
   create_id2()
-
 
 
 # misc --------------------------------------------------------------------
