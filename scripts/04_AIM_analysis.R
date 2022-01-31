@@ -41,6 +41,14 @@ aim1 <- read_csv("data_raw/AIM/LMF_ALL.data.2011-2015.FINAL_v2.csv")
 sites_c4 <- read_csv(
   "data_processed/site-num_C4Pgrass-presence_c4off.csv")
 
+
+# * ecoregions ------------------------------------------------------------
+# shapefile of ecoregions level 3, downloaded from here:
+# https://gaftp.epa.gov/EPADataCommons/ORD/Ecoregions/us/us_eco_l3.zip
+# useful for grouping summaries of the AIM data by region
+
+eco1 <- vect("data_raw/ecoregion_level_3/us_eco_l3.shp")
+
 # process AIM data --------------------------------------------------------
 
 # the WBG and WRG columns are c4 perennial bunch grasses and c4 perennial 
@@ -57,15 +65,32 @@ mean(aim2$C4Pgrass == "present") * 100 # % of sites w/ c4pgrass present
 # creating a SpatVector (terra package)
 # for some reason logical data column gets converted to character,
 # C4Pgrass needed to be numeric
-aim_sv1 <- vect(aim2, geom = c("longitude", "latitude"))
-
+aim_sv1 <- vect(aim2, geom = c("longitude", "latitude"),
+                crs = "4326") # crs is wgs 1984, lat/lon
 
 # process sites -----------------------------------------------------------
 
 # creating SpatVector
-sites_c4_sv1 <- vect(sites_c4, geom = c("x", "y"))
+sites_c4_sv1 <- vect(sites_c4, geom = c("x", "y"),
+                     crs = "4326")
 
-# * maps ------------------------------------------------------------------
+
+# Extract upscaled values -------------------------------------------------
+
+# extracting up-scaled stepwat2 biomass values for each AIM site
+
+aim_sv2 <- aim_sv1
+# the 2nd column are the values extracted from the raster for each AIM site
+aim_sv2$C4Pgrass_biomass <- extract(C4_r, aim_sv1)[, 2]
+aim_sv2$C4Pgrass_aim <- aim_sv2$C4Pgrass # presence/absence for aim data
+aim_sv2$C4Pgrass <- NULL
+
+# presence/absence for up-scaled data
+aim_sv2$C4Pgrass_mod <- ifelse(aim_sv2$C4Pgrass_biomass > 0, "present", "absent") 
+
+table(as.data.frame(aim_sv2[, c("C4Pgrass_aim", "C4Pgrass_mod")]))
+
+# maps ------------------------------------------------------------------
 
 # map(s) showing AIM C4Pgrass occurrence on top of interpolated STEPWAT2 
 # C4Pgrass biomass data, as well as the 200 simulation sites
@@ -115,3 +140,4 @@ plot(sites_c4_sv1,
      add = TRUE, pch = pch1, cex = 0.8)
 
 dev.off()
+
