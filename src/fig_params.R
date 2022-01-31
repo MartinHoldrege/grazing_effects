@@ -48,6 +48,12 @@ lab_bio2 <- expression(~Delta*" Biomass (scaled %)")
 lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
 lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
 
+# number of individuals
+lab_indivs0 <- expression("# of individuals ("*m^-2*")")
+lab_indivs2 <- expression(~Delta*" # of individuals (scaled %)")
+lab_c4on0_indivs <- expression("# of individuals ("*m^-2*"); C4Pgrass on")
+lab_c4off0_indivs <- expression("# of individuals ("*m^-2*"); C4Pgrass off")
+
 # C3Pgrass/Pgrass
 lab_C3_Pgrass_ratio <- expression(frac(C3Pgrass~biomass, Pgrass~biomass))
 
@@ -67,8 +73,9 @@ lab_mat <- expression("MAT ("*degree*C*")")
 
 # effect size
 lab_es0 <- expression("ln("*frac(biomass, reference~group~biomass)*")")
+lab_es0_indivs <- expression("ln("*frac(individuals, reference~group~individuals)*")")
 lab_es_on_off <- expression("ln("*frac(biomass~C4off, biomass~C4on)*")")
-
+lab_es_on_off_indivs <- expression("ln("*frac(individuals~C4off, individuals~C4on)*")")
 
 # mapping figure dimensions ------------------------------------------------
 
