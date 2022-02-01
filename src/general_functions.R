@@ -594,3 +594,17 @@ summarise_bio_indivs <- function(df, suffix = "_diff"){
   
   out
 }
+
+
+# classification ----------------------------------------------------------
+
+#' percent correctly classified
+#'
+#' @param x 2x2 contingency table created with table()
+#'
+#' @return pcc
+pcc <- function(x){
+  x <- addmargins(x)
+  out <- (x[1, 1] + x[2,2])/x[3,3]*100
+  out
+}

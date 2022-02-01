@@ -13,10 +13,12 @@ The purpose of this analysis is to plot AIM data showing observed
 presence/absence of C4 perennial
 grasses, and compare that to where stepwat2 is simulating c4pgrass present when that
 data is upscaled. 
-Additional analyses are also be done to look at AIM sites that show C4grass
+Also just tally for how many aim sites
+c4 grass presence/absence is mis-specified, by eco-region.
+
+**TO DO**: Additional analyses are need to be done to look at AIM sites that show C4grass
 but for which the upscaled data doesn't simulate c4 grass, and then look
-at what c4 grass species occur there. Also just tally for how many aim sites
-c4 grass presence/absence is misspecified
+at what C4 grass species occur there.
 
 # Dependencies
 
@@ -24,8 +26,10 @@ c4 grass presence/absence is misspecified
 library(tidyverse)
 library(terra)
 library(knitr)
+# library(sf)
 source("src/mapping_functions.R") # knit directory is project directory
 source("src/fig_params.R")
+source("src/general_functions.R")
 ```
 
 # Read in data 
@@ -45,7 +49,8 @@ C4_r <- rast(file.path("data_processed/interpolated_rasters/biomass",
 2011-2015 AIM vegetation data that Rachel Renne has compiled
 
 ```{r }
-aim1 <- read_csv("data_raw/AIM/LMF_ALL.data.2011-2015.FINAL_v2.csv")
+aim1 <- read_csv("data_raw/AIM/LMF_ALL.data.2011-2015.FINAL_v2.csv",
+                 show_col_types = FALSE)
 ```
 
 ### Site locations
@@ -58,7 +63,7 @@ File created in "03_interpolate.R" script
 
 ```{r }
 sites_c4 <- read_csv(
-  "data_processed/site-num_C4Pgrass-presence_c4off.csv")
+  "data_processed/site-num_C4Pgrass-presence_c4off.csv", show_col_types = FALSE)
 ```
 
 ### Ecoregion
@@ -123,10 +128,10 @@ aim_sv2$C4Pgrass <- NULL
 aim_sv2$C4Pgrass_mod <- ifelse(aim_sv2$C4Pgrass_biomass > 0, "present", "absent")
 ```
 
-Adding in the eco-region
+Adding in the eco-region. Map of the ecoregions can be seen 
+[here](https://gaftp.epa.gov/EPADataCommons/ORD/Ecoregions/us/Eco_Level_III_US.pdf)
 
 ```{r}
-
 
  # reproject to same projection as eco1 (albers equal area)
 aim_sv3 <- project(aim_sv2, eco1)
@@ -140,23 +145,87 @@ eco_aim <- extract(eco1, aim_sv3)
 # adding eco region columns
 aim_sv3 <- cbind(aim_sv3, eco_aim[, c("US_L3CODE", "US_L3NAME")])
 
+# if want to crop ecoregion polygons
+# eco_crop <- crop(eco1, y = ext(aim_sv3))
+# plot(eco_crop)
 
 ```
 
 
-CONTINUE HERE:
-TODO--create map that shows the eco regions
-within each eco region create a contingency table
-and extract which species have been present in sites where no c4 species
-were simulated, and how many times they've been absent. 
-
 # Summarise AIM data
 
 Contingency table showing C4pgrass presence absence in observed (aim data),
-and modeled (up-scaled STEPWAT2)
+and modeled (up-scaled STEPWAT2) for all AIM plots
 
 ```{r warning = FALSE}
-table(as.data.frame(aim_sv2[, c("C4Pgrass_aim", "C4Pgrass_mod")])) 
+con1 <- table(as.data.frame(aim_sv3[, c("C4Pgrass_aim", "C4Pgrass_mod")]))
+
+# percent correctly classified
+round(pcc(con1))
+
+addmargins(con1) 
+
+proportions(con1, 2)# column percents
+
+```
+
+Contingency tables for each ecoregion, with column and row sums
+as well as tables showing cell percents as percent of column sum and row sum,
+respectively
+
+```{r}
+# separate dataframe for each eco-region
+aim_l1 <- as.data.frame(aim_sv3) %>% 
+  # convert to factor so contingency tables keep all levels even if 0
+  mutate(C4Pgrass_aim = factor(C4Pgrass_aim), 
+         C4Pgrass_mod = factor(C4Pgrass_mod)) %>% 
+  split(., .$US_L3CODE, drop = TRUE)
+
+n_aim <- map_dbl(aim_l1, nrow) %>% 
+  sort(decreasing = TRUE)
+
+# sorting list, based on how many aim sites are in each ecoregioin
+aim_l1 <- aim_l1[names(n_aim)]
+
+# list of contingency tables
+con_l <- map(aim_l1, function(x) {
+  table(x[, c("C4Pgrass_aim", "C4Pgrass_mod")])
+})
+```
+
+Percent correctly classified by ecoregion (top number is the ecoregion,
+bottom is the pcc)
+
+```{r}
+map_dbl(con_l, pcc) %>% 
+  round()
+```
+
+Contingency tables
+
+```{r}
+# print contingency tables
+
+regions <- names(con_l)
+for (i in seq_along(con_l)){
+  con <- con_l[[i]]
+  US_L3NAME <- unique(aim_l1[[i]]$US_L3NAME) # region name
+  cat(paste0("\n\nEco region:", regions[i], ", ", US_L3NAME, "\n\n"))
+  
+  print(addmargins(con))
+  
+  cat("\ncolumn proportion\n\n")
+  print(round(proportions(con, 2), 2))# column proportion
+  cat("\nrow proportion\n\n")
+  print(round(proportions(con, 1), 2)) # row proportion
+  cat("\n----------------------------")
+
+}
+
+con <- con_l[[1]]
+addmargins(con) %>% str()
+x <- addmargins(con)
+pcc <- (x[1, 1] + x[2,2])/x[3,3]*100
 ```
 
 
