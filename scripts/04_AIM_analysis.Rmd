@@ -23,6 +23,7 @@ c4 grass presence/absence is misspecified
 ```{r warning = FALSE, message = FALSE}
 library(tidyverse)
 library(terra)
+library(knitr)
 source("src/mapping_functions.R") # knit directory is project directory
 source("src/fig_params.R")
 ```
@@ -93,7 +94,7 @@ to force it to be logical)
 
 ```{r }
 aim_sv1 <- vect(aim2, geom = c("longitude", "latitude"),
-                crs = "4326") #' crs is wgs 1984, lat/lon
+                crs = "EPSG:4326") #' crs is wgs 1984, lat/lon
 ```
 
 ## sites
@@ -102,29 +103,64 @@ creating SpatVector
 
 ```{r }
 sites_c4_sv1 <- vect(sites_c4, geom = c("x", "y"),
-                     crs = "4326")
+                     crs = "EPSG:4326")
 ```
 
 ## Extract data for each AIM site
 
 Extracting up-scaled stepwat2 biomass values for each AIM site
 
-```{r }
-aim_sv2 <- aim_sv1
-```
-
-The 2nd column contains values extracted from the raster for each AIM site
-
 ```{r warning = FALSE}
+aim_sv2 <- aim_sv1
+
+# The 2nd column contains values extracted from the raster for each AIM site
+
 aim_sv2$C4Pgrass_biomass <- extract(C4_r, aim_sv1)[, 2]
 aim_sv2$C4Pgrass_aim <- aim_sv2$C4Pgrass #' presence/absence for aim data
 aim_sv2$C4Pgrass <- NULL
 
 # creating column of presence/absence of up-scaled data
-aim_sv2$C4Pgrass_mod <- ifelse(aim_sv2$C4Pgrass_biomass > 0, "present", "absent") 
-
-table(as.data.frame(aim_sv2[, c("C4Pgrass_aim", "C4Pgrass_mod")]))
+aim_sv2$C4Pgrass_mod <- ifelse(aim_sv2$C4Pgrass_biomass > 0, "present", "absent")
 ```
+
+Adding in the eco-region
+
+```{r}
+
+
+ # reproject to same projection as eco1 (albers equal area)
+aim_sv3 <- project(aim_sv2, eco1)
+
+# plot(eco1)
+# points(aim_sv_albers1)
+
+# eco regions of each of the AIM points
+eco_aim <- extract(eco1, aim_sv3)
+
+# adding eco region columns
+aim_sv3 <- cbind(aim_sv3, eco_aim[, c("US_L3CODE", "US_L3NAME")])
+
+
+```
+
+
+CONTINUE HERE:
+TODO--create map that shows the eco regions
+within each eco region create a contingency table
+and extract which species have been present in sites where no c4 species
+were simulated, and how many times they've been absent. 
+
+# Summarise AIM data
+
+Contingency table showing C4pgrass presence absence in observed (aim data),
+and modeled (up-scaled STEPWAT2)
+
+```{r warning = FALSE}
+table(as.data.frame(aim_sv2[, c("C4Pgrass_aim", "C4Pgrass_mod")])) 
+```
+
+
+
 
 # MAPs
 
@@ -141,6 +177,7 @@ base_map <- function(title) {
 # function here where it can't cause harm
 # (see https://github.com/rspatial/terra/issues/30)
 safely(base_map(title = "Current C4Pgrass, light grazing"))
+
 ```
 
 
