@@ -282,21 +282,26 @@ pcent <- 0.05 # 5th percentile is the reference level
 # reference lower limit threshold
 # --we want to know how many sites are going below this 
 # threshold
-# 5th percentile under current light grazing for each PFT
+# 5th percentile under current light grazing for each PFT, at sites
+# with >0 biomass
 ref_threshold <- pft5_bio1 %>% 
-  filter(RCP == "Current", graze == "Light") %>% 
+  filter(RCP == "Current", graze == "Light",
+         biomass > 0) %>% 
   group_by(c4, PFT) %>% 
   # lower limit of biomass, under today's conditions
-  summarise(threshold = quantile(biomass, probs = pcent))
+  summarise(threshold = quantile(biomass, probs = pcent),
+            .groups = "drop")
 
 threshold1 <- pft5_bio1 %>% 
   left_join(ref_threshold,  by = c("c4", "PFT")) %>% 
   group_by(across(all_of(group_cols[group_cols != "site"]))) %>% 
   mutate(above= biomass > threshold) %>% 
   # % sites above threshold
-  summarise(pcent_above = mean(above)*100) %>% 
+  summarise(pcent_above = mean(above)*100,
+            .groups = "drop_last") %>% 
   # median across GCMs
-  summarise(pcent_above = median(pcent_above))
+  summarise(pcent_above = median(pcent_above),
+            .groups = "drop")
 
 
 # wildfire ----------------------------------------------------------------

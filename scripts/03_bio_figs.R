@@ -519,6 +519,7 @@ threshold1 %>%
 })
 
 dev.off()
+
 # fire --------------------------------------------------------------------
 
 # boxplot of fire return interval by RCP, and grazing intensity
@@ -579,3 +580,4 @@ map(levs_c4, function(lev_c4) {
   )
   dev.off()
 })
+
