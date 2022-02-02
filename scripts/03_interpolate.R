@@ -137,15 +137,23 @@ pft5_bio_w1 <- pft5_bio1 %>%
               names_from = "id",
               values_from = "biomass")
 
-pft5_bio_w2 <- sc1[, c("cellnumbers", "site_id")] %>% 
-  rename(site = site_id) %>% 
-  inner_join(pft5_bio_w1, by = "site") %>% 
-  dplyr::select(-site)
+# joining in cell numbers
+pft5_bio_w2 <- join_subsetcells(step_dat = pft5_bio_w1, sc_dat = sc1)
 
-# rownames needed for interpolatePoints
-rownames(pft5_bio_w2) <- pft5_bio_w2$cellnumbers
 
-stopifnot(nrow(pft5_bio_w2) == 200) # check for join issues
+# *crossing threshold ----------------------------------------------------
+# What is mildest (minimum) grazing treatment that causes biomass to go 
+# below threshold, within a climate scenario
+
+thresh_min_graze_w1 <- thresh_min_graze1 %>% 
+  filter_rcp_c4() %>% 
+  mutate(id = paste(c4, PFT, "min-graze", RCP, years, sep = "_")) %>% 
+  dplyr::select(site, id, min_graze) %>% 
+  pivot_wider(id_cols = "site",
+              names_from = "id",
+              values_from = "min_graze") %>% 
+  join_subsetcells(sc_dat = sc1) # joining in cell numbers 
+  
 
 # identify matches --------------------------------------------------------
 # ID matches from subset cells for all Target cells (i.e. calculates distance)
@@ -177,15 +185,35 @@ mean(match1$matching_quality < 1.5) # ~94%
 # use matches from multivarmatch to interpolate the STEPWAT2 output
 # across all the grid cells
 
+# *crossing threshold ----------------------------------------------------
+
+rMultivariateMatching::interpolatePoints(
+  matches = match1,
+  output_results = thresh_min_graze_w1, 
+  exclude_poor_matches = TRUE,
+  subset_cell_names = "subset_cell",
+  quality_name = "matching_quality",
+  matching_distance = 1.5,
+  raster_template = template,
+  plotraster = FALSE,
+  saveraster = TRUE,
+  filepath = "./data_processed/interpolated_rasters/min_graze",
+  overwrite = TRUE
+)
 
 # * biomass ---------------------------------------------------------------
+
 # on my computer to run all PFTs/scenarios/GCMs would take 21.5 hours!, 
-# when run in parallel should take ~6.5 hours, 3.26 hrs if RCP4.5 is not included. It actually took 3 hrs, 40 min, as it is now. 
+# when run in parallel should take ~6.5 hours, 3.26 hrs if RCP4.5 is not included. 
+# It actually took 3 hrs, 40 min, as it is now. 
 
 # I'm using ideas from here:
 # https://nceas.github.io/oss-lessons/parallel-computing-in-r/parallel-computing-in-r.html
 # to run this in parallel
 
+# currently not re-running this code here (change if inputs are updated)
+if (FALSE){
+  
 # num cores, this includes logical cores (threads)
 num.cores <- parallel::detectCores() 
 
@@ -231,3 +259,5 @@ print(Sys.time())
 
 # When you're done, clean up the cluster
 stopImplicitCluster()
+
+}

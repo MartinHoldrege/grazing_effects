@@ -610,6 +610,59 @@ pcc <- function(x){
 }
 
 
+# filtering ---------------------------------------------------------------
+# misc. functions used to filter out rows
+
+#' filter out un-needed climate scenarios, and c4off
+#'
+#' @param df dataframe
+#'
+#' @return dataframe only including climate scenarios of interest
+#' (the main analysis only includes a subset of scenarios), and focuses 
+#' on c4on simulations
+filter_rcp_c4 <- function(df) {
+  rcp_levs <- c("Current", "RCP8.5")
+  year_levs <- c("Current", "2030-2060")
+  
+  stopifnot(rcp_levs %in% df$RCP,
+            year_levs %in% df$years)
+  out <- df %>% 
+    filter(.data$RCP %in% rcp_levs, 
+           .data$years %in% year_levs,
+           .data$c4 == "c4on")
+  out
+}
+
+
+# joins -------------------------------------------------------------------
+
+#' join stepwat data and subset cell information
+#' 
+#' @description This is for prepping the input data for the interpolatePoints()
+#' function
+#'
+#' @param step_dat stepwat data (wide format)
+#' @param sc_dat subset cell information (including cell numbers and 
+#' site number corresponding)
+#'
+#' @return Dataframe with the two df's joined, and cell number for rownames
+join_subsetcells <- function(step_dat, sc_dat) {
+  
+  # join in cell number info
+  out <- sc_dat[, c("cellnumbers", "site_id")] %>% 
+    rename(site = site_id) %>% 
+    inner_join(step_dat, by = "site") %>% 
+    dplyr::select(-site)
+  
+  # rownames needed for interpolatePoints()
+  rownames(out) <- out$cellnumbers
+  
+  stopifnot(nrow(out) == 200) # check for join issues
+  
+  out
+}
+
+
 # misc. -------------------------------------------------------------------
 
 # number of unique elements in a vector

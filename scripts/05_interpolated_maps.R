@@ -39,6 +39,12 @@ rast1 <- terra::rast(bio_files) # class SpatRast
 # median biomass across GCMs
 med1 <- terra::rast(file.path(p, "bio_future_median_across_GCMs.tif"))
 
+# minimum grazing level at which biomass threshold is exceeded
+min_graze_files <- list.files(file.path(p, "min_graze/"),
+                              full.names = TRUE)
+
+rast_min_gr1 <- rast(min_graze_files)
+
 # * raster info -------------------------------------------------------------
 
 # names of the raster layers, and treatment info, created in the 
@@ -135,7 +141,40 @@ rast_d_Pgrass <- rast_diff(rast = med2,
 names(rast_d_Pgrass)
 
 
-# maps--Pgrass and C3Pgrass/Pgrass ---------------------------------------------------
+# maps--min graze -------------------------------------------------------
+
+min_gr_info <- tibble(id = names(rast_min_gr1),
+                    id2 = id) %>% 
+  separate(col = id2,
+           into = c("c4", "PFT", "type", "RCP", "years"),
+           sep = "_") %>% 
+  mutate(years = years2factor(years),
+         RCP = rcp2factor(RCP),
+         PFT = pft_all_factor(PFT)) %>% 
+  arrange(PFT, RCP)
+
+pdf("figures/min_graze_maps/min_graze_c4on.pdf",
+    width = wfig6, height = hfig6)
+
+par(mar = mar, mgp = mgp)
+layout(layout.matrix4, widths = widths6, heights = heights6)
+
+for (i in 1:nrow(min_gr_info)) {
+  row <- min_gr_info[i, ]
+  
+  RCP <- if (row$RCP == "Current") {
+    row$RCP
+  } else {
+    paste0(row$RCP, " (", row$years, ")")
+  }
+  title <- paste(row$PFT, RCP)
+  image_min_gr(rast_min_gr1, subset = row$id,
+               title = title)
+}
+
+dev.off()
+
+# maps--Pgrass and C3Pgrass/Pgrass ------------------------------------------
 
 # testing
 # either pass the name of the layer or the layer number

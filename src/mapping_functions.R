@@ -254,3 +254,51 @@ image_bio_diff <- function(rast, subset, title = "") {
 }
 
 
+#' Map of minimum grazing level needed to cross threshold
+#'
+#' @param rast raster
+#' @param subset layer of raster to plot (integer or character string)
+#' @param title map title (string)
+#'
+#' @return Map
+image_min_gr <- function(rast, 
+                         subset, 
+                         title = ""
+) {
+  
+  stopifnot(
+    length(subset) == 1 # this function can only work with one raster layer
+  )
+  
+  # 
+  color <- c("darkgrey", rev(RColorBrewer::brewer.pal(4, "YlOrRd")))
+
+  # main figure
+  image(subset(rast, subset = subset), # the layer to be plotted
+        # if default used, maps are more pixelated looking
+        maxcell = 500000,
+        col = color,
+        breaks = seq(1:6) -0.5, 
+        ylim = c(30, 49),
+        xlim = c(-125, -102.7), useRaster = TRUE,
+        xlab = "", ylab ="",
+        bty = "n", xaxt = "n",yaxt="n")
+  mtext(title, side = 3, line = 0, adj = 0, cex=0.7)
+  maps::map("state", interior = T, add = T)
+  
+  legend(
+    -125, 33.5,
+    legend = c("Already below threshold", 
+               "Moderate grazing", 
+               "Heavy grazing", 
+               "Very Heavy Grazing",
+               "Didn't cross threshold"),
+    title = "Grazing required to cross threshold",
+    fill = color,
+    bg = "white",
+    box.col = "white",
+    ncol = 2,
+    cex = 0.7)
+}
+
+
