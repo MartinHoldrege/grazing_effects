@@ -273,7 +273,10 @@ pft5_es_wgcm <- pft5_bio1 %>%
   create_id2()
 
 
-# % below threshold --------------------------------------------------
+# threshold ---------------------------------------------------------------
+
+
+# * % below threshold --------------------------------------------------
 # percent of sites that are above a specified biomass threshold under future 
 # climate/grazing
 
@@ -303,11 +306,27 @@ threshold1 <- pft5_bio1 %>%
   summarise(pcent_above = median(pcent_above),
             .groups = "drop")
 
+# * crossing threshold ----------------------------------------------------
+# What is mildest grazing treatment that causes biomass to go below threshold. 
+# That is for a given scenario (most importantly, current and RCP8.5 mid century),
+# what is the mildest grazing scenario that causes a site's biomass to go
+# below the threshold (or is it already below threshold)
+
+thresh_min_graze1 <- pft5_bio2 %>% 
+  left_join(ref_threshold,  by = c("c4", "PFT")) %>% 
+  mutate(above= biomass > threshold) %>% 
+  group_by(c4, years, RCP, site, PFT) %>% 
+  # min_graze = 1 (means it was already below the threshold w/ light grazing
+  # min_graze == 5 means it was above the threshold for all grazing trmts)
+  summarise(min_graze = cross_threshold(graze = graze, above = above),
+            .groups = "drop")
+
+
+
 
 # wildfire ----------------------------------------------------------------
 
 # * return interval -------------------------------------------------------
-
 
 fire1 <- bio4 %>% 
   # fire return interval. WildFire is the mean number of fires in a given year

@@ -608,3 +608,49 @@ pcc <- function(x){
   out <- (x[1, 1] + x[2,2])/x[3,3]*100
   out
 }
+
+
+# misc. -------------------------------------------------------------------
+
+# number of unique elements in a vector
+lu <- function(x) length(unique(x))
+
+
+
+#' Grazing level that causes a site's biomass to drop below threshold
+#' 
+#' @description Function should be applied in a summarise statement, where
+#' the datafarme is grouped by scenario, PFT and site, but not by grazing
+#' level. 
+#'
+#' @param graze factor of grazing level (length 4)
+#' @param above logical, whether the given grazing level has biomas above 
+#' threshold
+#'
+#' @return integer with values of 1 to 5, 1 means low grazing biomass
+#' was below threshold, 2, means that mildes grazing level that was below
+#' threshold was moderate, 5 means that no grazing level was below that threshold
+cross_threshold <- function(graze, above) {
+  
+  stopifnot(
+    length(graze) == 4,
+    length(above) == 4,
+    is.logical(above),
+    lu(graze) == 4, # there should be 4 grazing levels
+    is.factor(graze) # input needs to be an ordered factor
+  )
+  # grazing level (integer) (works only if graze is an ordered factor)
+  graze_int <- as.integer(graze)
+  
+  min_graze <- if(all(above)) {
+    # when no grazing level caused biomass to go below threshold 
+    # (there are 4 grazing levels)
+    5 
+  } else {
+    # the minimum (mildest), grazing level that caused biomass to go
+    # below the threshold, 
+    min(graze_int[!above])
+  }
+  
+  min_graze
+}
