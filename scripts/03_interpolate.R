@@ -145,7 +145,7 @@ pft5_bio_w2 <- join_subsetcells(step_dat = pft5_bio_w1, sc_dat = sc1)
 # What is mildest (minimum) grazing treatment that causes biomass to go 
 # below threshold, within a climate scenario
 
-thresh_min_graze_w1 <- thresh_min_graze1 %>% 
+thresh_min_graze_w <- thresh_min_graze1 %>% 
   filter_rcp_c4() %>% 
   mutate(id = paste(c4, PFT, "min-graze", RCP, years, sep = "_")) %>% 
   dplyr::select(site, id, min_graze) %>% 
@@ -154,6 +154,19 @@ thresh_min_graze_w1 <- thresh_min_graze1 %>%
               values_from = "min_graze") %>% 
   join_subsetcells(sc_dat = sc1) # joining in cell numbers 
   
+
+# * wgcm bio diff ---------------------------------------------------------
+# change in biomass from light to heavy grazing, within a climate scenario
+
+pft5_d_wgcm_w <- pft5_d_wgcm %>% 
+  filter_rcp_c4() %>% 
+  filter(graze == "Heavy") %>% 
+  mutate(id = paste(c4, PFT, "bio-diff-wgcm", id, sep = "_")) %>% 
+  dplyr::select(site, id, bio_diff) %>% 
+  pivot_wider(id_cols = "site",
+              names_from = "id",
+              values_from = "bio_diff") %>% 
+  join_subsetcells(sc_dat = sc1) 
 
 # identify matches --------------------------------------------------------
 # ID matches from subset cells for all Target cells (i.e. calculates distance)
@@ -185,11 +198,30 @@ mean(match1$matching_quality < 1.5) # ~94%
 # use matches from multivarmatch to interpolate the STEPWAT2 output
 # across all the grid cells
 
-# *crossing threshold ----------------------------------------------------
+
+# * wgcm bio-diff ---------------------------------------------------------
 
 rMultivariateMatching::interpolatePoints(
   matches = match1,
-  output_results = thresh_min_graze_w1, 
+  output_results = pft5_d_wgcm_w, 
+  exclude_poor_matches = TRUE,
+  subset_cell_names = "subset_cell",
+  quality_name = "matching_quality",
+  matching_distance = 1.5,
+  raster_template = template,
+  plotraster = FALSE,
+  saveraster = TRUE,
+  filepath = "./data_processed/interpolated_rasters/bio_diff",
+  overwrite = TRUE
+)
+
+# *crossing threshold ----------------------------------------------------
+
+if (FALSE){ # currently not re-running this
+  
+rMultivariateMatching::interpolatePoints(
+  matches = match1,
+  output_results = thresh_min_graze_w, 
   exclude_poor_matches = TRUE,
   subset_cell_names = "subset_cell",
   quality_name = "matching_quality",
@@ -200,7 +232,8 @@ rMultivariateMatching::interpolatePoints(
   filepath = "./data_processed/interpolated_rasters/min_graze",
   overwrite = TRUE
 )
-
+  
+}
 # * biomass ---------------------------------------------------------------
 
 # on my computer to run all PFTs/scenarios/GCMs would take 21.5 hours!, 

@@ -262,6 +262,7 @@ pft5_d_wgcm <- pft5_bio1 %>%
   summarise_bio_indivs(suffix = "_diff") %>% 
   create_id2()
 
+
 # naming es = effects size wgcm = within gcm comparison
 pft5_es_wgcm <- pft5_bio1 %>% 
   scaled_change_2var(by = c("c4", "PFT", "RCP", "GCM", "years"), 

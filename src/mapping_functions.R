@@ -288,7 +288,7 @@ image_min_gr <- function(rast,
   
   legend(
     -125, 33.5,
-    legend = c("Already below threshold", 
+    legend = c("Light grazing", 
                "Moderate grazing", 
                "Heavy grazing", 
                "Very Heavy Grazing",

@@ -265,6 +265,29 @@ spp2pft <- function(x) {
   
   out
 }
+
+
+#' Convert columns to factors
+#'
+#' @param df dataframe with key columns to be converted to factors
+#'
+#' @return dataframe with key columns converted to factors
+df_factor <- function(df) {
+  stopifnot(is.data.frame(df))
+  
+  nms <- names(df)
+  
+  if("graze" %in% nms) df$graze <- graze2factor(df$graze)
+  
+  if("years" %in% nms) df$years <- years2factor(df$years)
+  
+  if("RCP" %in% nms) df$RCP <- rcp2factor(df$RCP)
+  
+  if("PFT" %in% nms) df$PFT <- pft_all_factor(df$PFT)
+  
+  df
+}
+
 # create new variables ----------------------------------------------------
 
 #' create id2 variable from id variable

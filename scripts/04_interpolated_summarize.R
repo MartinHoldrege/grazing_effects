@@ -51,11 +51,8 @@ rast_info <- tibble(id2 = r_names,
   separate(col = id2,
            into = c("c4", "PFT", "type", "RCP", "years", "graze", "GCM"),
            sep = "_") %>% 
+  df_factor() %>% 
   mutate(layer_num = 1:nrow(.),
-         graze = graze2factor(graze),
-         years = years2factor(years),
-         RCP = rcp2factor(RCP),
-         PFT = pft_all_factor(PFT),
          # remove GCM from the string
          id_noGCM = str_replace(id, "_[^_]*$", "")) %>% 
   # the ordering is important for later creation of spatraster dataset

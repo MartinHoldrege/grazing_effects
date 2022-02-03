@@ -45,6 +45,13 @@ min_graze_files <- list.files(file.path(p, "min_graze/"),
 
 rast_min_gr1 <- rast(min_graze_files)
 
+# withing GCM scaled % change in biomass
+wgcm_files <- list.files(file.path(p, "bio_diff"),
+                         pattern = "bio-diff-wgcm",
+                         full.names = TRUE)
+
+rast_wgcm1 <- rast(wgcm_files)
+
 # * raster info -------------------------------------------------------------
 
 # names of the raster layers, and treatment info, created in the 
@@ -140,17 +147,98 @@ rast_d_Pgrass <- rast_diff(rast = med2,
 
 names(rast_d_Pgrass)
 
+# maps: wgcm ------------------------------------------------------------
+# change in biomass within a grazing level
+# 6 panels for each PFT. 
+# top row current: light grazing bio, heavy grazing, and delta from light to heavy
+# bottom row, same thing but for one future scenario. 
+
+wgcm_info1 <- tibble(id = names(rast_wgcm1),
+                    id2 = id) %>% 
+  separate(col = id2,
+           into = c("c4", "PFT", "type", "RCP", "years", "graze"),
+           sep = "_") %>% 
+  df_factor() %>% 
+  arrange(PFT, RCP)
+
+# combing information on median biomass and wgcm biomass difference
+wgcm_info2 <- rast_info %>% 
+  dplyr::select(-GCM,-id, -layer_num) %>% 
+  rename(id = id_noGCM) %>% 
+  filter_rcp_c4() %>% 
+  filter(graze %in% c("Light", "Heavy")) %>% 
+  distinct() %>% 
+  bind_rows(wgcm_info1) %>% 
+  arrange(PFT, RCP, graze, desc(type))
+wgcm_info2
+
+# this figure creation takes a few minutes
+pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v1.pdf",
+    width = wfig6, height = hfig6)
+
+par(mar = mar, mgp = mgp)
+layout(layout.matrix6, widths = widths6, heights = heights6)
+
+pft_ids <- ""
+for (i in 1:nrow(wgcm_info2)) {
+  row <- wgcm_info2[i, ]
+  
+  RCP <- if (row$RCP == "Current") {
+    as.character(row$RCP)
+  } else {
+    paste0(row$RCP, " (", row$years, ")")
+  }
+  
+  
+  if(row$type == "biomass") {
+    
+    # extracting min/max for all rasters of that PFT, so panels 
+    # have the same range
+    pft_ids_new <- wgcm_info2 %>% 
+      filter(row$PFT == PFT, row$type == type) %>% pull(id)
+    
+    # so vector isn't being extracted repeatedly for the same PFT
+    if(any(pft_ids_new != pft_ids)) {
+      # very inefficient, but minmax() doesn't work when the raster contains
+      # zero's which are plotted differently
+      vec <- values(med2[[pft_ids_new]]) %>% as.vector()
+    }
+    
+    
+    # biomass figures
+    title <- paste0(row$PFT, " ", RCP, ", ", row$graze, " grazing")
+    
+    image_bio(med2, subset = row$id, title = title,
+              vec = vec)
+    
+    pft_ids <- pft_ids_new
+    
+  } else {
+    # bio diff figure
+    title <- paste0(D, row$PFT, ", ", RCP, ", ", "light to ", 
+                    tolower(row$graze), " grazing")
+    title <- substitute(paste(Delta, PFT, ", ", RCP, ", ", "light to ", 
+                               graze, " grazing"),
+                        list(c4 = row$c4,
+                             PFT = as.character(row$PFT), 
+                             graze = tolower(as.character(row$graze)),
+                             RCP = RCP))
+    image_bio_diff(rast_wgcm1, subset = row$id, title = title)
+  }
+}
+
+dev.off()
 
 # maps--min graze -------------------------------------------------------
+#showing two panels for each PFT, the min graze for current, and min
+# graze, for one future scenario.
 
 min_gr_info <- tibble(id = names(rast_min_gr1),
                     id2 = id) %>% 
   separate(col = id2,
            into = c("c4", "PFT", "type", "RCP", "years"),
            sep = "_") %>% 
-  mutate(years = years2factor(years),
-         RCP = rcp2factor(RCP),
-         PFT = pft_all_factor(PFT)) %>% 
+  df_factor() %>% 
   arrange(PFT, RCP)
 
 pdf("figures/min_graze_maps/min_graze_c4on.pdf",
