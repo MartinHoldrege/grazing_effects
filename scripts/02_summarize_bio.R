@@ -174,12 +174,14 @@ c4on_v_off_diff <- pft5_bio1_tot %>%
 # proportion of Pgrass biomass that is C3Pgrass
 C3_Pgrass_ratio <- pft5_bio1 %>% 
   filter(PFT %in% c("C3Pgrass", "Pgrass")) %>% 
+  select(-indivs) %>% # pivot doesn't work with other data column present
   pivot_wider(names_from = "PFT",
-              values_from = "biomass") %>% 
+              values_from = "biomass") %>%  
   mutate(C3_Pgrass_ratio = C3Pgrass/Pgrass) %>% 
   # median across GCMs
   group_by(across(all_of(group_cols[group_cols != "PFT"]))) %>% 
-  summarise(C3_Pgrass_ratio = median(C3_Pgrass_ratio))
+  summarise(C3_Pgrass_ratio = median(C3_Pgrass_ratio),
+            .groups = 'drop')
 
 # % change in biomass by PFT ----------------------------------------------
 
