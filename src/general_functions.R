@@ -639,11 +639,13 @@ pcc <- function(x){
 #' filter out un-needed climate scenarios, and c4off
 #'
 #' @param df dataframe
+#' @param PFT logical, whether to also filter to only include the main
+#'  PFTs interest
 #'
 #' @return dataframe only including climate scenarios of interest
 #' (the main analysis only includes a subset of scenarios), and focuses 
 #' on c4on simulations
-filter_rcp_c4 <- function(df) {
+filter_rcp_c4 <- function(df, PFT = FALSE) {
   rcp_levs <- c("Current", "RCP8.5")
   year_levs <- c("Current", "2030-2060")
   
@@ -652,7 +654,16 @@ filter_rcp_c4 <- function(df) {
   out <- df %>% 
     filter(.data$RCP %in% rcp_levs, 
            .data$years %in% year_levs,
-           .data$c4 == "c4on")
+           .data$c4 == "c4on") %>%
+    droplevels() #drop unused factor levels
+  
+  # also filter by PFT
+  if(PFT) {
+    pft_levs <- pft5_factor(x = NULL, return_levels = TRUE)
+    
+    out <- out[out$PFT %in% pft_levs, ] # filter rows
+    out$PFT <- pft5_factor(as.character(out$PFT)) # relevel factor
+  }
   out
 }
 

@@ -322,6 +322,11 @@ scale_color_graze <- function() {
   scale_color_manual(values = cols_graze, name = "Grazing")
 }
 
-scale_fill_graze <- function() {
-  scale_fill_manual(values = cols_graze, name = "Grazing")
+scale_fill_graze <- function(include_light = TRUE) {
+  col <- if(include_light) {
+    cols_graze
+  } else {
+    cols_graze[-1] # exclude light grazing
+  }
+  scale_fill_manual(values = col, name = "Grazing")
 }

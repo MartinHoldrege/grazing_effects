@@ -63,6 +63,9 @@ lab_below0 <- "% of sites above threshold"
 # RCP
 lab_rcp <- "Scenario"
 
+# grazing
+lab_graze <- "Grazing"
+
 #fire
 lab_fire0 <- "Fire return interval (years)"
 lab_fire1 <- "Change in fire return interval (years)"
