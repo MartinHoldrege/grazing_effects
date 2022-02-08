@@ -27,8 +27,6 @@ wfig_box1 <- 9 # width of boxplots in inches
 wfig_box2 <- 6 # width of boxplots that show just 5 pft groups
 hfig_box2 <- 5 # height of 5 panel boxplots
 
-
-
 # number of columns of panels in boxplots
 ncol_box <- 3
 
@@ -59,7 +57,7 @@ levs_pft_l$other = levs_pft[!levs_pft %in% levs_pft_l$pft5]
 
 # for boxplots showing only the main 5 PFTs
 theme_box_pft5 <- function() {
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.6),
+  theme(#axis.text.x = element_text(angle = 45, vjust = 0.6),
         legend.position = c(0.85, 0.2))
  }
 
@@ -127,49 +125,67 @@ dev.off()
 
 # showing the biomass boxplot but only for the main PFTs, and RCP mid-century
 # for possible use in manuscript
-g <- pft5_bio_b %>% 
+
+df <- pft5_bio_b %>% 
+  filter_rcp_c4(PFT = TRUE)
+
+n_zero <- pft5_bio2 %>% 
   filter_rcp_c4(PFT = TRUE) %>% 
-  ggplot(aes(x = graze, y = biomass, fill = RCP)) +
+  group_by(RCP, PFT, graze) %>% 
+  summarize(n_zero = sum(biomass == 0, na.rm =TRUE),
+            .groups = 'drop_last')
+
+# check
+if (any(summarize(n_zero, lu = lu(n_zero))$lu != 1)) {
+  warning("different number of sites with 0 biomass between grazing trmts")
+} 
+
+# text to add to figure regarding how many sites had 0 biomass
+n_zero2 <- n_zero %>% 
+  summarise(n_zero = unique(n_zero),
+            .groups = 'drop') %>% 
+  mutate(string = paste0(n_zero, " sites (", n_zero/200*100, "%)\n had 0 biomass"),
+         string = ifelse(n_zero == 0, "", string),
+         # singular
+         string = ifelse(n_zero == 1, str_replace(string, "sites", "site"),
+                         string),
+         graze = 'Light',
+         y = ifelse(PFT == "Cheatgrass", -6, 0) #  where to put label
+         )
+n_zero2
+
+g <- ggplot(df, aes(x = RCP, y = biomass, fill = graze)) +
   facet_rep_wrap(~ PFT, scales = "free", ncol = 3) +
   # currently seems like I need to restrict the named color vector to the names
   # being plotted, see https://github.com/tidyverse/ggplot2/pull/4619
-  scale_fill_manual(values = cols_rcp[c('Current', 'RCP8.5')], 
-                    name = "Scenario") +
-  labs(x = lab_graze,
+  scale_fill_graze() +
+  labs(x = lab_rcp,
        y = lab_bio0) +
-  theme_box_pft5()
+  theme_box_pft5() +
+#  ylim(-5, NA) +
+  geom_text(data = n_zero2, aes(y = y, label = string),
+            size = 2,vjust = 'inward',
+            lineheight = 0.7)
+
 
 # boxplot
 jpeg("figures/biomass/pub_qual/bio-boxplot_pft5_rcp8.5_c4on.jpeg",
      res = 600, height = hfig_box2, width = wfig_box2, units = "in")
+g +  geom_boxplot(outlier.size = outlier.size) +
+  # for some reason geom_vline needs to come after boxplot, or error thrown
+  geom_vline(xintercept = 1.5, linetype = 2)
 
-g +  geom_boxplot(outlier.size = outlier.size) 
 
 dev.off()
 
 jpeg("figures/biomass/pub_qual/bio-violin_pft5_rcp8.5_c4on.jpeg",
      res = 600, height = hfig_box2, width = wfig_box2, units = "in")
 
-g + geom_violin()
+g + geom_violin() +
+  geom_vline(xintercept = 1.5, linetype = 2)
 
 dev.off()
 
-# same violin plot but including data points with 0 biomass
-jpeg("figures/biomass/pub_qual/bio-violin_pft5_rcp8.5_c4on_incl0.jpeg",
-     res = 600, height = hfig_box2, width = wfig_box2, units = "in")
-
-pft5_bio2 %>% 
-  filter_rcp_c4(PFT = TRUE) %>% 
-  ggplot(aes(x = graze, y = biomass, fill = RCP)) +
-  facet_rep_wrap(~ PFT, scales = "free", ncol = 3) +
-  scale_fill_manual(values = cols_rcp[c('Current', 'RCP8.5')], 
-                    name = "Scenario") +
-  labs(x = lab_graze,
-       y = lab_bio0) +
-  theme_box_pft5()+
-  geom_violin()
-
-dev.off()
 
 # * scatterplot (vs climate) ----------------------------------------------
 
