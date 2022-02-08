@@ -16,10 +16,10 @@ cols_rcp <- c("Current" = "cornflower blue",
               "RCP8.5" = "green3")
 
 # colors for grazing levels (from 5-class OrRd on colorbrewer2)
-cols_graze <- c("Light" = "#fdcc8a", 
+cols_graze <- c("Light" = "#fdd49e", 
                 "Moderate" = "#fc8d59",
-                "Heavy" = "#e34a33",
-                "Very Heavy" = "#b30000")
+                "Heavy" = "#d7301f",
+                "Very Heavy" = "#7f0000")
 
 # color for whether c4 present at a given point location
 cols_c4present <- c("absent" = "black", "present" = "#377eb8")
@@ -76,6 +76,7 @@ lab_mat <- expression("MAT ("*degree*C*")")
 
 # effect size
 lab_es0 <- expression("ln("*frac(biomass, reference~group~biomass)*")")
+lab_es1 <- expression("ln("*frac(biomass, light~grazing~biomass)*")")
 lab_es0_indivs <- expression("ln("*frac(individuals, reference~group~individuals)*")")
 lab_es_on_off <- expression("ln("*frac(biomass~C4off, biomass~C4on)*")")
 lab_es_on_off_indivs <- expression("ln("*frac(individuals~C4off, individuals~C4on)*")")

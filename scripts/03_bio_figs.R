@@ -492,7 +492,6 @@ pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v1.pdf",
 
 # % change
 map(levs_c4, function(x){
-  
   pft5_d_wgcm %>% 
     filter(c4 == x) %>% 
     ggplot(aes(id2, bio_diff, fill = graze)) +
@@ -553,27 +552,74 @@ map(levs_c4, function(x){
 
 dev.off()
 
-# pub qual
-# effect size boxplot for main PFTs, and only RCP8.5 mid-century,
-# (i.e. closer to publication quality)
-jpeg("figures/biomass/pub_qual/bio-diff_boxplot_pft5_rcp8.5_c4on.jpeg",
-     res = 600, height = hfig_box2, width = wfig_box2, units = "in")
 
-pft5_es_wgcm %>% 
-  filter_rcp_c4(PFT = TRUE) %>% 
-  group_by(PFT, RCP, graze, years) %>% 
-  compute_boxplot_stats(var = "bio_es") %>% 
-  ggplot(aes(x = RCP, fill = graze)) +
-  geom_boxplot_identity() +
+# ***fewer scenarios ------------------------------------------------------
+
+# effect size boxplot/violin plot for main PFTs, and only RCP8.5 mid-century,
+# (i.e. closer to publication quality)
+
+
+ylim <- c(-1.9, 1) # limits for cheatgrass
+
+
+df <- pft5_es_wgcm %>% 
+  filter_rcp_c4(PFT = TRUE)
+
+outliers <- df%>% 
+  filter(bio_es < ylim[1])
+
+if(!all(outliers$PFT == "Cheatgrass")) {
+  stop("Other PFTs also have outliers")
+} else {
+  outliers <- outliers %>% 
+    group_by(graze, RCP, PFT) %>% 
+    summarize(n = n(),
+              .groups = 'drop') %>% 
+    mutate(n = paste0(n, "*"))
+}
+
+# base of the plot
+g <- ggplot(df, aes(x = RCP, y = bio_es, fill = graze)) +
+  geom_blank() + # added so that geom_vline doesn't throw an error
+  geom_vline(xintercept = 1.5, linetype = 2) +
   facet_rep_wrap(~ PFT, scales = "free", ncol = 3,
                  repeat.tick.labels = TRUE) +
+  # setting axis limits separately for the cheatgrass panel
+  ggh4x::facetted_pos_scales(y = list(
+    PFT == "Cheatgrass" ~ scale_y_continuous(
+      limits = ylim, #
+      sec.axis = sec_axis(trans = es2pchange,name = "% Change",
+                          breaks = c(-75, 0, 75, 150)))
+  ))+
   scale_fill_graze(include_light = FALSE) +
   labs(x = lab_rcp,
-       y = lab_es0) +
+       y = lab_es1) +
   theme_box_pft5()+
   add_sec_axis() +
-  geom_vline(xintercept = 1.5, linetype = 2)
-  
+  # so non cheatgrass panels all have the same limits 
+  expand_limits(y = c(-1.1, 0.35)) +
+  # printing how many outliers not shown. 
+  geom_text(data = outliers, aes(x = as.numeric(RCP) + as.numeric(graze)/3.7 -0.5,
+                                 y = -2, label = n, color = graze),
+            size = 3, vjust = 'inward') +
+  scale_color_manual(values = cols_graze) +
+  guides(color = 'none')
+
+# boxplot
+jpeg("figures/biomass/pub_qual/bio-diff_boxplot_pft5_rcp8.5_c4on.jpeg",
+     res = 600, height = hfig_box2, width = wfig_box2, units = "in")
+g +
+  geom_boxplot(outlier.size = outlier.size) 
+
+dev.off()
+
+# violin plot
+jpeg("figures/biomass/pub_qual/bio-diff_violin_pft5_rcp8.5_c4on.jpeg",
+     res = 600, height = hfig_box2, width = wfig_box2, units = "in")
+
+# applying filter otherwise violin goes off the edge of the page
+g +
+  geom_violin(data = df %>% filter(bio_es > ylim[1])) 
 
 dev.off()
 
