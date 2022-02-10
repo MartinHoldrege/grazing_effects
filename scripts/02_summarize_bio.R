@@ -56,8 +56,8 @@ stopifnot(length(sites_noc4) == 98)
 # num of individuals is just given for the 4 letter species codes,
 # not the written out functional types they correspond to
 
-# GCM--needs to be listed last for sequential grouping below
-group_cols <- c("c4", 'years', 'RCP', 'graze', 'site', "PFT", "id", 'GCM')
+# GCM, followed by site--needs to be listed last for sequential grouping below
+group_cols <- c("c4", 'years', 'RCP', 'graze',  "id", "PFT", 'site', 'GCM')
 
 indivs1 <- bio4a %>% 
   select(-biomass) %>% 
@@ -326,6 +326,42 @@ thresh_min_graze1 <- pft5_bio2 %>%
 
 
 
+# Composition -------------------------------------------------------------
+# calculating the proportion of biomass made up by the 5 most important
+# plant functional types
+
+
+comp1 <- pft5_bio1_tot %>% 
+  filter_rcp_c4() %>% 
+  # median across GCMs
+  summarise(biomass = median(biomass),
+            .groups = 'drop') %>% 
+  group_by(c4, years, RCP, graze,  id, PFT) %>% 
+  # mean biomass across sites
+  summarise(biomass = mean(biomass),
+            .groups = 'drop_last') %>% 
+  # percent of total biomass
+  mutate(bio_perc = biomass/biomass[PFT == "Total"] * 100) %>% 
+  filter(PFT %in% c(pft5_factor(NULL, return_levels = TRUE), "Total")) 
+
+# calculating biomass and % of total biomass in the 'other' category,
+# that is not biomass from the main 5 PFTs
+comp2 <- comp1 %>% 
+  mutate(other_biomass = biomass[PFT == "Total"] - sum(biomass[PFT != "Total"]),
+         other_perc = 100 - sum(bio_perc[PFT != 'Total']),
+         biomass = other_biomass,
+         bio_perc = other_perc,
+         PFT = "Other") %>%
+  select(-other_biomass, -other_perc) %>% 
+  distinct() %>% 
+  bind_rows(comp1) %>% 
+  filter(PFT != "Total") %>% 
+  mutate(PFT = factor(PFT,  levels = c(pft5_factor(NULL, return_levels = TRUE), 
+                                       "Other")),
+         PFT = fct_rev(PFT) # reverse order for for figure making
+         ) %>% 
+  arrange(RCP, graze) %>% 
+  mutate(id = factor(id, levels = unique(id)))
 
 # wildfire ----------------------------------------------------------------
 

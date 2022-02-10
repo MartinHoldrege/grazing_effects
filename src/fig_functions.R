@@ -77,7 +77,7 @@ box1 <- function(var = "biomass", y = lab_bio0, add_facet_wrap = TRUE,
               size = 2.5),
     geom_boxplot(outlier.size = outlier.size), # not showing outliers as points
     scale_fill_manual(values = cols_rcp, name = "Scenario"),
-    scale_x_discrete(labels = years2lab),
+    scale_x_discrete(labels = id2year),
     geom_vline(xintercept = line_loc, linetype = 2),
     theme(legend.position = legend_pos_box1,
           axis.text = element_text(size = 7)),
@@ -118,7 +118,7 @@ box2 <- function(axis_data, # axis data can be a different data frame than
                    repeat.tick.labels = repeat.tick.labels),
     scale_fill_graze(),
     # so just display the RCP
-    scale_x_discrete(labels = years2lab),
+    scale_x_discrete(labels = id2year),
     theme(legend.position = legend_pos_box1),
     geom_vline(xintercept = xintercept, linetype = 2),
     labs(x = lab_yrs, subtitle = subtitle),
@@ -155,7 +155,7 @@ box3 <- function(axis_data, var = "bio_diff") {
     facet_rep_wrap(~PFT, scales = "free", ncol = ncol_box),
     scale_fill_graze(),
     # so just display the RCP
-    scale_x_discrete(labels = years2lab),
+    scale_x_discrete(labels = id2year),
     theme(legend.position = legend_pos_box1),
     geom_vline(xintercept = line_loc2, linetype = 2),
     labs(x = lab_yrs),
@@ -255,7 +255,8 @@ scatter_light <- function(pft, # for subtitle
 # axis functions ----------------------------------------------------------
 
 # from 'id' column get the label to use for time period in boxplots
-years2lab <- function(x) {
+
+id2year <- function(x) {
   # x--id (character vector), that includes the time period in it
   # returns--character vector of letter designations of the time period
   out <- case_when(
@@ -265,6 +266,23 @@ years2lab <- function(x) {
   )
   if(any(is.na(out))) {
     warning("Not all time periods matched")
+  }
+  out
+}
+
+# return the grazing level from an id string
+id2graze <- function(x) {
+  # x--id (character vector), that includes the grazing level in it
+  # returns--character vector of the grazing level
+  out <- case_when(
+    str_detect(x, "Light") ~ "Light",
+    str_detect(x, "Moderate") ~ "Moderate",
+    str_detect(x, "VeryHeavy") ~ "Very Heavy",
+    str_detect(x, "Heavy") ~ "Heavy"
+    
+  )
+  if(any(is.na(out))) {
+    warning("Not all time years matched")
   }
   out
 }

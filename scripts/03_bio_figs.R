@@ -306,7 +306,7 @@ c4on_v_off_diff %>%
             size = 2.5) +
   geom_boxplot_identity() +
   scale_fill_manual(values = cols_rcp, name = "Scenario") +
-  scale_x_discrete(labels = years2lab) +
+  scale_x_discrete(labels = id2year) +
   geom_vline(xintercept = line_loc, linetype = 2) +
   theme(legend.position = legend_pos_box1,
         axis.text = element_text(size = 7)) +
@@ -650,7 +650,7 @@ threshold1 %>%
   geom_point(aes(color = RCP)) +
   facet_rep_wrap(~ PFT, ncol = ncol_box) +
   scale_color_manual(values = cols_rcp, name = "Scenario") +
-  scale_x_discrete(labels = years2lab) +
+  scale_x_discrete(labels = id2year) +
   geom_vline(xintercept = line_loc, linetype = 2) +
   theme(legend.position = legend_pos_box1,
         axis.text = element_text(size = 7)) +
@@ -662,6 +662,51 @@ threshold1 %>%
   
 })
 
+dev.off()
+
+
+# composition -------------------------------------------------------------
+# stacked barcharts showing the composition of the 5 main PFTs.
+# this is based on the mean biomass across sites for each of the PFTs
+
+g <- ggplot(comp2, aes(x = id, fill = PFT)) +
+  scale_x_discrete(labels = id2graze) +
+  labs(x = lab_graze) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.6)) +
+  geom_vline(xintercept = 4.5, linetype = 2) 
+
+# absolute biomass (stacked)
+g1 <- g +
+  geom_bar(aes(y = biomass), position = 'stack', stat = 'identity') +
+  geom_text(data = box_anno(comp2, var = "biomass", group_by = "RCP",
+                            y = 600),
+            aes(x, y, label = RCP, fill = NULL)) +
+  labs(y = lab_bio0,
+       x = NULL) +
+  # code below so that legend doesn't appear but figure dimension are unchanged
+  scale_fill_manual(values = cols_pft5_other,
+                    guide = guide_legend(override.aes = list(alpha = 0))) +
+  theme(legend.title = element_text(color = "transparent"),
+        legend.text = element_text(color = "transparent"),
+        axis.text.x = element_blank()) 
+
+# % of total biomass (stacked)
+g2 <- g +
+  geom_bar(aes(y = bio_perc), position = 'stack', stat = 'identity') +
+  geom_text(data = box_anno(comp2, var = "bio_perc", group_by = "RCP",
+                            y = 108),
+            aes(x, y, label = RCP, fill = NULL)) +
+  labs(y = lab_perc_bio0) +
+  scale_fill_manual(values = cols_pft5_other, name = "") +
+  scale_y_continuous(breaks = seq(0, 100, by = 25))
+
+
+jpeg("figures/biomass/comp_stacked-bar_RCP8.5-M_c4on.jpeg",
+     res = 600, width = 4, height = 6, units = 'in')
+grid::grid.draw(
+  # doing this so the left axis is aligned, and figures are the same height
+  rbind(ggplotGrob(g1), ggplotGrob(g2))
+)
 dev.off()
 
 # fire --------------------------------------------------------------------
@@ -684,7 +729,7 @@ map(levs_c4, function(lev_c4) {
               size = 2.5) +
     geom_boxplot(outlier.color = NA) + # not showing outliers as points
     scale_fill_manual(values = cols_rcp, name = "Scenario") +
-    scale_x_discrete(labels = years2lab) +
+    scale_x_discrete(labels = id2year) +
     geom_vline(xintercept = line_loc, linetype = 2) +
     theme(legend.position = "top",
           axis.text = element_text(size = 7))  +
@@ -710,7 +755,7 @@ map(levs_c4, function(lev_c4) {
                  outlier.color = NA) +
     scale_fill_graze() +
     # so just display the RCP
-    scale_x_discrete(labels = years2lab) +
+    scale_x_discrete(labels = id2year) +
     theme(legend.position = "top") +
     geom_vline(xintercept = 2.5, linetype = 2) +
     labs(x = lab_yrs,

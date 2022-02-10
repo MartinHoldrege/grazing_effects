@@ -24,6 +24,14 @@ cols_graze <- c("Light" = "#fdd49e",
 # color for whether c4 present at a given point location
 cols_c4present <- c("absent" = "black", "present" = "#377eb8")
 
+# colors for the main 5 PFts, and an 'other' category
+cols_pft5_other <- c("Other" = "darkgrey",
+                     "Pforb" = "#d8b365",
+                     "Cheatgrass" = "#f6e8c3",
+                     "C4Pgrass" = "#c7eae5",
+                     "C3Pgrass" = "#5ab4ac",
+                     "Sagebrush" = "#01665e")
+
 # * for maps --------------------------------------------------------------
 
 # Create color ramp that represents the proportional changes in biomass...
@@ -47,6 +55,7 @@ lab_bio0 <- expression("Biomass ("*gm^-2*")")
 lab_bio2 <- expression(~Delta*" Biomass (scaled %)")
 lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
 lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
+lab_perc_bio0 <- "% of total biomass"
 
 # number of individuals
 lab_indivs0 <- expression("# of individuals ("*m^-2*")")

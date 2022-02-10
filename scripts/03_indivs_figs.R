@@ -178,7 +178,7 @@ c4on_v_off_diff %>%
             size = 2.5) +
   geom_boxplot_identity() +
   scale_fill_manual(values = cols_rcp, name = "Scenario") +
-  scale_x_discrete(labels = years2lab) +
+  scale_x_discrete(labels = id2year) +
   geom_vline(xintercept = line_loc, linetype = 2) +
   theme(legend.position = legend_pos_box1,
         axis.text = element_text(size = 7)) +
