@@ -288,9 +288,9 @@ id2graze <- function(x) {
 }
 
 # for adding a second y axis to effect size figures, that shows % change
-add_sec_axis <- function(...) {
+add_sec_axis <- function(name = "% Change", breaks = waiver(),...) {
   scale_y_continuous(sec.axis = sec_axis(trans = es2pchange, 
-                                         name = "% Change",
+                                         name = name,
                                          ...)) 
 }
 

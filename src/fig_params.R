@@ -49,6 +49,8 @@ cols_map_bio <- colorRampPalette(c("#f7fcb9","#d9f0a3","#addd8e","#78c679","#41a
 
 lab_yrs <- "Time period"
 
+# change
+lab_change0 <- "% Change relative to light grazing"
 
 # biomass
 lab_bio0 <- expression("Biomass ("*gm^-2*")")

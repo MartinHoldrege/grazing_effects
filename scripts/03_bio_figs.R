@@ -588,14 +588,15 @@ g <- ggplot(df, aes(x = RCP, y = bio_es, fill = graze)) +
   ggh4x::facetted_pos_scales(y = list(
     PFT == "Cheatgrass" ~ scale_y_continuous(
       limits = ylim, #
-      sec.axis = sec_axis(trans = es2pchange,name = "% Change",
+      sec.axis = sec_axis(trans = es2pchange, 
+                          name = lab_change0,
                           breaks = c(-75, 0, 75, 150)))
   ))+
   scale_fill_graze(include_light = FALSE) +
   labs(x = lab_rcp,
        y = lab_es1) +
   theme_box_pft5()+
-  add_sec_axis() +
+  add_sec_axis(name = lab_change0) +
   # so non cheatgrass panels all have the same limits 
   expand_limits(y = c(-1.1, 0.35)) +
   # printing how many outliers not shown. 
