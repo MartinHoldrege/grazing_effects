@@ -23,21 +23,15 @@ p <- "data_processed/interpolated_rasters"
 
 # * rasters ---------------------------------------------------------------
 
-# data up-scaled for each GCM, and for c4on and c4off
-bio_files <- list.files(file.path(p, "biomass/"),
-                        pattern = "^c4.*tif$",
-                        full.names = TRUE)
-length(bio_files)
-
-# for now just using a subset for computational efficiency
-#bio_files <- bio_files[sample(1:length(bio_files), 200)]
-
-# this is kind of a 'raster stack', where each layers is a tif
-# it's not actually loaded into memory
-rast1 <- terra::rast(bio_files) # class SpatRast
-
 # median biomass across GCMs
-med1 <- terra::rast(file.path(p, "bio_future_median_across_GCMs.tif"))
+med2 <- rast(file.path(p, "bio_future_median_across_GCMs.tif"))
+
+# ratio of C3Pgrass/total Pgrass, median across GCMs
+gratio_med2 <- rast(file.path(p, "C3Pgrass-Pgrass-ratio_by-scenario_median.tif"))
+
+# scaled % change of PGrass relative to current conditions of the same intensity
+# (i.e. 'wgraze'). Median across GCMs
+rast_d_Pgrass <- rast(file.path(p, "Pgrass_bio-diff-wgraze_median.tif"))
 
 # minimum grazing level at which biomass threshold is exceeded
 min_graze_files <- list.files(file.path(p, "min_graze/"),
@@ -62,99 +56,19 @@ wgraze_files <- list.files(file.path(p, "bio_diff"),
 rast_wgraze1 <- rast(wgraze_files)
 
 # * raster info -------------------------------------------------------------
-
-# names of the raster layers, and treatment info, created in the 
+# These files have been created in the 
 # 04_interpolated_summarize.R script
+
+# names of the raster layers, and treatment info, 
 rast_info <- readRDS(file.path(p, "raster_info.RDS"))
 
+# names/info of median grass layers (for c3pgrass)
+grass_info_med <- readRDS(file.path(p, "grass_info_med.RDS"))
 
-# prepare rasters ----------------------------------------------------------
+# names info about perennial grass layers
+Pgrass_info_med <- readRDS(file.path(p, "Pgrass_info_med.RDS"))
 
-# * median biomass ----------------------------------------------------------
-
-# layers of current biomass
-info_current <- rast_info %>% 
-  filter(RCP == "Current") 
-
-rast_current <- rast1[[info_current$id]]
-
-# renaming without trailing 'current'
-names(rast_current) <- info_current$id_noGCM 
-
-# combing so have median across gcms in the future, and current biomass
-med2 <- c(rast_current, med1) # med1 didn't include current
-
-# * c3Pgrass/Pgrass -------------------------------------------------------
-# this might belong in the 04_...summarize script. 
-
-grass_info <- rast_info %>% 
-  filter(PFT %in% c("C3Pgrass", "Pgrass"),
-         # just looking at end of century and current for now
-         years %in% c("2070-2100", "Current")) %>% 
-  arrange(PFT, c4, graze, RCP, years) %>% # important so comparing correct lyrs
-  # creates two identical df's except the PFT and id columns are different
-  split(f = .$PFT, drop = TRUE)
-  
-
-grass_id <- map(grass_info, function(x) x$id) # id values
-grass_id_noGCM <- map(grass_info, function(x) x$id_noGCM) # id values
-
-# seperate rasters for Pgrass and C3Pgrass
-grass_r1 <- map(grass_id, function(x) rast1[[x]])
-
-# grass ratio 
-gratio_r1 <- grass_r1$C3Pgrass/grass_r1$Pgrass
-
-# check that number of layers has been preserved
-stopifnot(nlyr(gratio_r1) == length(grass_id[[1]]))
-
-# ** median ratio ----------------------------------------------------------
-
-# info on the median lyrs
-grass_info_med <- grass_info$C3Pgrass %>% 
-  arrange(graze, RCP, years, c4) %>% 
-  select(-id, -GCM, -layer_num) %>% 
-  filter(!duplicated(.))
-
-# split into list
-gratio_r_l <- split(gratio_r1, grass_id_noGCM$C3Pgrass)
-
-# naming so layers will be identifiable, C3Pgrass is in name
-# but this actuall C3Pgrass/Pgrass ratio
-names(gratio_r_l) <- unique(grass_id_noGCM$C3Pgrass)
-
-# take median across GCMs
-gratio_med1 <- map(gratio_r_l, app, fun = "median")
-
-# this is operation is super slow and should be migrated to
-# 04_interpolated_summarize.R
-gratio_med2 <- rast(gratio_med1) # put back into one SpatRaster
-nlyr(gratio_med2)
-names(gratio_med2)
-
-# ** Pgrass ----------------------------------------------------------------
-
-Pgrass_id_noGCM <- names(med2) %>% 
-  str_subset("_Pgrass_") %>% #on Pgrass
-  str_subset("_2030-2060_", negate = TRUE) # not mid century
-
-# information on Pgrass, medians across GCMs (same as info for C3Pgrass)
-Pgrass_info_med<- grass_info_med %>% 
-  mutate(id_noGCM = str_replace(id_noGCM, "_C3Pgrass","_Pgrass")) %>% 
-  select(-PFT)
-
-Pgrass_target_lyrs <- Pgrass_info_med %>% 
-  filter(RCP != "Current") %>% 
-  pull(id_noGCM)
-
-Pgrass_ref_lyrs <- create_ref_id(Pgrass_target_lyrs)
-
-# scaled % change relative to current grazing of the same intensity
-rast_d_Pgrass <- rast_diff(rast = med2,
-                           target_layer = Pgrass_target_lyrs,
-                           ref_layer = create_ref_id(Pgrass_target_lyrs))
-
-names(rast_d_Pgrass)
+# Maps ----------------------------------------------------------
 
 # maps: wgcm & w-graze  -----------------------------------------------------
 # change in biomass within a grazing level
