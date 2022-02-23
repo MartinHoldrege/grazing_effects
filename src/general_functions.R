@@ -641,13 +641,24 @@ pcc <- function(x){
 #' @param df dataframe
 #' @param PFT logical, whether to also filter to only include the main
 #'  PFTs interest
+#' @param current logical, whether rcp and year columns should inlcude
+#' current, should only be set to false in bio-diff variables, where it 
+#' is the difference relative to current conditions
 #'
 #' @return dataframe only including climate scenarios of interest
 #' (the main analysis only includes a subset of scenarios), and focuses 
 #' on c4on simulations
-filter_rcp_c4 <- function(df, PFT = FALSE) {
+filter_rcp_c4 <- function(df, PFT = FALSE, current = TRUE) {
   rcp_levs <- c("Current", "RCP8.5")
   year_levs <- c("Current", "2030-2060")
+  
+  if (current) {
+    rcp_levs <- c("Current", "RCP8.5")
+    year_levs <- c("Current", "2030-2060")
+  } else {
+    rcp_levs <- "RCP8.5"
+    year_levs <- "2030-2060"
+  }
   
   stopifnot(rcp_levs %in% df$RCP,
             year_levs %in% df$years)

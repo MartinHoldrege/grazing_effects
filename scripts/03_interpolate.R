@@ -52,7 +52,7 @@ bioclim_vars <- c("bioclim_01", "bioclim_04", "bioclim_09", "bioclim_12",
 
 tc2 <- tc1[, c("cellnumbers", "x", "y", bioclim_vars)]
 
-# rounding (so x, y used everwhere will match)
+# rounding (so x, y used will match)
 digits <-  4
 tc2 <- tc2 %>% 
   mutate(x = round(x, digits = digits),
@@ -168,6 +168,22 @@ pft5_d_wgcm_w <- pft5_d_wgcm %>%
               values_from = "bio_diff") %>% 
   join_subsetcells(sc_dat = sc1) 
 
+
+# * bio diff --------------------------------------------------------------
+# change in biomass from current to RCP 8.5, under a given grazing scenario/
+# this is the % change scaled to current max biomass. 
+
+pft5_bio_d2_w <- pft5_bio_d2 %>% 
+  filter_rcp_c4(current = FALSE) %>% 
+  filter(graze %in% c("Light", "Heavy")) %>% 
+  # here 'wgraze' means bio-diff within a grazing treatment.
+  # this is the median across GCMS
+  mutate(id = paste(c4, PFT, "bio-diff-wgraze", id, 'median', sep = "_")) %>% 
+  pivot_wider(id_cols = "site",
+              names_from = "id",
+              values_from = "bio_diff") %>% 
+  join_subsetcells(sc_dat = sc1) 
+
 # identify matches --------------------------------------------------------
 # ID matches from subset cells for all Target cells (i.e. calculates distance)
 
@@ -199,9 +215,26 @@ mean(match1$matching_quality < 1.5) # ~94%
 # across all the grid cells
 
 
-# * wgcm bio-diff ---------------------------------------------------------
+# * within graze bio-diff -------------------------------------------------
 
 rMultivariateMatching::interpolatePoints(
+  matches = match1,
+  output_results = pft5_bio_d2_w, 
+  exclude_poor_matches = TRUE,
+  subset_cell_names = "subset_cell",
+  quality_name = "matching_quality",
+  matching_distance = 1.5,
+  raster_template = template,
+  plotraster = FALSE,
+  saveraster = TRUE,
+  filepath = "./data_processed/interpolated_rasters/bio_diff",
+  overwrite = TRUE
+)
+
+# * wgcm bio-diff ---------------------------------------------------------
+if (FALSE){ # currently not re-running this (b/ has already run)
+
+  rMultivariateMatching::interpolatePoints(
   matches = match1,
   output_results = pft5_d_wgcm_w, 
   exclude_poor_matches = TRUE,
@@ -217,8 +250,6 @@ rMultivariateMatching::interpolatePoints(
 
 # *crossing threshold ----------------------------------------------------
 
-if (FALSE){ # currently not re-running this
-  
 rMultivariateMatching::interpolatePoints(
   matches = match1,
   output_results = thresh_min_graze_w, 
