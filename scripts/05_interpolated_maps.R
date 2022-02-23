@@ -46,11 +46,20 @@ min_graze_files <- list.files(file.path(p, "min_graze/"),
 rast_min_gr1 <- rast(min_graze_files)
 
 # withing GCM scaled % change in biomass
+# these are medians across GCMs
 wgcm_files <- list.files(file.path(p, "bio_diff"),
                          pattern = "bio-diff-wgcm",
                          full.names = TRUE)
 
 rast_wgcm1 <- rast(wgcm_files)
+
+# within grazing level scaled % change in biomass
+# (i.e. current to future, for given grazing level), medians across GCMs
+wgraze_files <- list.files(file.path(p, "bio_diff"),
+                           pattern = "bio-diff-wgraze.*median.tif$",
+                           full.names = TRUE)
+
+rast_wgraze1 <- rast(wgraze_files)
 
 # * raster info -------------------------------------------------------------
 
@@ -75,7 +84,6 @@ names(rast_current) <- info_current$id_noGCM
 # combing so have median across gcms in the future, and current biomass
 med2 <- c(rast_current, med1) # med1 didn't include current
 
-
 # * c3Pgrass/Pgrass -------------------------------------------------------
 # this might belong in the 04_...summarize script. 
 
@@ -94,12 +102,11 @@ grass_id_noGCM <- map(grass_info, function(x) x$id_noGCM) # id values
 # seperate rasters for Pgrass and C3Pgrass
 grass_r1 <- map(grass_id, function(x) rast1[[x]])
 
-# grass ratio (this is throwing a warning--not sure why)
+# grass ratio 
 gratio_r1 <- grass_r1$C3Pgrass/grass_r1$Pgrass
 
 # check that number of layers has been preserved
 stopifnot(nlyr(gratio_r1) == length(grass_id[[1]]))
-
 
 # ** median ratio ----------------------------------------------------------
 
@@ -119,6 +126,8 @@ names(gratio_r_l) <- unique(grass_id_noGCM$C3Pgrass)
 # take median across GCMs
 gratio_med1 <- map(gratio_r_l, app, fun = "median")
 
+# this is operation is super slow and should be migrated to
+# 04_interpolated_summarize.R
 gratio_med2 <- rast(gratio_med1) # put back into one SpatRaster
 nlyr(gratio_med2)
 names(gratio_med2)
@@ -147,21 +156,34 @@ rast_d_Pgrass <- rast_diff(rast = med2,
 
 names(rast_d_Pgrass)
 
-# maps: wgcm ------------------------------------------------------------
+# maps: wgcm & w-graze  -----------------------------------------------------
 # change in biomass within a grazing level
-# 6 panels for each PFT. 
+# 8 panels for each PFT. 
 # top row current: light grazing bio, heavy grazing, and delta from light to heavy
-# bottom row, same thing but for one future scenario. 
+# middle row, same thing but for one future scenario. 
+# bottom row, scaled percent change in biomass from current to RCP8.5 mid century,
+# for light grazing, and second figure the same but for heavy grazing.
 
 wgcm_info1 <- tibble(id = names(rast_wgcm1),
                     id2 = id) %>% 
   separate(col = id2,
            into = c("c4", "PFT", "type", "RCP", "years", "graze"),
            sep = "_") %>% 
-  df_factor() %>% 
-  arrange(PFT, RCP)
+  df_factor() 
 
-# combing information on median biomass and wgcm biomass difference
+wgraze_info1 <- tibble(id = names(rast_wgraze1),
+                       id2 = id) %>% 
+  separate(col = id2,
+           into = c("c4", "PFT", "type", "RCP", "years", "graze", "GCM"),
+           sep = "_") %>% 
+  select(-GCM) %>% # this is just 'median'
+  df_factor() %>% 
+  arrange(PFT, graze) %>% 
+  group_by(PFT) %>% 
+  # making a higher numbered order variable so these plotted last on the page
+  mutate(order = 1:n() + 10) 
+
+# combing information on median biomass and wgcm and wgraze biomass difference
 wgcm_info2 <- rast_info %>% 
   dplyr::select(-GCM,-id, -layer_num) %>% 
   rename(id = id_noGCM) %>% 
@@ -169,15 +191,21 @@ wgcm_info2 <- rast_info %>%
   filter(graze %in% c("Light", "Heavy")) %>% 
   distinct() %>% 
   bind_rows(wgcm_info1) %>% 
-  arrange(PFT, RCP, graze, desc(type))
+  # putting in order want to use when plotting
+  arrange(PFT, RCP, graze, desc(type)) %>% 
+  group_by(PFT) %>% 
+  mutate(order = 1:n()) %>% 
+  bind_rows(wgraze_info1) %>% 
+  arrange(PFT, order)
+  
 wgcm_info2
 
 # this figure creation takes a few minutes
-pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v1.pdf",
-    width = wfig6, height = hfig6)
+pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v2.pdf",
+    width = wfig6, height = hfig6*3/2)
 
 par(mar = mar, mgp = mgp)
-layout(layout.matrix6, widths = widths6, heights = heights6)
+layout(layout.matrix8, widths = widths8, heights = heights8)
 
 pft_ids <- ""
 for (i in 1:nrow(wgcm_info2)) {
@@ -188,7 +216,6 @@ for (i in 1:nrow(wgcm_info2)) {
   } else {
     paste0(row$RCP, " (", row$years, ")")
   }
-  
   
   if(row$type == "biomass") {
     
@@ -213,10 +240,8 @@ for (i in 1:nrow(wgcm_info2)) {
     
     pft_ids <- pft_ids_new
     
-  } else {
-    # bio diff figure
-    title <- paste0(D, row$PFT, ", ", RCP, ", ", "light to ", 
-                    tolower(row$graze), " grazing")
+  } else if(row$type == "bio-diff-wgcm") {
+    # bio diff (within gcm) figure
     title <- substitute(paste(Delta, PFT, ", ", RCP, ", ", "light to ", 
                                graze, " grazing"),
                         list(c4 = row$c4,
@@ -224,6 +249,15 @@ for (i in 1:nrow(wgcm_info2)) {
                              graze = tolower(as.character(row$graze)),
                              RCP = RCP))
     image_bio_diff(rast_wgcm1, subset = row$id, title = title)
+  } else {
+    title <- substitute(paste(Delta, PFT, ", Current to ", RCP, ", ", 
+                              graze, " grazing"),
+                        list(c4 = row$c4,
+                             PFT = as.character(row$PFT), 
+                             graze = tolower(as.character(row$graze)),
+                             RCP = RCP))
+    image_bio_diff(rast_wgraze1, subset = row$id, title = title)
+    
   }
 }
 
