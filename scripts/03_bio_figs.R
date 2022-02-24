@@ -629,7 +629,7 @@ dev.off()
 ref_threshold2 <- ref_threshold %>% 
   mutate(string = paste(round(threshold, 0), "g/m^2"))
 
-pdf("figures/biomass/threshold_dotplots_v1.pdf", 
+pdf("figures/threshold/threshold_dotplots_v1.pdf", 
     height = 6.5, width = wfig_box1)
 
 map(levs_c4, function(lev_c4) {
@@ -665,7 +665,39 @@ threshold1 %>%
 
 dev.off()
 
+# * fewer scenarios -------------------------------------------------------
+# threshold dotplot just showing current and RCP 8.5 mid-century.
+# grouped by climate scenario.
 
+geom_text(data = filter(ref_threshold2, c4 == lev_c4),
+          aes(x = 3, y = 10, label = string),
+          size = 2.5)
+df <- threshold1 %>% 
+  filter_rcp_c4(PFT = TRUE) %>% 
+  # it's not relevant whether cheatgrass drops below a 'sustainable' level.
+  filter(PFT != "Cheatgrass" ) 
+
+ref_threshold3 <- ref_threshold2 %>% 
+  filter(c4 == 'c4on',
+         PFT %in% df$PFT)
+
+jpeg("figures/threshold/threshold_5th-pcent_RCP8.5-mid_v1.jpeg",
+     res = 600, units = 'in',
+     height = 4, width = 4)
+ggplot(df, aes(x = RCP, y = pcent_above)) +
+  facet_rep_wrap(~ PFT, ncol = 2) +
+  geom_point(aes(color = graze), position = position_dodge(width = 1)) +
+  scale_color_graze() +
+  geom_vline(xintercept = 1.5, linetype = 2) +
+  labs(x = lab_rcp,
+       y = lab_below0) +
+  theme(legend.position = 'top',
+        legend.text = element_text(size = 6),
+        legend.title = element_text(size = 8)) +
+  geom_text(data = ref_threshold3,
+            aes(x = 0.8, y = 25, label = string),
+            size = 2.5)
+dev.off()
 # composition -------------------------------------------------------------
 # stacked barcharts showing the composition of the 5 main PFTs.
 # this is based on the mean biomass across sites for each of the PFTs
