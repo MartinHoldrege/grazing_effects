@@ -35,9 +35,9 @@ cols_pft5_other <- c("Other" = "darkgrey",
 # * for maps --------------------------------------------------------------
 
 # Create color ramp that represents the proportional changes in biomass...
-cols_map_bio_d <- c(rev(c("#ffeda0","#fed976","#feb24c","#fd8d3c","#fc4e2a","#e31a1c",
-                "#bd0026")),
-          "#deebf7","#c6dbef","#9ecae1","#6baed6","#4292c6",
+cols_map_bio_d <- c(rev(c("#ffeda0","#fed976","#feb24c","#fc4e2a","#e31a1c",
+                "#bd0026")), 'grey', 'grey',
+          "#deebf7","#c6dbef","#9ecae1","#4292c6",
           "#08519c","#08306b")
 
 # Standard color ramp for current biomass:

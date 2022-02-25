@@ -115,14 +115,16 @@ wgcm_info2 <- rast_info %>%
 wgcm_info2
 
 # this figure creation takes a few minutes
-pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v2.pdf",
+pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v3.pdf",
     width = wfig6, height = hfig6*3/2)
 
 par(mar = mar, mgp = mgp)
 layout(layout.matrix8, widths = widths8, heights = heights8)
 
 pft_ids <- ""
+# for (i in 1:16) { # for testing
 for (i in 1:nrow(wgcm_info2)) {
+
   row <- wgcm_info2[i, ]
   
   RCP <- if (row$RCP == "Current") {
@@ -220,7 +222,7 @@ image_bio(med2, subset = 1, title = "test",
           legend_lab = "C3Pgrass/Pgrass")
 
 
-pdf("figures/biomass_maps/C3-ratio_and_Pgrass_c4on-off.pdf",
+pdf("figures/biomass_maps/C3-ratio_and_Pgrass_c4on-off_v2.pdf",
   width = wfig6, height = hfig6)
 
 # C3Pgrass/Pgrass maps (not showing % change just the ratio)

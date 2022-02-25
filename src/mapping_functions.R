@@ -208,7 +208,8 @@ image_bio_diff <- function(rast, subset, title = "") {
   
 
   # for now hard coding breaks and colors
-  truebks <- sort(c(-(2^(1:7)), 0, 2^(1:7)))
+  bks <- c(100, 60, 40, 30, 20, 10, 5)
+  truebks <- c(-bks, 0, rev(bks))
   cols <-  cols_map_bio_d
   
   # run a check on whether truebks are excluding values
@@ -234,8 +235,10 @@ image_bio_diff <- function(rast, subset, title = "") {
   maps::map("state", interior = T, add = T)
   
   # Color bar/legend at the bottom
-  polygon(x = c(-117,-117,-109,-109), y = c(32,34.5,34.5,32),col = "white",border = "white")
-  polygon(x = c(-125,-125,-102.7,-102.7), y = c(30,33.5,33.5,30),border = "white", col = "white")
+  polygon(x = c(-117,-117,-109,-109), y = c(32,34.5,34.5,32),col = "white",
+          border = "white")
+  polygon(x = c(-125,-125,-102.7,-102.7), y = c(30,33.5,33.5,30),
+          border = "white", col = "white")
   
   # creating mini polygons for each legend color
   axisat <- seq(-125, -102.7, length.out = length(cols) + 1)
@@ -248,7 +251,7 @@ image_bio_diff <- function(rast, subset, title = "") {
   polygon(x = c(-125, -125, -102.7 ,-102.7), y = c(31.75, 32.5, 32.5, 31.75), 
           lwd = 1.5)
   mtext(expression(paste("", Delta, " Biomass (%)")), side = 1, line = -0.49, cex = 0.7)
-  axis(side = 1, pos = 31.75, at = seq(-125,-102.7, length.out = 15),
+  axis(side = 1, pos = 31.75, at = seq(-125,-102.7, length.out = length(truebks)),
        cex.axis = 0.9, labels = truebks)
   
 }
