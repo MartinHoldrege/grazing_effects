@@ -90,6 +90,42 @@ med1 <- map(rast_gcm_l, app, fun = "median")
 
 med2 <- rast(med1)
 
+
+# delta biomass gref  -----------------------------------------------------------
+# delta biomass from current light to future heavy grazing
+# specifically, future is RCP 8.5. Because the reference level
+# is current, I'm calculating this using median rasters (which in this case
+# should yield the same answer as calculate for each gcm then taking the median).
+
+gref_info <- rast_info %>% 
+  filter_rcp_c4() %>% 
+  select(-GCM, -id, -layer_num) %>% 
+  distinct() %>% 
+  filter((RCP == 'Current' & graze == "Light" )|
+           (RCP == 'RCP8.5' & graze == "Heavy")) 
+
+gref_info <- split(gref_info, gref_info$RCP) %>% 
+  map(function(x) arrange(x, PFT))
+
+stopifnot(
+  gref_info$Current$PFT == gref_info$RCP8.5$PFT,
+  # this only works if there is one raster per PFT (i.e. reference raster)
+  unique(gref_info$Current$PFT) == gref_info$Current$PFT
+  )
+
+# difference between current light and future heavy grazing
+current <- subset(med2, subset = gref_info$Current$id_noGCM)
+future <- subset(med2, subset = gref_info$RCP8.5$id_noGCM)
+diff <- future - current
+max <- t(minmax(current))[, 2] # max value in each raster
+
+stopifnot(names(max) == gref_info$Current$id_noGCM)
+
+# gref stands for fixed grazing reference
+rast_diff_gref <- diff/max*100 # scaled percent change
+names(rast_diff_gref) <- names(rast_diff_gref) %>% 
+  str_replace("biomass", 'bio-diff-gref-cur-light')
+
 #  c3Pgrass/Pgrass -------------------------------------------------------
 
 grass_info <- rast_info %>% 
@@ -189,4 +225,10 @@ writeRaster(gratio_med2, "data_processed/interpolated_rasters/C3Pgrass-Pgrass-ra
 # scaled percent change from current to future (wgraze), for Pgrass
 
 writeRaster(rast_d_Pgrass, "data_processed/interpolated_rasters/Pgrass_bio-diff-wgraze_median.tif",
+            overwrite = TRUE)
+
+# # scaled % change from current light grazing to future (RCP8.5-mid) heavy graze
+
+writeRaster(rast_diff_gref,
+            "data_processed/interpolated_rasters/bio-diff-gref-cur-light_median.tif",
             overwrite = TRUE)

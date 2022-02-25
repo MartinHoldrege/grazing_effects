@@ -752,3 +752,22 @@ cross_threshold <- function(graze, above) {
   
   min_graze
 }
+
+#' create dataframe of raster information
+#'
+#' @param rast raster (with named layers)
+#' @param into columns the components of the layer names will be seperated
+#' into
+#'
+#' @return dataframe
+create_rast_info <- function(rast,
+                            into = c("c4", "PFT", "type", "RCP", "years", 
+                                     "graze", "GCM")) {
+  out <- tibble(id = names(rast),
+         id2 = id) %>% 
+    separate(col = id2,
+             into = into,
+             sep = "_") %>% 
+    df_factor() 
+  out
+}

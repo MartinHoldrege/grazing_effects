@@ -103,7 +103,7 @@ layout.matrix6 <- matrix(c(1,2,3,4,5,6), nrow = 2, ncol = 3,
                          byrow = TRUE) # for 6 paneled figs
 
 # parameters specific to 8 paneled figures
-layout.matrix8 <- matrix(c(1:8, 0), nrow = 3, ncol = 3, 
+layout.matrix9 <- matrix(1:9, nrow = 3, ncol = 3, 
                          byrow = TRUE) # for 6 paneled figs
 
 # leaving right column empty, but still same dimensions as for 6 columns
@@ -111,8 +111,8 @@ layout.matrix4 <- matrix(c(1,2, 0,3,4,0), nrow = 2, ncol = 3,
                          byrow = TRUE) # for 4 paneled figs
 widths6 <- rep(1, 3)
 heights6 = rep(1, 2)
-widths8 <- rep(1, 3)
-heights8 <- rep(1, 3)
+widths9 <- rep(1, 3)
+heights9 <- rep(1, 3)
 
 wfig6 <- 9 # width of 9 figure panels (inches)
 hfig6 <- 6 # height of 9 figure panels

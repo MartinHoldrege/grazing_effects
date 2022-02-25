@@ -55,6 +55,10 @@ wgraze_files <- list.files(file.path(p, "bio_diff"),
 
 rast_wgraze1 <- rast(wgraze_files)
 
+# scaled % change from current light grazing to future (RCP8.5-mid) heavy graze
+# median across GCMs
+rast_diff_gref <- rast(file.path(p, "bio-diff-gref-cur-light_median.tif"))
+
 # * raster info -------------------------------------------------------------
 # These files have been created in the 
 # 04_interpolated_summarize.R script
@@ -70,32 +74,32 @@ Pgrass_info_med <- readRDS(file.path(p, "Pgrass_info_med.RDS"))
 
 # Maps ----------------------------------------------------------
 
-# maps: wgcm & w-graze  -----------------------------------------------------
+# maps: wgcm & w-graze & gref----------------------------------------------
 # change in biomass within a grazing level
-# 8 panels for each PFT. 
+# 9 panels for each PFT. 
 # top row current: light grazing bio, heavy grazing, and delta from light to heavy
 # middle row, same thing but for one future scenario. 
 # bottom row, scaled percent change in biomass from current to RCP8.5 mid century,
 # for light grazing, and second figure the same but for heavy grazing.
+# 3rd figure (bottom right corner): change from current light grazing to future
+# heavy
 
-wgcm_info1 <- tibble(id = names(rast_wgcm1),
-                    id2 = id) %>% 
-  separate(col = id2,
-           into = c("c4", "PFT", "type", "RCP", "years", "graze"),
-           sep = "_") %>% 
-  df_factor() 
+into_vars <- c("c4", "PFT", "type", "RCP", "years", "graze")
+wgcm_info1 <- create_rast_info(
+  rast_wgcm1, into = into_vars)
 
-wgraze_info1 <- tibble(id = names(rast_wgraze1),
-                       id2 = id) %>% 
-  separate(col = id2,
-           into = c("c4", "PFT", "type", "RCP", "years", "graze", "GCM"),
-           sep = "_") %>% 
+
+wgraze_info1 <- create_rast_info(rast_wgraze1) %>%  
   select(-GCM) %>% # this is just 'median'
-  df_factor() %>% 
   arrange(PFT, graze) %>% 
   group_by(PFT) %>% 
   # making a higher numbered order variable so these plotted last on the page
-  mutate(order = 1:n() + 10) 
+  mutate(order = 1:n() + 6) 
+
+gref_info <- create_rast_info(rast_diff_gref, into = into_vars) %>% 
+  group_by(PFT) %>% 
+  # making a higher numbered order variable so these plotted last on the page
+  mutate(order = 9) 
 
 # combing information on median biomass and wgcm and wgraze biomass difference
 wgcm_info2 <- rast_info %>% 
@@ -110,6 +114,7 @@ wgcm_info2 <- rast_info %>%
   group_by(PFT) %>% 
   mutate(order = 1:n()) %>% 
   bind_rows(wgraze_info1) %>% 
+  bind_rows(gref_info) %>% 
   arrange(PFT, order)
   
 wgcm_info2
@@ -119,10 +124,10 @@ pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v3.pdf",
     width = wfig6, height = hfig6*3/2)
 
 par(mar = mar, mgp = mgp)
-layout(layout.matrix8, widths = widths8, heights = heights8)
+layout(layout.matrix9, widths = widths9, heights = heights9)
 
 pft_ids <- ""
-# for (i in 1:16) { # for testing
+# for (i in 1:9) { # for testing
 for (i in 1:nrow(wgcm_info2)) {
 
   row <- wgcm_info2[i, ]
@@ -155,7 +160,7 @@ for (i in 1:nrow(wgcm_info2)) {
               vec = vec)
     
     pft_ids <- pft_ids_new
-    
+    # effect of grazing within a climate scenario
   } else if(row$type == "bio-diff-wgcm") {
     # bio diff (within gcm) figure
     title <- substitute(paste(Delta, PFT, ", ", RCP, ", ", "light to ", 
@@ -165,7 +170,8 @@ for (i in 1:nrow(wgcm_info2)) {
                              graze = tolower(as.character(row$graze)),
                              RCP = RCP))
     image_bio_diff(rast_wgcm1, subset = row$id, title = title)
-  } else {
+    # climate effect withing grazing trmt
+  } else if (row$type == "bio-diff-wgraze") {
     title <- substitute(paste(Delta, PFT, ", Current to ", RCP, ", ", 
                               graze, " grazing"),
                         list(c4 = row$c4,
@@ -173,7 +179,15 @@ for (i in 1:nrow(wgcm_info2)) {
                              graze = tolower(as.character(row$graze)),
                              RCP = RCP))
     image_bio_diff(rast_wgraze1, subset = row$id, title = title)
-    
+    # change in climate and grazing
+  } else {
+    title <- substitute(paste(Delta, PFT, ", Current light to ", RCP, ", ", 
+                              graze),
+                        list(c4 = row$c4,
+                             PFT = as.character(row$PFT), 
+                             graze = tolower(as.character(row$graze)),
+                             RCP = as.character(row$RCP)))
+    image_bio_diff(rast_diff_gref, subset = row$id, title = title)
   }
 }
 
