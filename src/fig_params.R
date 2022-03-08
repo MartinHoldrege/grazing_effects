@@ -26,12 +26,13 @@ cols_c4present <- c("absent" = "black", "present" = "#377eb8")
 
 # colors for the main 5 PFts, and an 'other' category
 cols_pft5_other <- c("Other" = "darkgrey",
-                     "Pforb" = "#d8b365",
                      "Cheatgrass" = "#f6e8c3",
+                     "Pforb" = "#d8b365",
                      "C4Pgrass" = "#c7eae5",
                      "C3Pgrass" = "#5ab4ac",
                      "Sagebrush" = "#01665e")
 
+cols_herb <- cols_pft5_other[c("Cheatgrass","Pforb", "C4Pgrass", "C3Pgrass")]
 # * for maps --------------------------------------------------------------
 
 # Create color ramp that represents the proportional changes in biomass...

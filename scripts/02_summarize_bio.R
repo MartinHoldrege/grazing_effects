@@ -356,12 +356,22 @@ comp2 <- comp1 %>%
   distinct() %>% 
   bind_rows(comp1) %>% 
   filter(PFT != "Total") %>% 
-  mutate(PFT = factor(PFT,  levels = c(pft5_factor(NULL, return_levels = TRUE), 
-                                       "Other")),
-         PFT = fct_rev(PFT) # reverse order for for figure making
-         ) %>% 
+  mutate(PFT = factor(PFT,  
+                      levels = c("Other", "Cheatgrass", 'Aforb', "Pforb",  
+                                 "C4Pgrass", 
+                                 "C3Pgrass", "Sagebrush")))%>% 
   arrange(RCP, graze) %>% 
   mutate(id = factor(id, levels = unique(id)))
+
+# composition of just key herbaceous PFTs
+comp_herb1 <- comp2 %>% 
+  filter(PFT %in% c('C3Pgrass', 'C4Pgrass', 'Pforb', "Cheatgrass")) %>% 
+  # this df is already grouped
+  mutate(bio_perc = biomass/(sum(biomass))*100)
+
+# test that the percents do sum to 100
+test <- summarise(comp_herb1, test = sum(bio_perc))$test
+stopifnot(all.equal(test, rep(100, length(test))))
 
 # wildfire ----------------------------------------------------------------
 
