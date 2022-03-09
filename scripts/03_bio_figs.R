@@ -559,58 +559,55 @@ dev.off()
 # (i.e. closer to publication quality)
 
 
-ylim <- c(-1.9, 1) # limits for cheatgrass
+ylim <- c(-1.1, 0.4) # limits for cheatgrass
 
 
 df <- pft5_es_wgcm %>% 
   filter_rcp_c4(PFT = TRUE)
 
-outliers <- df%>% 
-  filter(bio_es < ylim[1])
+outliers0 <- df%>% 
+  filter(bio_es < ylim[1] | bio_es > ylim[2])
 
-if(!all(outliers$PFT == "Cheatgrass")) {
+if(!all(outliers0$PFT == "Cheatgrass")) {
   stop("Other PFTs also have outliers")
 } else {
-  outliers <- outliers %>% 
+  outliers <- outliers0 %>% 
     group_by(graze, RCP, PFT) %>% 
     summarize(n = n(),
               .groups = 'drop') %>% 
-    mutate(n = paste0(n, "*"))
+    mutate(n = paste(n, "")) # add symbol her (e.g. *) if desired
 }
+
 
 # base of the plot
 g <- ggplot(df, aes(x = RCP, y = bio_es, fill = graze)) +
   geom_blank() + # added so that geom_vline doesn't throw an error
   geom_vline(xintercept = 1.5, linetype = 2) +
-  facet_rep_wrap(~ PFT, scales = "free", ncol = 3,
+  facet_rep_wrap(~ PFT, ncol = 3,
                  repeat.tick.labels = TRUE) +
-  # setting axis limits separately for the cheatgrass panel
-  ggh4x::facetted_pos_scales(y = list(
-    PFT == "Cheatgrass" ~ scale_y_continuous(
-      limits = ylim, #
-      sec.axis = sec_axis(trans = es2pchange, 
-                          name = lab_change0,
-                          breaks = c(-75, 0, 75, 150)))
-  ))+
   scale_fill_graze(include_light = FALSE) +
   labs(x = lab_rcp,
        y = lab_es1) +
   theme_box_pft5()+
   add_sec_axis(name = lab_change0) +
-  # so non cheatgrass panels all have the same limits 
-  expand_limits(y = c(-1.1, 0.35)) +
+  # this restricts 
+  #expand_limits(y = ylim) +
   # printing how many outliers not shown. 
-  geom_text(data = outliers, aes(x = as.numeric(RCP) + as.numeric(graze)/3.7 -0.5,
-                                 y = -2, label = n, color = graze),
-            size = 3, vjust = 'inward') +
   scale_color_manual(values = cols_graze) +
-  guides(color = 'none')
+  guides(color = 'none') +
+  coord_cartesian(ylim = ylim)
+
 
 # boxplot
 jpeg("figures/biomass/pub_qual/bio-diff_boxplot_pft5_rcp8.5_c4on.jpeg",
      res = 600, height = hfig_box2, width = wfig_box2, units = "in")
-g +
-  geom_boxplot(outlier.size = outlier.size) 
+g+
+  geom_boxplot(outlier.size = outlier.size) +
+  # add label of the number of outliers
+  geom_label(data = outliers, aes(x = as.numeric(RCP) + as.numeric(graze)/3.7 -0.5,
+                                  y = Inf, label = n, color = graze),
+             fill = 'white', label.padding = unit(0.1, 'lines') ,
+             size = 2.5, vjust = 'inward', label.size = 0) 
 
 dev.off()
 
