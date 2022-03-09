@@ -41,8 +41,9 @@ rast_min_gr1 <- rast(min_graze_files)
 
 # withing GCM scaled % change in biomass
 # these are medians across GCMs
+# e.g. change from heavy to light grazing, for RCP8.5 mid-century
 wgcm_files <- list.files(file.path(p, "bio_diff"),
-                         pattern = "bio-diff-wgcm",
+                         pattern = "_bio-diff-wgcm-heavy_",
                          full.names = TRUE)
 
 rast_wgcm1 <- rast(wgcm_files)
@@ -57,7 +58,7 @@ rast_wgraze1 <- rast(wgraze_files)
 
 # scaled % change from current light grazing to future (RCP8.5-mid) heavy graze
 # median across GCMs
-rast_diff_gref <- rast(file.path(p, "bio-diff-gref-cur-light_median.tif"))
+rast_diff_gref <- rast(file.path(p, "bio-diff-gref-cur-heavy_median.tif"))
 
 # * raster info -------------------------------------------------------------
 # These files have been created in the 
@@ -77,17 +78,16 @@ Pgrass_info_med <- readRDS(file.path(p, "Pgrass_info_med.RDS"))
 # maps: wgcm & w-graze & gref----------------------------------------------
 # change in biomass within a grazing level
 # 9 panels for each PFT. 
-# top row current: light grazing bio, heavy grazing, and delta from light to heavy
+# top row current: light grazing bio, heavy grazing, and delta from heavy to ligth
 # middle row, same thing but for one future scenario. 
 # bottom row, scaled percent change in biomass from current to RCP8.5 mid century,
 # for light grazing, and second figure the same but for heavy grazing.
-# 3rd figure (bottom right corner): change from current light grazing to future
-# heavy
+# 3rd figure (bottom right corner): change from current heavy grazing to future
+# light
 
 into_vars <- c("c4", "PFT", "type", "RCP", "years", "graze")
 wgcm_info1 <- create_rast_info(
   rast_wgcm1, into = into_vars)
-
 
 wgraze_info1 <- create_rast_info(rast_wgraze1) %>%  
   select(-GCM) %>% # this is just 'median'
@@ -110,7 +110,7 @@ wgcm_info2 <- rast_info %>%
   distinct() %>% 
   bind_rows(wgcm_info1) %>% 
   # putting in order want to use when plotting
-  arrange(PFT, RCP, graze, desc(type)) %>% 
+  arrange(PFT, RCP, desc(type), graze) %>% 
   group_by(PFT) %>% 
   mutate(order = 1:n()) %>% 
   bind_rows(wgraze_info1) %>% 
@@ -119,19 +119,22 @@ wgcm_info2 <- rast_info %>%
   
 wgcm_info2
 
-# this figure creation takes a few minutes
-pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v3.pdf",
+# this figure creation takes a few minutes.
+
+# NOTE that currently, some of the change values (heavy to light),
+# are >100%. Those are throwing warnings (in the image_bio_diff function).
+
+pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v4.pdf",
     width = wfig6, height = hfig6*3/2)
 
 par(mar = mar, mgp = mgp)
 layout(layout.matrix9, widths = widths9, heights = heights9)
 
 pft_ids <- ""
-# for (i in 1:9) { # for testing
+#for (i in 1:9) { # for testing
 for (i in 1:nrow(wgcm_info2)) {
-
+ 
   row <- wgcm_info2[i, ]
-  
   RCP <- if (row$RCP == "Current") {
     as.character(row$RCP)
   } else {
@@ -161,9 +164,9 @@ for (i in 1:nrow(wgcm_info2)) {
     
     pft_ids <- pft_ids_new
     # effect of grazing within a climate scenario
-  } else if(row$type == "bio-diff-wgcm") {
+  } else if(row$type == "bio-diff-wgcm-heavy") {
     # bio diff (within gcm) figure
-    title <- substitute(paste(Delta, PFT, ", ", RCP, ", ", "light to ", 
+    title <- substitute(paste(Delta, PFT, ", ", RCP, ", ", "heavy to ", 
                                graze, " grazing"),
                         list(c4 = row$c4,
                              PFT = as.character(row$PFT), 
@@ -181,7 +184,7 @@ for (i in 1:nrow(wgcm_info2)) {
     image_bio_diff(rast_wgraze1, subset = row$id, title = title)
     # change in climate and grazing
   } else {
-    title <- substitute(paste(Delta, PFT, ", Current light to ", RCP, ", ", 
+    title <- substitute(paste(Delta, PFT, ", Current heavy to ", RCP, ", ", 
                               graze),
                         list(c4 = row$c4,
                              PFT = as.character(row$PFT), 

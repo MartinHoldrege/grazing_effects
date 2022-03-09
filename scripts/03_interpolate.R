@@ -156,12 +156,23 @@ thresh_min_graze_w <- thresh_min_graze1 %>%
   
 
 # * wgcm bio diff ---------------------------------------------------------
-# change in biomass from light to heavy grazing, within a climate scenario
 
+# change in biomass from light to heavy grazing, within a climate scenario
 pft5_d_wgcm_w <- pft5_d_wgcm %>% 
   filter_rcp_c4() %>% 
   filter(graze == "Heavy") %>% 
   mutate(id = paste(c4, PFT, "bio-diff-wgcm", id, sep = "_")) %>% 
+  dplyr::select(site, id, bio_diff) %>% 
+  pivot_wider(id_cols = "site",
+              names_from = "id",
+              values_from = "bio_diff") %>% 
+  join_subsetcells(sc_dat = sc1) 
+
+# change in biomass from heavy to light grazing, within a scenario
+pft5_d_wgcm_heavy_w <- pft5_d_wgcm_heavy %>% 
+  filter_rcp_c4() %>% 
+  filter(graze == "Light") %>% 
+  mutate(id = paste(c4, PFT, "bio-diff-wgcm-heavy", id, sep = "_")) %>% 
   dplyr::select(site, id, bio_diff) %>% 
   pivot_wider(id_cols = "site",
               names_from = "id",
@@ -214,57 +225,48 @@ mean(match1$matching_quality < 1.5) # ~94%
 # use matches from multivarmatch to interpolate the STEPWAT2 output
 # across all the grid cells
 
-
-# * within graze bio-diff -------------------------------------------------
-
-rMultivariateMatching::interpolatePoints(
-  matches = match1,
-  output_results = pft5_bio_d2_w, 
-  exclude_poor_matches = TRUE,
-  subset_cell_names = "subset_cell",
-  quality_name = "matching_quality",
-  matching_distance = 1.5,
-  raster_template = template,
-  plotraster = FALSE,
-  saveraster = TRUE,
-  filepath = "./data_processed/interpolated_rasters/bio_diff",
-  overwrite = TRUE
+# list of dataframes to upscale
+output_results_l <- list(
+  pft5_bio_d2_w = pft5_bio_d2_w, # within graze bio-diff
+  pft5_d_wgcm_w = pft5_d_wgcm_w, # wgcm bio-diff (relative to light grazing)
+  pft5_d_wgcm_heavy_w = pft5_d_wgcm_heavy_w,# wgcm bio-diff (rel to heavy graze)
+  thresh_min_graze_w = thresh_min_graze_w #crossing threshold
 )
 
-# * wgcm bio-diff ---------------------------------------------------------
-if (FALSE){ # currently not re-running this (b/ has already run)
-
-  rMultivariateMatching::interpolatePoints(
-  matches = match1,
-  output_results = pft5_d_wgcm_w, 
-  exclude_poor_matches = TRUE,
-  subset_cell_names = "subset_cell",
-  quality_name = "matching_quality",
-  matching_distance = 1.5,
-  raster_template = template,
-  plotraster = FALSE,
-  saveraster = TRUE,
-  filepath = "./data_processed/interpolated_rasters/bio_diff",
-  overwrite = TRUE
+# locations where the upscaled rasters will be put
+output_paths <- c(
+  pft5_bio_d2_w = "./data_processed/interpolated_rasters/bio_diff",
+  pft5_d_wgcm_w = "./data_processed/interpolated_rasters/bio_diff",
+  pft5_d_wgcm_heavy_w = "./data_processed/interpolated_rasters/bio_diff",
+  thresh_min_graze_w = "./data_processed/interpolated_rasters/min_graze"
 )
 
-# *crossing threshold ----------------------------------------------------
+stopifnot(names(output_paths) == names(output_results_l))
 
-rMultivariateMatching::interpolatePoints(
-  matches = match1,
-  output_results = thresh_min_graze_w, 
-  exclude_poor_matches = TRUE,
-  subset_cell_names = "subset_cell",
-  quality_name = "matching_quality",
-  matching_distance = 1.5,
-  raster_template = template,
-  plotraster = FALSE,
-  saveraster = TRUE,
-  filepath = "./data_processed/interpolated_rasters/min_graze",
-  overwrite = TRUE
-)
-  
-}
+# select dataframes to upscale (i.e. code is slow so 
+# if other dfs have been previously, they don't need to be re-run)
+names_to_upscale <- "pft5_d_wgcm_heavy_w"
+# names_to_upscale <- names(output_paths) # un-comment if want to upscale all
+
+# interpolate
+map2(output_results_l[names_to_upscale], 
+     output_paths[names_to_upscale], 
+     function(df, path) {
+      rMultivariateMatching::interpolatePoints(
+        matches = match1,
+        output_results = df, 
+        exclude_poor_matches = TRUE,
+        subset_cell_names = "subset_cell",
+        quality_name = "matching_quality",
+        matching_distance = 1.5,
+        raster_template = template,
+        plotraster = FALSE,
+        saveraster = TRUE,
+        filepath = path,
+        overwrite = TRUE
+      )
+})
+
 # * biomass ---------------------------------------------------------------
 
 # on my computer to run all PFTs/scenarios/GCMs would take 21.5 hours!, 

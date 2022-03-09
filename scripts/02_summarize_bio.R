@@ -275,6 +275,17 @@ pft5_es_wgcm <- pft5_bio1 %>%
   summarise_bio_indivs(suffix = "_es") %>% 
   create_id2()
 
+# ** change relative to heavy grazing of same gcm -------------------------
+
+# naming" d = difference, wgcm = within gcm comparison
+pft5_d_wgcm_heavy <- pft5_bio1 %>% 
+  scaled_change_2var(by = c("c4", "PFT", "RCP", "GCM", "years"), 
+                     ref_graze = "Heavy", percent = TRUE, effect_size = FALSE,
+                     within_GCM = TRUE) %>% 
+  # median across GCMs
+  group_by(c4, site, years, RCP, PFT, graze, id) %>% 
+  summarise_bio_indivs(suffix = "_diff") %>% 
+  create_id2()
 
 # threshold ---------------------------------------------------------------
 

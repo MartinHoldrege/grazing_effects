@@ -9,6 +9,7 @@
 # in the 03_interpolate.R script, which can takes ~ 4 hours to run on
 # my laptop (when excluding RCP4.5)
 
+# this script takes ~ 10 min to run
 
 # dependencies ------------------------------------------------------------
 
@@ -92,7 +93,7 @@ med2 <- rast(med1)
 
 
 # delta biomass gref  -----------------------------------------------------------
-# delta biomass from current light to future heavy grazing
+# delta biomass from current heavy to future light grazing
 # specifically, future is RCP 8.5. Because the reference level
 # is current, I'm calculating this using median rasters (which in this case
 # should yield the same answer as calculate for each gcm then taking the median).
@@ -101,8 +102,8 @@ gref_info <- rast_info %>%
   filter_rcp_c4() %>% 
   select(-GCM, -id, -layer_num) %>% 
   distinct() %>% 
-  filter((RCP == 'Current' & graze == "Light" )|
-           (RCP == 'RCP8.5' & graze == "Heavy")) 
+  filter((RCP == 'Current' & graze == "Heavy" )|
+           (RCP == 'RCP8.5' & graze == "Light")) 
 
 gref_info <- split(gref_info, gref_info$RCP) %>% 
   map(function(x) arrange(x, PFT))
@@ -124,7 +125,7 @@ stopifnot(names(max) == gref_info$Current$id_noGCM)
 # gref stands for fixed grazing reference
 rast_diff_gref <- diff/max*100 # scaled percent change
 names(rast_diff_gref) <- names(rast_diff_gref) %>% 
-  str_replace("biomass", 'bio-diff-gref-cur-light')
+  str_replace("biomass", 'bio-diff-gref-cur-heavy')
 
 #  c3Pgrass/Pgrass -------------------------------------------------------
 
@@ -230,5 +231,5 @@ writeRaster(rast_d_Pgrass, "data_processed/interpolated_rasters/Pgrass_bio-diff-
 # # scaled % change from current light grazing to future (RCP8.5-mid) heavy graze
 
 writeRaster(rast_diff_gref,
-            "data_processed/interpolated_rasters/bio-diff-gref-cur-light_median.tif",
+            "data_processed/interpolated_rasters/bio-diff-gref-cur-heavy_median.tif",
             overwrite = TRUE)

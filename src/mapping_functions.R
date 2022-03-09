@@ -217,7 +217,8 @@ image_bio_diff <- function(rast, subset, title = "") {
   min <- min(vec, na.rm = TRUE)
   max <- max(vec, na.rm = TRUE)
   if(min < min(truebks) | max > max(truebks)) {
-    stop("Raster contains data outside of the range of the breaks")
+    warning(title, " Raster contains data outside of the range of the breaks",
+         'max value is ', round(max), ". Min value is ", round(min), '.')
   }
 
   
