@@ -91,7 +91,7 @@ wgcm_info1 <- create_rast_info(
 
 wgraze_info1 <- create_rast_info(rast_wgraze1) %>%  
   select(-GCM) %>% # this is just 'median'
-  arrange(PFT, graze) %>% 
+  arrange(PFT, desc(graze)) %>% 
   group_by(PFT) %>% 
   # making a higher numbered order variable so these plotted last on the page
   mutate(order = 1:n() + 6) 
@@ -110,7 +110,7 @@ wgcm_info2 <- rast_info %>%
   distinct() %>% 
   bind_rows(wgcm_info1) %>% 
   # putting in order want to use when plotting
-  arrange(PFT, RCP, desc(type), graze) %>% 
+  arrange(PFT, RCP, desc(type), desc(graze)) %>% 
   group_by(PFT) %>% 
   mutate(order = 1:n()) %>% 
   bind_rows(wgraze_info1) %>% 

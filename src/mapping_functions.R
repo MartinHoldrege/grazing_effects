@@ -208,8 +208,10 @@ image_bio_diff <- function(rast, subset, title = "") {
   
 
   # for now hard coding breaks and colors
-  bks <- c(100, 60, 40, 30, 20, 10, 5)
-  truebks <- c(-bks, 0, rev(bks))
+  bks <- c(60, 40, 30, 20, 10, 5)
+  # last break is 150 so that larger increases are included
+  # consider improving
+  truebks <- c(-100, -bks, 0, rev(bks), 150)
   cols <-  cols_map_bio_d
   
   # run a check on whether truebks are excluding values
