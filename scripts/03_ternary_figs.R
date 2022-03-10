@@ -68,10 +68,36 @@ create_lines_df2 <- function(df, split_var, xyz) {
 
 # * fig functions ---------------------------------------------------------
 
+# function to zoom into the smallest triangle that includes all
+# all the data
+# This function fails in several cases.
+# AT this point I don't know how to properly automate zooming in
+tern_zoom <- function(df, xyz) {
+  # i'm pulling this code from here:
+  # https://github.com/nicholasehamilton/ggtern/issues/24
+  
+  max_vals <- map_dbl(df[xyz], max) %>% 
+    plyr::round_any(5, f = ceiling) # rounding up to the nearest 5s
+  
+  #set the lowest to the second lowest
+  # (I'm not sure what this is necessary but otherwise 
+  # ggtern throws an error and the points don't sum to 100)
+  max_vals[order(max_vals)[1]] <-  sort(max_vals)[2]
+  
+  #back to fractions
+  max_vals = max_vals/100
+  
+  tern_limits(max_vals[2], max_vals[1], max_vals[3])
+}
 
 # function to create terniary plots
-tern <- function(df, split_var, xyz) {
-  ggtern(df, aes_string(x = xyz[1], y = xyz[2], z = xyz[3])) +
+tern <- function(df, 
+                 split_var, # the variable to split the data frame by
+                 xyz, # character vector of 3 columns of interest
+                 # whether to zoom in and make smallest triangle possible
+                 zoom = FALSE 
+                 ) {
+  out <- ggtern(df, aes_string(x = xyz[1], y = xyz[2], z = xyz[3])) +
     geom_segment(data = create_lines_df2(df, split_var, xyz = xyz), 
                  aes(x, y, z, xend = xend, yend = yend, zend = zend),
                  alpha = 0.2) +
@@ -80,14 +106,23 @@ tern <- function(df, split_var, xyz) {
          xarrow = paste(xyz[1], "cover"),
          yarrow = paste(xyz[2], "cover"),
          zarrow = paste(xyz[3], "cover"))
-}
+  
+  # whether to zoom in
+  if (zoom) {
+    out <- out +
+      tern_zoom(df = df, xyz = xyz)
+  }
+
+  out
+  }
 
 # function to create ternary plots that compare light vs heavy grazing
 # in a given climate scenario
 tern_wrcp <- function(df, 
                       xyz, 
                       levs_rcp = levs_2rcp, 
-                      c4string = 'c4on') {
+                      c4string = 'c4on',
+                      zoom = FALSE) {
   
   out <- map(levs_rcp, function(x){
     # c4on and off are the same for current conditions here,
@@ -103,7 +138,7 @@ tern_wrcp <- function(df,
     } else {
       x
     }
-    g <- tern(df, split_var = 'graze', xyz = xyz) +
+    g <- tern(df, split_var = 'graze', xyz = xyz, zoom = zoom) +
       geom_point(aes(color = graze), size = 0.5) +
       scale_color_manual(values = cols_graze[levs_2graze]) +
       labs(subtitle = paste0("Light vs heavy grazing, under ",
@@ -117,7 +152,9 @@ tern_wrcp <- function(df,
 tern_wgraze <- function(df, # dataframe
                         xyz, # string--names of 3 PFTs of interest
                         levs_graze = levs_2graze, # grazing levels of interest
-                        c4string = 'c4on') {
+                        c4string = 'c4on',
+                        # whether to zoom in on plot
+                        zoom = FALSE) {
   df <- df %>% 
     filter(c4 == c4string)
   
@@ -125,7 +162,7 @@ tern_wgraze <- function(df, # dataframe
   out <- map(levs_graze, function(x) {
     df %>% 
       filter(graze == x) %>% 
-      tern(split_var = 'RCP', xyz = xyz) +
+      tern(split_var = 'RCP', xyz = xyz, zoom = zoom) +
       geom_point(aes(color = RCP), size = 0.5) +
       scale_color_manual(values = cols_rcp[levs_2rcp]) +
       labs(subtitle = paste0("Current vs RCP8.5 (2030-2060), under ",
@@ -136,12 +173,13 @@ tern_wgraze <- function(df, # dataframe
 
 # create ternary plots comparing current light grazing 
 # vs future heavy grazing
-tern_across_graze_RCP <- function(df, xyz, c4string = 'c4on') {
+tern_across_graze_RCP <- function(df, xyz, c4string = 'c4on',
+                                  zoom = FALSE) {
   df %>% 
     filter((RCP == "RCP8.5" & graze == 'Heavy')|
              (RCP == "Current" & graze == "Light"),
            c4 == c4string)%>% 
-    tern(split_var = 'graze', xyz = xyz) +
+    tern(split_var = 'graze', xyz = xyz, zoom = zoom) +
     geom_point(aes(color = graze, shape = RCP), size = 0.5) +
     scale_color_manual(values = cols_graze[levs_2graze]) +
     labs(subtitle = paste0("Current light vs RCP8.5 (2030-2060) heavy grazing",
@@ -175,42 +213,102 @@ perc_dfs <- map(pft_levs, function(x) {
 
 # figures -----------------------------------------------------------------
 
+if (false){
+# for testing 
+df <- perc_dfs[[2]] %>% 
+  filter(#RCP == "Current",
+        graze == "Heavy",
+         c4 == 'c4on')
+xyz = pft_levs[[2]]
+
+max_vals <- map_dbl(df[xyz], max) %>% 
+  plyr::round_any(5, f = ceiling) # rounding up to the nearest 5s
+
+#set the lowest to the second lowest
+# (I'm not sure what this is necessary but otherwise 
+# ggtern throws an error and the points don't sum to 100)
+max_vals[order(max_vals)[1]] <-  sort(max_vals)[2]
+
+#back to fractions
+max_vals = max_vals/100
+
+
+g <- tern(df, split_var = 'RCP', xyz = xyz) +
+  geom_point(aes(color = RCP), size = 0.5) 
+g + scale_T_continuous(limits = range(df[[xyz[2]]])/100)
+
+g+ 
+  tern_limits(max_vals[2], max_vals[1], max_vals[3])
+g +
+  tern_zoom(df, xyz)
+}
+# end testing
+
+
+# * normal scales (0-100) -------------------------------------------------
+# each edge of ternary plot goes from 0 to 100
 
 pdf("figures/ternary/ternary_by-PFT-group_v1.pdf")
 
-# * within RCP level comparisons --------------------------------------------
 map2(perc_dfs, pft_levs, function(df, xyz) {
+  
+  # * within RCP level comparisons --------------------------------------------
   out <- list()
-  out$c4on <- tern_wrcp(df, xyz = xyz, c4string = 'c4on')
-  out$c4off <- tern_wrcp(df, xyz = xyz, c4string = 'c4off')
-  out
-})
+  out[[1]] <- tern_wrcp(df, xyz = xyz, c4string = 'c4on')
+  out[[2]] <- tern_wrcp(df, xyz = xyz, c4string = 'c4off')
 
-# * within grazing level comparisons ----------------------------------------
+  # * within grazing level comparisons ----------------------------------------
 
-# ie ternary plots show current vs RCP8.5, under given grazing level
+  # ie ternary plots show current vs RCP8.5, under given grazing level
 
-map2(perc_dfs, pft_levs, function(df, xyz) {
-  out <- list()
-  out$c4on <- tern_wgraze(df, xyz = xyz, c4string = 'c4on')
-  out$c4off <- tern_wgraze(df, xyz = xyz, c4string = 'c4off')
-  out
-})
+  out[[3]] <- tern_wgraze(df, xyz = xyz, c4string = 'c4on')
+  out[[4]] <- tern_wgraze(df, xyz = xyz, c4string = 'c4off')
+  
+  # * across gazing and RCP comparison ----------------------------------------
 
-# * across gazing and RCP comparison ----------------------------------------
-
-# comparing current light grazing 
-# vs future heavy grazing
+  # comparing current light grazing 
+  # vs future heavy grazing
 
 # looping over pft groupings
-map2(perc_dfs, pft_levs, function(df, xyz) {
-  out <- list()
-  out$c4on <- tern_across_graze_RCP(df, xyz = xyz, c4string = 'c4on')
-  out$c4off <- tern_across_graze_RCP(df, xyz = xyz, c4string = 'c4off')
+  out[[5]] <- tern_across_graze_RCP(df, xyz = xyz, c4string = 'c4on')
+  out[[6]] <- tern_across_graze_RCP(df, xyz = xyz, c4string = 'c4off')
+  
   out
 })
-
 
 dev.off()
 
+# * zoomed in -----------------------------------------------------------
+# plots show the smalles triangle that inclues all the data
+# Note--zooming in isn' working in many cases, the min values from one or 
+# more axes are getting cut-off
 
+pdf("figures/ternary/ternary_by-PFT-group_zoom_v1.pdf")
+
+# looping over PFT groupings
+map2(perc_dfs, pft_levs, function(df, xyz) {
+  
+  # * within RCP level comparisons --------------------------------------------
+  out <- list()
+  out[[1]] <- tern_wrcp(df, xyz = xyz, c4string = 'c4on', zoom = TRUE)
+  out[[2]] <- tern_wrcp(df, xyz = xyz, c4string = 'c4off', zoom = TRUE)
+  
+  # * within grazing level comparisons ----------------------------------------
+  
+  # ie ternary plots show current vs RCP8.5, under given grazing level
+  
+  out[[3]] <- tern_wgraze(df, xyz = xyz, c4string = 'c4on', zoom = TRUE)
+  out[[4]] <- tern_wgraze(df, xyz = xyz, c4string = 'c4off', zoom = TRUE)
+  
+  # * across gazing and RCP comparison ----------------------------------------
+  
+  # comparing current light grazing 
+  # vs future heavy grazing
+  out[[5]] <- tern_across_graze_RCP(df, xyz = xyz, c4string = 'c4on', 
+                                    zoom = TRUE)
+  out[[6]] <- tern_across_graze_RCP(df, xyz = xyz, c4string = 'c4off', 
+                                    zoom = TRUE)
+  out
+})
+
+dev.off()
