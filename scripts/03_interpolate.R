@@ -168,10 +168,10 @@ pft5_d_wgcm_w <- pft5_d_wgcm %>%
               values_from = "bio_diff") %>% 
   join_subsetcells(sc_dat = sc1) 
 
-# change in biomass from heavy to light grazing, within a scenario
+# change in biomass from heavy to moderate or light grazing, within a scenario
 pft5_d_wgcm_heavy_w <- pft5_d_wgcm_heavy %>% 
   filter_rcp_c4() %>% 
-  filter(graze == "Light") %>% 
+  filter(graze %in% c("Light", "Moderate")) %>% 
   mutate(id = paste(c4, PFT, "bio-diff-wgcm-heavy", id, sep = "_")) %>% 
   dplyr::select(site, id, bio_diff) %>% 
   pivot_wider(id_cols = "site",

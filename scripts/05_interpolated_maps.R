@@ -22,6 +22,7 @@ source("src/general_functions.R")
 p <- "data_processed/interpolated_rasters"
 
 # * rasters ---------------------------------------------------------------
+gref <- "Moderate" # current grazing level to compare to (for filter below)
 
 # median biomass across GCMs
 med2 <- rast(file.path(p, "bio_future_median_across_GCMs.tif"))
@@ -41,7 +42,7 @@ rast_min_gr1 <- rast(min_graze_files)
 
 # withing GCM scaled % change in biomass
 # these are medians across GCMs
-# e.g. change from heavy to light grazing, for RCP8.5 mid-century
+# e.g. change from heavy to light or moderate for RCP8.5 mid-century
 wgcm_files <- list.files(file.path(p, "bio_diff"),
                          pattern = "_bio-diff-wgcm-heavy_",
                          full.names = TRUE)
@@ -56,8 +57,10 @@ wgraze_files <- list.files(file.path(p, "bio_diff"),
 
 rast_wgraze1 <- rast(wgraze_files)
 
-# scaled % change from current light grazing to future (RCP8.5-mid) heavy graze
+# scaled % change from current moderate or heavy grazing to future (RCP8.5-mid) 
+# light graze
 # median across GCMs
+
 rast_diff_gref <- rast(file.path(p, "bio-diff-gref-cur-heavy_median.tif"))
 
 # * raster info -------------------------------------------------------------
@@ -78,16 +81,18 @@ Pgrass_info_med <- readRDS(file.path(p, "Pgrass_info_med.RDS"))
 # maps: wgcm & w-graze & gref----------------------------------------------
 # change in biomass within a grazing level
 # 9 panels for each PFT. 
-# top row current: light grazing bio, heavy grazing, and delta from heavy to ligth
+# top row current: moderat grazing bio, heavy grazing, and delta from heavy to ligth
 # middle row, same thing but for one future scenario. 
 # bottom row, scaled percent change in biomass from current to RCP8.5 mid century,
-# for light grazing, and second figure the same but for heavy grazing.
+# for moderate grazing, and second figure the same but for heavy grazing.
 # 3rd figure (bottom right corner): change from current heavy grazing to future
-# light
+# moderate
 
 into_vars <- c("c4", "PFT", "type", "RCP", "years", "graze")
 wgcm_info1 <- create_rast_info(
-  rast_wgcm1, into = into_vars)
+  rast_wgcm1, into = into_vars) %>% 
+  # change from heavy grazing to gref (ie. light or moderate)
+  filter(graze == gref)
 
 wgraze_info1 <- create_rast_info(rast_wgraze1) %>%  
   select(-GCM) %>% # this is just 'median'
@@ -99,14 +104,15 @@ wgraze_info1 <- create_rast_info(rast_wgraze1) %>%
 gref_info <- create_rast_info(rast_diff_gref, into = into_vars) %>% 
   group_by(PFT) %>% 
   # making a higher numbered order variable so these plotted last on the page
-  mutate(order = 9) 
+  mutate(order = 9) %>% 
+  filter(graze == gref)
 
 # combing information on median biomass and wgcm and wgraze biomass difference
 wgcm_info2 <- rast_info %>% 
   dplyr::select(-GCM,-id, -layer_num) %>% 
   rename(id = id_noGCM) %>% 
   filter_rcp_c4() %>% 
-  filter(graze %in% c("Light", "Heavy")) %>% 
+  filter(graze %in% c(gref, "Heavy")) %>% 
   distinct() %>% 
   bind_rows(wgcm_info1) %>% 
   # putting in order want to use when plotting
@@ -124,7 +130,7 @@ wgcm_info2
 # NOTE that currently, some of the change values (heavy to light),
 # are >100%. Those are throwing warnings (in the image_bio_diff function).
 
-pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v4.pdf",
+pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v5.pdf",
     width = wfig6, height = hfig6*3/2)
 
 par(mar = mar, mgp = mgp)
