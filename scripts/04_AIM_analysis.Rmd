@@ -278,7 +278,7 @@ c4_spp_pcent_missed <- aimc4_missed %>%
   group_by(US_L3CODE, US_L3NAME) %>% 
    # number of plots in the region
   mutate(n_plots = length(unique(PLOTKEY))) %>%
-  group_by(US_L3CODE, US_L3NAME, CPLANT) %>% 
+  group_by(US_L3CODE, US_L3NAME, CPLANT, Scientificname) %>% 
   summarise(pcent_plots = n()/unique(n_plots)*100,
             pcent_plots = round(pcent_plots, 1),
             .groups = 'drop') %>% 
