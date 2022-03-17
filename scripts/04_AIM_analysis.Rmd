@@ -53,6 +53,13 @@ aim1 <- read_csv("data_raw/AIM/LMF_ALL.data.2011-2015.FINAL_v2.csv",
                  show_col_types = FALSE)
 ```
 
+cover of individual C4 grasses (Also compiled by RR).
+
+```{r}
+aimc4_1 <- read_csv("data_raw/AIM/LMF_c4grasses.csv",
+                 show_col_types = FALSE)
+```
+
 ### Site locations
 
 Location of the 200 sites for which simulations were run,
@@ -68,7 +75,7 @@ sites_c4 <- read_csv(
 
 ### Ecoregion
 
-Sshapefile of level 3 ecoregions , downloaded from here:
+Shapefile of level 3 ecoregions , downloaded from here:
 https://gaftp.epa.gov/EPADataCommons/ORD/Ecoregions/us/us_eco_l3.zip
 
 Useful for grouping summaries of the AIM data by region
@@ -92,10 +99,32 @@ aim2 <- aim1 %>%
 
 mean(aim2$C4Pgrass == "present") * 100 #' % of sites w/ c4pgrass present
 ```
+Keeping only perennial c4 species
+
+```{r}
+aimc4_2 <- aimc4_1 %>% 
+  filter(Duration != "Annual")
+```
+
+running a check between the to AIM files
+
+```{r}
+
+if(!all(aimc4_2$PLOTKEY %in% aim2$PLOTKEY[aim2$C4Pgrass == "present"])) {
+  stop('some plots that are present int c4 grass data set are not 
+  present in the overall dataset')
+}
+
+if (any(aimc4_2$PLOTKEY %in% aim2$PLOTKEY[aim2$C4Pgrass == "absent"])) {
+  stop('some sites are marked as c4 grass being present, but c4 species recorded')
+}
+
+```
+
 
 Creating a SpatVector (terra package)
-for some reason logical data column gets converted to character (can't try
-to force it to be logical)
+for some reason logical data column gets converted to character (can't 
+force it to be logical)
 
 ```{r }
 aim_sv1 <- vect(aim2, geom = c("longitude", "latitude"),
@@ -228,7 +257,39 @@ x <- addmargins(con)
 pcc <- (x[1, 1] + x[2,2])/x[3,3]*100
 ```
 
+## C4 grass species at sites where not modelled with STEPWAT2
 
+```{r}
+
+# plotkeys of aim sites where c4 grasses incorrectly
+# modelled as absent
+plots_c4_missed <- aim_sv3 %>% 
+  as_tibble() %>% 
+  filter(C4Pgrass_mod == "absent", # modeled as absent
+         C4Pgrass_aim == "present") %>%  # but actually present
+  pull(PLOTKEY)
+
+aimc4_missed <- aimc4_2 %>% 
+  filter(PLOTKEY %in% plots_c4_missed) %>% 
+  left_join(as_tibble(aim_sv3[, c("PLOTKEY", "US_L3CODE", "US_L3NAME")]),
+            by = "PLOTKEY")
+
+c4_spp_pcent_missed <- aimc4_missed %>% 
+  group_by(US_L3CODE, US_L3NAME) %>% 
+   # number of plots in the region
+  mutate(n_plots = length(unique(PLOTKEY))) %>%
+  group_by(US_L3CODE, US_L3NAME, CPLANT) %>% 
+  summarise(pcent_plots = n()/unique(n_plots)*100,
+            pcent_plots = round(pcent_plots, 1),
+            .groups = 'drop') %>% 
+  arrange(US_L3CODE, desc(pcent_plots))
+  
+kable(c4_spp_pcent_missed,
+      caption = paste("The percent of AIM sites where a given C4 grass species",
+                       "is present, out of AIM sites where upscaled STEPWAT2 data",
+                        "incorrectly classified C4Pgrass as absent"
+                       ))
+```
 
 
 # MAPs
