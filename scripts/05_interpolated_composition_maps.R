@@ -65,6 +65,45 @@ calc_perc <- function(x) {
   out
 }
 
+
+#' Adjust min and max vectors
+#' 
+#' @description Goal is to to create min/max values so that each
+#' vertex of the ternary plot sums to 100%. Currently this is 
+#' achieved by adjust the max values (ie increasing them as needed)
+#'
+#' @param min vector of length 3
+#' @param max vector of length 3
+#'
+#' @return list with two elements, min and max
+#' 
+adjust_minmax <- function(min, max) {
+  
+  stopifnot(length(min) == 3,
+            length(max) == 3, # one value for each of 3 layers
+            # should be a percent
+            min <= 100 & min >= 0,
+            max <= 100 & max >= 0,
+            letters[1:3] %in% names(min),
+            letters[1:3] %in% names(max))
+  
+  # top vertex
+  max['a'] <- 100 - sum(min[c('b', 'c')])
+  # bottom right vertex
+  max['b'] <- 100 - sum(min[c('a', 'c')])
+  # bottom left vertex
+  max['c'] <- 100 - sum(min[c('a', 'b')])
+  
+  # check that each vertex sums to 100
+  stopifnot(
+    sum(max['a'], min[c("b", "c")]) == 100,
+    sum(max['b'], min[c("a", "c")]) == 100,
+    sum(max['c'], min[c("a", "b")]) == 100
+  )
+  
+  list(min = min, max = max)
+}
+
 #' Normalize SpatRaster
 #'
 #' @param x SpatRaster object
@@ -103,6 +142,34 @@ rast_normalize <- function(x, min = NULL, max = NULL) {
   out
 }
 
+#' Add grid lines to ternary plot
+#'
+#' @description Draws 4 lines on ternary plots in each direction
+#' This if for drawing on top of colors (at which point the underlying
+#' colors get overplotted and aren't visible)
+add_lines <- function() {
+  breaks = c(0.2, 0.4, 0.6, 0.8) # where lines will be created
+  breaks2 <- rep(breaks, each = 2)
+  
+  rows <- c(1, 4, 5, 8)
+  # horizontal lines (a-b lines)
+  m <- matrix(0, nrow = length(breaks)*2, ncol = 3)
+  m[ ,1] <- rep(rev(breaks), each = 2)
+  
+  m[-rows, 2] <- breaks2[-rows]
+  m[rows, 3] <- breaks2[rows]
+  AddToTernary(lines, m, col = 'darkgrey', lty = 'dotted', lwd = 2)
+  # vertical a to c lines
+  m2 <- m[nrow(m):1, c(3, 2, 1)]
+  AddToTernary(lines, m2, col = 'darkgrey', lty = 'dotted', lwd = 2)
+  # vertical b to c lines
+  m3 <- m[, c(2, 1, 3)]
+  AddToTernary(lines, m3, col = 'darkgrey', lty = 'dotted', lwd = 2)
+  
+  # draw triangle
+  m4 <- matrix(c(1, 0, 0, 0, 1, 0, 0, 0, 1, 1,0, 0), nrow = 3)
+  AddToTernary(lines, m4, col = 'darkgrey', lty = 'solid', lwd = 3)
+}
 
 # create rgb triangle
 ternary_rgb <- function(alab, blab, clab, # labels for three axis
@@ -119,9 +186,10 @@ ternary_rgb <- function(alab, blab, clab, # labels for three axis
               #point = 'right', 
               lab.cex = 0.8,
               grid.minor.lines = 0,
+              grid.lines = 5,
               grid.lty = 'solid',
               col = rgb(1, 1, 1),
-              grid.col = 'white',
+              grid.col = 'darkgrey',
               axis.col = rgb(0.6, 0.6, 0.6),
               ticks.col = rgb(0.6, 0.6, 0.6),
               axis.rotate = FALSE,
@@ -131,6 +199,7 @@ ternary_rgb <- function(alab, blab, clab, # labels for three axis
   
   cols <- TernaryPointValues(rgb)
   ColourTernary(cols, spectrum = NULL)
+  add_lines() # add grid lines
   
   cex = 0.6
   
@@ -250,7 +319,7 @@ create_rgb_map <- function(RCP, # string
 
 # * example map -----------------------------------------------------------
 
-pfts <- c(a = "C3Pgrass", b = "C4Pgrass", c = "Pforb")
+pfts <- c(a = "Pforb", b = "C3Pgrass", c = "C4Pgrass")
 
 id <- paste0("c4on_", pfts, "_biomass_Current_Current_Light")
 
@@ -267,6 +336,10 @@ names(max) <- letters[1:3]
 
 min <- floor(min)
 max <- ceiling(max)
+
+# adjust so vertices will sum to 100%
+min <- adjust_minmax(min, max)$min # at the moment this step doesn't make any changes
+max <- adjust_minmax(min, max)$max
 
 r <- rast_normalize(x, min = min, max = max)
 
@@ -339,6 +412,11 @@ figs_by_pft <- map(pft_levs, function(pfts) {
     out
   })
   
+  # adjust so vertices will sum to 100%
+    # at the moment this function doesn't actually make changes to min
+  pft_min <- adjust_minmax(pft_min, pft_max)$min 
+  pft_max <- adjust_minmax(pft_min, pft_max)$max
+  
   # rgb triangle
   temp <- temp_ternary_rgb(pfts, min = pft_min, max = pft_max)
   
@@ -354,7 +432,7 @@ figs_by_pft <- map(pft_levs, function(pfts) {
 figs_arranged <- map(figs_by_pft, tmap_arrange, nrow = 2)
 
 # save figures
-file <- paste0("figures/composition_maps/composition_rgb_v1_", 
+file <- paste0("figures/composition_maps/composition_rgb_v2_", 
                c4string, ".pdf")
 
 pdf(file, height = 9, width = 9)
