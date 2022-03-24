@@ -186,7 +186,7 @@ pft5_d_wgcm_heavy_w <- pft5_d_wgcm_heavy %>%
 
 pft5_bio_d2_w <- pft5_bio_d2 %>% 
   filter_rcp_c4(current = FALSE) %>% 
-  filter(graze %in% c("Light", "Heavy")) %>% 
+  filter(graze %in% c("Light", "Moderate", "Heavy")) %>% 
   # here 'wgraze' means bio-diff within a grazing treatment.
   # this is the median across GCMS
   mutate(id = paste(c4, PFT, "bio-diff-wgraze", id, 'median', sep = "_")) %>% 
@@ -244,8 +244,8 @@ output_paths <- c(
 stopifnot(names(output_paths) == names(output_results_l))
 
 # select dataframes to upscale (i.e. code is slow so 
-# if other dfs have been previously, they don't need to be re-run)
-names_to_upscale <- "pft5_d_wgcm_heavy_w"
+# if other dfs have been run previously, they don't need to be re-run)
+names_to_upscale <- "pft5_bio_d2_w"
 # names_to_upscale <- names(output_paths) # un-comment if want to upscale all
 
 # interpolate

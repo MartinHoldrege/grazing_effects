@@ -96,6 +96,7 @@ wgcm_info1 <- create_rast_info(
 
 wgraze_info1 <- create_rast_info(rast_wgraze1) %>%  
   select(-GCM) %>% # this is just 'median'
+  filter(graze %in% c(gref, "Heavy")) %>% 
   arrange(PFT, desc(graze)) %>% 
   group_by(PFT) %>% 
   # making a higher numbered order variable so these plotted last on the page
@@ -144,7 +145,8 @@ for (i in 1:nrow(wgcm_info2)) {
   RCP <- if (row$RCP == "Current") {
     as.character(row$RCP)
   } else {
-    paste0(row$RCP, " (", row$years, ")")
+    #paste0(row$RCP, " (", row$years, ")") # uncomment if want years in title
+    as.character(row$RCP)
   }
   
   if(row$type == "biomass") {
@@ -201,6 +203,18 @@ for (i in 1:nrow(wgcm_info2)) {
 }
 
 dev.off()
+
+
+# maps--12 panel figure ---------------------------------------------------
+# for manuscript
+# 3 figs per row (1 row per pft)
+# scaled percent change in biomass from current to RCP8.5 mid century,
+# for heavy grazing, and second figure the same but for moderate grazing.
+# 3rd figure change from current heavy grazing to future
+# moderate
+
+# TO DO--create 12 panel fig, remove unnecessary legends. 
+
 
 # maps--min graze -------------------------------------------------------
 #showing two panels for each PFT, the min graze for current, and min
