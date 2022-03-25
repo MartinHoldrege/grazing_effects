@@ -215,6 +215,59 @@ dev.off()
 
 # TO DO--create 12 panel fig, remove unnecessary legends. 
 
+wgcm_info_pft4 <- wgcm_info2 %>% 
+  filter(PFT %in% c("Sagebrush", "C4Pgrass", "C3Pgrass", "Pforb"),
+         # just the 'bottom row' of figures
+         order %in% 7:9) 
+
+stopifnot(nrow(wgcm_info_pft4) == 12) # should be 1 row per panel
+
+jpeg("figures/biomass_maps/12-panel-maps_wgraze_gref_v1.jpeg",
+    width = wfig6, height = hfig6*2, units = 'in',
+    res = 600)
+
+par(mar = mar, mgp = mgp)
+layout(matrix(1:12, nrow = 4, byrow = TRUE), 
+       widths = widths9, 
+       # heights vary b/ only bottom row has legend
+       heights = c(0.81, 0.81, 0.81, 1))
+
+for (i in 1:nrow(wgcm_info_pft4)) {
+  
+  row <- wgcm_info_pft4[i, ]
+  RCP <- as.character(row$RCP)
+  
+  # only add legend to bottom rows
+  legend <- if (row$PFT == "Pforb") {
+    TRUE
+  } else {
+    FALSE
+  }
+  
+  if (row$type == "bio-diff-wgraze") {
+    title <- substitute(paste(Delta, PFT, ", Current to ", RCP, ", ", 
+                              graze, " grazing"),
+                        list(c4 = row$c4,
+                             PFT = as.character(row$PFT), 
+                             graze = tolower(as.character(row$graze)),
+                             RCP = RCP))
+    image_bio_diff(rast_wgraze1, subset = row$id, title = title,
+                   legend = legend)
+    # change in climate and grazing
+  } else {
+    title <- substitute(paste(Delta, PFT, ", Current heavy to ", RCP, ", ", 
+                              graze),
+                        list(c4 = row$c4,
+                             PFT = as.character(row$PFT), 
+                             graze = tolower(as.character(row$graze)),
+                             RCP = as.character(row$RCP)))
+    image_bio_diff(rast_diff_gref, subset = row$id, title = title,
+                   legend = legend)
+  }
+}
+
+dev.off()
+
 
 # maps--min graze -------------------------------------------------------
 #showing two panels for each PFT, the min graze for current, and min
