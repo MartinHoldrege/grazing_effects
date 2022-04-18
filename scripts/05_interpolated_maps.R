@@ -292,7 +292,7 @@ min_gr_info <- tibble(id = names(rast_min_gr1),
   df_factor() %>% 
   arrange(PFT, RCP)
 
-pdf("figures/min_graze_maps/min_graze_c4on.pdf",
+pdf("figures/min_graze_maps/min_graze_c4on_v2.pdf",
     width = wfig6, height = hfig6)
 
 par(mar = mar, mgp = mgp)
@@ -300,6 +300,32 @@ layout(layout.matrix4, widths = widths6, heights = heights6)
 
 for (i in 1:nrow(min_gr_info)) {
   row <- min_gr_info[i, ]
+  
+  RCP <- if (row$RCP == "Current") {
+    row$RCP
+  } else {
+    paste0(row$RCP, " (", row$years, ")")
+  }
+  title <- paste(row$PFT, RCP)
+  image_min_gr(rast_min_gr1, subset = row$id,
+               title = title)
+}
+
+dev.off()
+
+# same figures as above but just for pforb and c3pgrass, on single page
+jpeg("figures/min_graze_maps/min_graze_c3pgrass-pforb_c4on_v1.jpeg",
+    width = wfig6, height = hfig6, units = "in",
+    res = 800)
+
+par(mar = mar, mgp = mgp)
+layout(layout.matrix4, widths = widths6, heights = heights6)
+
+df <- min_gr_info %>% 
+  filter(PFT %in% c("C3Pgrass", "Pforb"))
+
+for (i in 1:nrow(df)) {
+  row <- df[i, ]
   
   RCP <- if (row$RCP == "Current") {
     row$RCP

@@ -311,9 +311,9 @@ image_min_gr <- function(rast,
     length(subset) == 1 # this function can only work with one raster layer
   )
   
-  # 
-  color <- c("darkgrey", rev(RColorBrewer::brewer.pal(4, "YlOrRd")))
-
+  color <- rev(RColorBrewer::brewer.pal(9, "YlOrRd"))[c(1, 3, 5, 7)]
+  color <- c(color, "#abd9e9")
+  
   # main figure
   image(subset(rast, subset = subset), # the layer to be plotted
         # if default used, maps are more pixelated looking
