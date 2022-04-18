@@ -213,20 +213,27 @@ dev.off()
 # 3rd figure change from current heavy grazing to future
 # moderate
 
-# TO DO--create 12 panel fig, remove unnecessary legends. 
-
 wgcm_info_pft4 <- wgcm_info2 %>% 
   filter(PFT %in% c("Sagebrush", "C4Pgrass", "C3Pgrass", "Pforb"),
          # just the 'bottom row' of figures
-         order %in% 7:9) 
+         order %in% 7:9) %>% 
+  ungroup() %>% 
+  mutate(row = 1:nrow(.))
 
 stopifnot(nrow(wgcm_info_pft4) == 12) # should be 1 row per panel
 
-jpeg("figures/biomass_maps/12-panel-maps_wgraze_gref_v1.jpeg",
+# labels for 'columns' of figures
+col_labs <- c(
+  "Current climate to RCP8.5\n under heavy grazing",
+  "Current climate to RCP8.5\n under moderate grazing",
+  "Current climate heavy grazing\n to RCP8.5 moderate grazing")
+
+jpeg("figures/biomass_maps/12-panel-maps_wgraze_gref_v2.jpeg",
     width = wfig6, height = hfig6*2, units = 'in',
     res = 600)
 
-par(mar = mar, mgp = mgp)
+par(mar = c(1, 0.25, 0, 0.25), mgp = mgp,
+    oma = c(0, 4.5, 6.5, 0))
 layout(matrix(1:12, nrow = 4, byrow = TRUE), 
        widths = widths9, 
        # heights vary b/ only bottom row has legend
@@ -238,33 +245,37 @@ for (i in 1:nrow(wgcm_info_pft4)) {
   RCP <- as.character(row$RCP)
   
   # only add legend to bottom rows
-  legend <- if (row$PFT == "Pforb") {
-    TRUE
-  } else {
+  adjust_ylim <- if (row$PFT == "Pforb") {
     FALSE
+  } else {
+    TRUE
   }
   
   if (row$type == "bio-diff-wgraze") {
-    title <- substitute(paste(Delta, PFT, ", Current to ", RCP, ", ", 
-                              graze, " grazing"),
-                        list(c4 = row$c4,
-                             PFT = as.character(row$PFT), 
-                             graze = tolower(as.character(row$graze)),
-                             RCP = RCP))
-    image_bio_diff(rast_wgraze1, subset = row$id, title = title,
-                   legend = legend)
+    image_bio_diff(rast_wgraze1, subset = row$id,
+                   # only add legend to bottom center figure
+                   legend = (i == 11),
+                   adjust_ylim = adjust_ylim, 
+                   cex = 1)
     # change in climate and grazing
   } else {
-    title <- substitute(paste(Delta, PFT, ", Current heavy to ", RCP, ", ", 
-                              graze),
-                        list(c4 = row$c4,
-                             PFT = as.character(row$PFT), 
-                             graze = tolower(as.character(row$graze)),
-                             RCP = as.character(row$RCP)))
-    image_bio_diff(rast_diff_gref, subset = row$id, title = title,
-                   legend = legend)
+    image_bio_diff(rast_diff_gref, subset = row$id,
+                                      legend = FALSE, 
+                   adjust_ylim = adjust_ylim)
   }
+  if(row$row %in% c(1, 4, 7, 10)) {
+    # adding PFT row labels
+    mtext(row$PFT, side = 2, cex = 1, outer = FALSE, line = 0)
+  }
+  # adding column labels
+  if(row$row %in% c(1:3)) {
+    # adding PFT row labels
+    mtext(col_labs[row$row], side = 3, outer = FALSE, line = 1, title = NULL)
+  }
+  
 }
+mtext("Plant functional type", side = 2, cex = 2, outer = TRUE, line = 1.5)
+mtext("Change in scenario", side = 3, cex = 2, outer = TRUE, line = 4.1)
 
 dev.off()
 

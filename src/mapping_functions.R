@@ -193,14 +193,15 @@ image_bio <- function(rast, subset, title = "", vec = NULL,
 #'
 #' @param cols vector (colors to use)
 #' @param truebks vector of where breaks will occur
+#' @param cex defines size of legend label
 #'
 #' @return plots the legend on top of the current graphic
-legend_bio_diff <- function(cols, truebks) {
+legend_bio_diff <- function(cols, truebks, cex = 0.7) {
   
   # making background white
   # polygon(x = c(-117,-117,-109,-109), y = c(32,34.5,34.5,32),col = "white",
   #         border = "white")
-  polygon(x = c(-125,-125,-102.7,-102.7), y = c(30,33.5,33.5,30),
+  polygon(x = c(-125,-125,-102.7,-102.7), y = c(-29.8,33.5,33.5,30),
           border = "white", col = "white")
   
   # Color bar/legend at the bottom
@@ -214,7 +215,8 @@ legend_bio_diff <- function(cols, truebks) {
   # black outline of color bar
   polygon(x = c(-125, -125, -102.7 ,-102.7), y = c(31.75, 32.5, 32.5, 31.75), 
           lwd = 1.5)
-  mtext(expression(paste("", Delta, " Biomass (%)")), side = 1, line = -0.49, cex = 0.7)
+  mtext(expression(paste("", Delta, " Biomass (%)")), side = 1, line = -0.49, 
+        cex = cex)
   axis(side = 1, pos = 31.75, at = seq(-125,-102.7, length.out = length(truebks)),
        cex.axis = 0.9, labels = truebks)
 }
@@ -228,9 +230,13 @@ legend_bio_diff <- function(cols, truebks) {
 #' that should be plotted
 #' @param title Title of figure
 #' @param legend logical, whether to add a legend to the plot
+#' @param adjust_ylim logical, if true then adjust ylim when there is no
+#' legend (i.e. if no legend the ylims are restricted)
+#' @param cex defines size of legend label
 #'
 #' @return Map of percent change in biomass
-image_bio_diff <- function(rast, subset, title = "", legend = TRUE) {
+image_bio_diff <- function(rast, subset, title = "", legend = TRUE,
+                           adjust_ylim = TRUE, cex = 0.7) {
   
   # range of bio_diff is: -85.67349 103.51214
   stopifnot(
@@ -254,7 +260,7 @@ image_bio_diff <- function(rast, subset, title = "", legend = TRUE) {
          'max value is ', round(max), ". Min value is ", round(min), '.')
   }
 
-  if (legend) {
+  if (legend | !adjust_ylim) {
     ylim <- c(30, 49) # ylim larger to accommodate legend
   } else {
     ylim <- c(33.5, 49)
@@ -273,9 +279,17 @@ image_bio_diff <- function(rast, subset, title = "", legend = TRUE) {
   mtext(title, side = 3, line = 0, adj = 0, cex= 0.7)
   maps::map("state", interior = T, add = T)
   
+  if(!adjust_ylim) {
+    # making background white
+    # polygon(x = c(-117,-117,-109,-109), y = c(32,34.5,34.5,32),col = "white",
+    #         border = "white")
+    polygon(x = c(-125,-125,-102.7,-102.7), y = c(-29.8,33.5,33.5,30),
+            border = "white", col = "white")
+  }
+  
   # add legend
   if (legend) {
-    legend_bio_diff(cols = cols, truebks = truebks)
+    legend_bio_diff(cols = cols, truebks = truebks, cex = cex)
   }
   
 }
