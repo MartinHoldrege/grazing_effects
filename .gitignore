@@ -1,6 +1,7 @@
 # folders
 data_raw/*
 paper/*
+presentations/*
 
 # figure files
 *.jpeg
@@ -17,6 +18,9 @@ paper/*
 *.csv
 *.RDS
 *.xml
+
+# knitted markdown files
+*.html
 
 # History files
 .Rhistory

@@ -1,0 +1,66 @@
+---
+title: "Descriptive statistics of STEPWAT2 biomass data"
+author: "Martin Holdrege"
+date: "`r lubridate::today()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+---
+
+The purpose of this file is to create tables of descriptive statistics
+that provide numbers that are useful when writing the results of the manuscript,
+so that the underlying code doesn't need to be run everytime you want to look
+up a number
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Dependencies
+
+```{r packages, message = FALSE, warning=FALSE,}
+library(tidyverse)
+library(knitr)
+```
+
+The 02_summarize_bio.R script creates the dataframes used below.
+
+```{r source, message = FALSE, warning=FALSE, results='hide', cache=TRUE}
+# note set cache=TRUE to cache=FALSE once done developing this code,
+# because it takes disk space
+source("scripts/02_summarize_bio.R")
+```
+
+# Grazing effects
+
+
+```{r}
+pft5_d_wgcm_heavy %>% 
+  filter(c4 == 'c4on') %>% 
+  group_by(graze, PFT) %>% 
+  summarize(mean = round(mean(bio_diff), 1),
+            median = round(median(bio_diff), 1)) %>% 
+  kable(caption = 'Mean and median scaled percent changes in biomass 
+        when transitioning from heavy grazing to another grazing level.
+        Values are averages/medians across all climate scenarios.')
+  
+```
+
+Percent of sites that had more/less biomass when changing from heavy grazing
+to another intensity. 
+
+```{r}
+pft5_d_wgcm_heavy %>% 
+  filter(c4 == 'c4on') %>% 
+  group_by(graze, PFT) %>% 
+  summarize(percent_increase = mean(bio_diff > 0)*100,
+            percent_decrease = 100 - percent_increase) %>% 
+  kable(caption = "Percent of sites that had biomass increasses/decreases when
+        changing from heavy grazing, average across all climate scenarios")
+```
+
+# Climate effects
+
+
