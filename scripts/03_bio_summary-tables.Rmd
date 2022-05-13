@@ -15,7 +15,7 @@ so that the underlying code doesn't need to be run everytime you want to look
 up a number
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 ```
 
 # Dependencies
@@ -61,6 +61,94 @@ pft5_d_wgcm_heavy %>%
         changing from heavy grazing, average across all climate scenarios")
 ```
 
+## composition
+
+Composition by grazing scenario and climate scenario (just current & RCP8.5)
+
+```{r}
+comp2 %>% 
+  filter(c4 == 'c4on') %>% 
+  ungroup() %>% 
+  select(-id) %>% 
+  mutate(bio_perc = round(bio_perc, 1)) %>% 
+  kable(
+    caption = 'Composition by grazing scenario and climate scenario (just current & RCP8.5)'
+  )
+```
+
+Average composition across climate scenarios
+
+```{r}
+
+comp2_all %>% 
+  filter(c4 == 'c4on') %>% 
+  group_by(PFT, graze) %>% 
+  summarize(bio_perc = mean(bio_perc)) %>% 
+  mutate(bio_perc = round(bio_perc, 1)) %>% 
+  kable(
+    caption = 'Composition by grazing, averaged across climate scenarios'
+  )
+```
+
+### herbaceous
+
+```{r}
+comp2_all %>% 
+  filter(PFT %in% c('C3Pgrass', 'C4Pgrass', 'Pforb', "Cheatgrass")) %>% 
+  # this df is already grouped
+  mutate(bio_perc = biomass/(sum(biomass))*100) %>% 
+  filter(c4 == 'c4on') %>% 
+  group_by(PFT, graze) %>% 
+  summarize(bio_perc = mean(bio_perc)) %>% 
+  mutate(bio_perc = round(bio_perc, 1)) %>% 
+  kable(
+    caption = 'Composition of herbaceous PFTs by grazing, averaged across climate scenarios'
+  )
+```
+
+
 # Climate effects
 
+Average climate effects across grazing treatments
 
+```{r wgraze}
+
+ pft5_bio_d2 %>% 
+  filter(c4 == 'c4on') %>% 
+  group_by(PFT, years, RCP) %>% 
+  summarize(mean = round(mean(bio_diff), 1)) %>% 
+  kable(caption = 'the mean % change from current to future climate conditions,
+  across grazing treatments')
+  
+
+```
+
+## composition
+
+```{r}
+comp2 %>% 
+  filter(c4 == 'c4on') %>% 
+  group_by(PFT, RCP, years) %>% 
+  summarize(bio_perc = mean(bio_perc)) %>% 
+  mutate(bio_perc = round(bio_perc, 1)) %>% 
+  kable(
+    caption = 'Composition by climate scenario, averaged across grazing intensities'
+  )
+```
+
+
+### herbaceous
+
+```{r}
+comp2 %>% 
+  filter(PFT %in% c('C3Pgrass', 'C4Pgrass', 'Pforb', "Cheatgrass")) %>% 
+  # this df is already grouped
+  mutate(bio_perc = biomass/(sum(biomass))*100) %>% 
+  filter(c4 == 'c4on') %>% 
+  group_by(PFT, RCP, years) %>% 
+  summarize(bio_perc = mean(bio_perc)) %>% 
+  mutate(bio_perc = round(bio_perc, 1)) %>% 
+  kable(
+    caption = 'Composition of herbaceous PFTs by climate, averaged across all grazing scenarios'
+  )
+```

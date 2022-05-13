@@ -343,7 +343,8 @@ thresh_min_graze1 <- pft5_bio2 %>%
 
 
 comp1 <- pft5_bio1_tot %>% 
-  filter_rcp_c4() %>% 
+  filter(c4 == 'c4on') %>% 
+#  filter_rcp_c4() %>% 
   # median across GCMs
   summarise(biomass = median(biomass),
             .groups = 'drop') %>% 
@@ -357,7 +358,8 @@ comp1 <- pft5_bio1_tot %>%
 
 # calculating biomass and % of total biomass in the 'other' category,
 # that is not biomass from the main 5 PFTs
-comp2 <- comp1 %>% 
+# all climate scenarios
+comp2_all <- comp1 %>% 
   mutate(other_biomass = biomass[PFT == "Total"] - sum(biomass[PFT != "Total"]),
          other_perc = 100 - sum(bio_perc[PFT != 'Total']),
          biomass = other_biomass,
@@ -368,11 +370,16 @@ comp2 <- comp1 %>%
   bind_rows(comp1) %>% 
   filter(PFT != "Total") %>% 
   mutate(PFT = factor(PFT,  
-                      levels = c("Other", "Cheatgrass", 'Aforb', "Pforb",  
+                      levels = c("Other", "Cheatgrass", "Pforb",  
                                  "C4Pgrass", 
                                  "C3Pgrass", "Sagebrush")))%>% 
-  arrange(RCP, graze) %>% 
+  arrange(RCP, graze) 
+
+# just current and RCP8.5 mid-century
+comp2 <- comp2_all %>%  
+  filter_rcp_c4()%>% 
   mutate(id = factor(id, levels = unique(id)))
+
 
 # composition of just key herbaceous PFTs
 comp_herb1 <- comp2 %>% 
