@@ -2,6 +2,7 @@
 
 # Script started Jan 7, 2022
 
+
 # Purpose: Create maps of biomass and change in biomass across the west
 # based on STEPWAT2 output for 200 sites (for each plant functional
 # type and climate and grazing scenario) that has been upscaled across
