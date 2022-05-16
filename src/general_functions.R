@@ -773,3 +773,34 @@ create_rast_info <- function(rast,
     df_factor() 
   out
 }
+
+
+#' Percent area crossing threshold
+#'
+#' @param lyr name of the layer of the SpatRaster
+#' @param r spatRaster object
+#'
+#' @return dataframe, The percent of total area belonging to each of the threshold
+#' categories. This is actual area (accounting for non-equal area projections)
+calc_pcent_by_thresh <- function(lyr, r) {
+  
+  r <- r[[lyr]]
+  
+  # calculating total area of all cells falling
+  # into the various threshold categories
+  
+  area <- zonal(cellSize(r), r, fun = 'sum')
+  x <- area$area/sum(area)*100
+  levels <- c("Light grazing", 
+              "Moderate grazing", 
+              "Heavy grazing", 
+              "Very Heavy Grazing",
+              "Didn't cross threshold")
+  
+  # the raster doesn't necessarily have all 5 values
+  # so just extracting the values it does have
+  names(x) <- levels[area[[1]]]
+  
+  out <- as.data.frame(as.list(x))
+  out
+}

@@ -11,8 +11,11 @@ output:
 
 The purpose of this file is to create tables of descriptive statistics
 that provide numbers that are useful when writing the results of the manuscript,
-so that the underlying code doesn't need to be run everytime you want to look
-up a number
+so that the underlying code doesn't need to be run every time you want to look
+up a number.
+
+Additional summary values of the interpolated/upscaled data are also 
+made. 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE)
@@ -20,9 +23,11 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 
 # Dependencies
 
-```{r packages, message = FALSE, warning=FALSE,}
+```{r packages, message = FALSE, warning=FALSE}
+source("src/general_functions.R")
 library(tidyverse)
 library(knitr)
+library(terra)
 ```
 
 The 02_summarize_bio.R script creates the dataframes used below.
@@ -33,7 +38,24 @@ The 02_summarize_bio.R script creates the dataframes used below.
 source("scripts/02_summarize_bio.R")
 ```
 
-# Grazing effects
+
+## reading in data
+
+```{r}
+p <- "data_processed/interpolated_rasters"
+
+# minimum grazing level at which biomass threshold is exceeded
+min_graze_files <- list.files(file.path(p, "min_graze/"),
+                              full.names = TRUE)
+
+rast_min_gr1 <- rast(min_graze_files)
+```
+
+
+
+# Site level
+
+## Grazing effects
 
 
 ```{r}
@@ -61,7 +83,7 @@ pft5_d_wgcm_heavy %>%
         changing from heavy grazing, average across all climate scenarios")
 ```
 
-## composition
+### composition
 
 Composition by grazing scenario and climate scenario (just current & RCP8.5)
 
@@ -90,7 +112,7 @@ comp2_all %>%
   )
 ```
 
-### herbaceous
+### herbaceous composition
 
 ```{r}
 comp2_all %>% 
@@ -107,7 +129,7 @@ comp2_all %>%
 ```
 
 
-# Climate effects
+## Climate effects
 
 Average climate effects across grazing treatments
 
@@ -123,7 +145,7 @@ Average climate effects across grazing treatments
 
 ```
 
-## composition
+### composition
 
 ```{r}
 comp2 %>% 
@@ -137,7 +159,7 @@ comp2 %>%
 ```
 
 
-### herbaceous
+### herbaceous composition
 
 ```{r}
 comp2 %>% 
@@ -152,3 +174,32 @@ comp2 %>%
     caption = 'Composition of herbaceous PFTs by climate, averaged across all grazing scenarios'
   )
 ```
+
+# Interpolated
+
+## graze threshold
+
+```{r}
+min_gr_info <- tibble(id = names(rast_min_gr1),
+                    id2 = id) %>% 
+  separate(col = id2,
+           into = c("c4", "PFT", "type", "RCP", "years"),
+           sep = "_") %>% 
+  df_factor() %>% 
+  arrange(PFT, RCP)
+
+# just the two PFTs focused on in the manuscript
+min_gr_info2 <- min_gr_info %>% 
+  filter(PFT %in% c("C3Pgrass", "Pforb"))
+
+
+df_pcent_by_thresh <- map_dfr(min_gr_info2$id, calc_pcent_by_thresh, 
+                              r = rast_min_gr1)
+
+df_pcent_by_thresh$id <- min_gr_info2$id
+kable(df_pcent_by_thresh,
+      caption = "Percent of upscaled area",
+      digits = 1)
+
+```
+
