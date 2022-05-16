@@ -205,7 +205,7 @@ for (i in 1:nrow(wgcm_info2)) {
 dev.off()
 
 
-# maps--12 panel figure ---------------------------------------------------
+# maps--9 panel figure ---------------------------------------------------
 # for manuscript
 # 3 figs per row (1 row per pft)
 # scaled percent change in biomass from current to RCP8.5 mid century,
@@ -214,13 +214,13 @@ dev.off()
 # moderate
 
 wgcm_info_pft4 <- wgcm_info2 %>% 
-  filter(PFT %in% c("Sagebrush", "C4Pgrass", "C3Pgrass", "Pforb"),
+  filter(PFT %in% c("Sagebrush", "C3Pgrass", "Pforb"),
          # just the 'bottom row' of figures
          order %in% 7:9) %>% 
   ungroup() %>% 
   mutate(row = 1:nrow(.))
 
-stopifnot(nrow(wgcm_info_pft4) == 12) # should be 1 row per panel
+stopifnot(nrow(wgcm_info_pft4) == 9) # should be 1 row per panel
 
 # labels for 'columns' of figures
 col_labs <- c(
@@ -228,16 +228,16 @@ col_labs <- c(
   "Current climate to RCP8.5\n under moderate grazing",
   "Current climate heavy grazing\n to RCP8.5 moderate grazing")
 
-jpeg("figures/biomass_maps/12-panel-maps_wgraze_gref_v2.jpeg",
-    width = wfig6, height = hfig6*2, units = 'in',
+jpeg("figures/biomass_maps/9-panel-maps_wgraze_gref_v1.jpeg",
+    width = wfig6, height = hfig6*3/2, units = 'in',
     res = 600)
 
 par(mar = c(1, 0.25, 0, 0.25), mgp = mgp,
     oma = c(0, 4.5, 6.5, 0))
-layout(matrix(1:12, nrow = 4, byrow = TRUE), 
+layout(matrix(1:9, nrow = 3, byrow = TRUE), 
        widths = widths9, 
        # heights vary b/ only bottom row has legend
-       heights = c(0.81, 0.81, 0.81, 1))
+       heights = c(0.81, 0.81, 1))
 
 for (i in 1:nrow(wgcm_info_pft4)) {
   
@@ -254,7 +254,7 @@ for (i in 1:nrow(wgcm_info_pft4)) {
   if (row$type == "bio-diff-wgraze") {
     image_bio_diff(rast_wgraze1, subset = row$id,
                    # only add legend to bottom center figure
-                   legend = (i == 11),
+                   legend = (i == 8),
                    adjust_ylim = adjust_ylim, 
                    cex = 1)
     # change in climate and grazing
@@ -263,7 +263,7 @@ for (i in 1:nrow(wgcm_info_pft4)) {
                                       legend = FALSE, 
                    adjust_ylim = adjust_ylim)
   }
-  if(row$row %in% c(1, 4, 7, 10)) {
+  if(row$row %in% c(1, 4, 7)) {
     # adding PFT row labels
     mtext(row$PFT, side = 2, cex = 1, outer = FALSE, line = 0)
   }
