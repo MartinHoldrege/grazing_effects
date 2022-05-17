@@ -559,11 +559,17 @@ dev.off()
 # (i.e. closer to publication quality)
 
 
-ylim <- c(-1.1, 0.4) # limits for cheatgrass
 
-
-df <- pft5_es_wgcm %>% 
+df <- pft5_es_wgcm_heavy %>% 
   filter_rcp_c4(PFT = TRUE)
+
+# setting y limits to include all data points (except cheatgrass outliers)
+range <- df %>% 
+  filter(PFT != 'Cheatgrass') %>% 
+  pull(bio_es) %>% 
+  range(na.rm = TRUE)
+
+ylim <- c(range[1] - 0.01, range[2] + 0.01)
 
 outliers0 <- df%>% 
   filter(bio_es < ylim[1] | bio_es > ylim[2])
@@ -575,7 +581,7 @@ if(!all(outliers0$PFT == "Cheatgrass")) {
     group_by(graze, RCP, PFT) %>% 
     summarize(n = n(),
               .groups = 'drop') %>% 
-    mutate(n = paste(n, "")) # add symbol her (e.g. *) if desired
+    mutate(n = paste(n, "")) # add symbol here (e.g. *) if desired
 }
 
 
@@ -583,23 +589,24 @@ if(!all(outliers0$PFT == "Cheatgrass")) {
 g <- ggplot(df, aes(x = RCP, y = bio_es, fill = graze)) +
   geom_blank() + # added so that geom_vline doesn't throw an error
   geom_vline(xintercept = 1.5, linetype = 2) +
+  geom_hline(yintercept = 0, linetype = 1, alpha = 0.3) +
   facet_rep_wrap(~ PFT, ncol = 3,
                  repeat.tick.labels = FALSE) +
-  scale_fill_graze(include_light = FALSE) +
+  scale_fill_graze(exclude = 'Heavy') +
   labs(x = lab_rcp,
        y = lab_es1) +
   theme_box_pft5()+
-  add_sec_axis(name = lab_change0) +
+  add_sec_axis(name = "% Change relative to heavy grazing") +
   # this restricts 
   #expand_limits(y = ylim) +
   # printing how many outliers not shown. 
   scale_color_manual(values = cols_graze) +
-  guides(color = 'none') +
+  guides(color = 'none')+
   coord_cartesian(ylim = ylim)
 
 
 # boxplot
-jpeg("figures/biomass/pub_qual/bio-diff_boxplot_pft5_rcp8.5_c4on_v2.jpeg",
+jpeg("figures/biomass/pub_qual/bio-diff_boxplot_pft5_rcp8.5_c4on_v2_heavy.jpeg",
      res = 600, height = hfig_box2, width = wfig_box2, units = "in")
 g+
   geom_boxplot(outlier.size = outlier.size) +
