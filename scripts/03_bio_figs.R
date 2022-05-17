@@ -584,7 +584,7 @@ g <- ggplot(df, aes(x = RCP, y = bio_es, fill = graze)) +
   geom_blank() + # added so that geom_vline doesn't throw an error
   geom_vline(xintercept = 1.5, linetype = 2) +
   facet_rep_wrap(~ PFT, ncol = 3,
-                 repeat.tick.labels = TRUE) +
+                 repeat.tick.labels = FALSE) +
   scale_fill_graze(include_light = FALSE) +
   labs(x = lab_rcp,
        y = lab_es1) +
@@ -599,7 +599,7 @@ g <- ggplot(df, aes(x = RCP, y = bio_es, fill = graze)) +
 
 
 # boxplot
-jpeg("figures/biomass/pub_qual/bio-diff_boxplot_pft5_rcp8.5_c4on.jpeg",
+jpeg("figures/biomass/pub_qual/bio-diff_boxplot_pft5_rcp8.5_c4on_v2.jpeg",
      res = 600, height = hfig_box2, width = wfig_box2, units = "in")
 g+
   geom_boxplot(outlier.size = outlier.size) +
@@ -607,7 +607,8 @@ g+
   geom_label(data = outliers, aes(x = as.numeric(RCP) + as.numeric(graze)/3.7 -0.5,
                                   y = Inf, label = n, color = graze),
              fill = 'white', label.padding = unit(0.1, 'lines') ,
-             size = 2.5, vjust = 'inward', label.size = 0) 
+             size = 2.5, vjust = 'inward', label.size = 0) +
+  theme(panel.spacing.x = unit(-2, "lines"))
 
 dev.off()
 
