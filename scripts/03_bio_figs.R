@@ -711,19 +711,23 @@ dev.off()
 # also separate barcharts for only the herbaceous PFTs
 
 # function for creating the stacked bar charts below
-g_comp <- function(df, color, text_y = 600, ylab2 = lab_perc_bio0) {
+g_comp <- function(df, color, text_y = 600, ylab2 = lab_perc_bio0,
+                   text_y2 = 108, # height of text for composition figure
+                   shift_ylim = 0,
+                   group_by = 'RCP', label = "RCP",
+                   xintercept = 4.5) {
   g <- ggplot(df, aes(x = id, fill = PFT)) +
     scale_x_discrete(labels = id2graze) +
     labs(x = lab_graze) +
     theme(axis.text.x = element_text(angle = 45, vjust = 0.6)) +
-    geom_vline(xintercept = 4.5, linetype = 2) 
+    geom_vline(xintercept = xintercept, linetype = 2) 
   
   # absolute biomass (stacked)
   g1 <- g +
     geom_bar(aes(y = biomass), position = 'stack', stat = 'identity') +
-    geom_text(data = box_anno(df, var = "biomass", group_by = "RCP",
+    geom_text(data = box_anno(df, var = "biomass", group_by = group_by,
                               y = text_y),
-              aes(x, y, label = RCP, fill = NULL)) +
+              aes_string("x", "y", label = label, fill = NULL)) +
     labs(y = lab_bio0,
          x = NULL) +
     # code below so that legend doesn't appear but figure dimension are unchanged
@@ -731,17 +735,20 @@ g_comp <- function(df, color, text_y = 600, ylab2 = lab_perc_bio0) {
                       guide = guide_legend(override.aes = list(alpha = 0))) +
     theme(legend.title = element_text(color = "transparent"),
           legend.text = element_text(color = "transparent"),
-          axis.text.x = element_blank()) 
+          axis.text.x = element_blank()) +
+    coord_cartesian(ylim = c(0, text_y + text_y*shift_ylim))
   
   # % of total biomass (stacked)
   g2 <- g +
     geom_bar(aes(y = bio_perc), position = 'stack', stat = 'identity') +
-    geom_text(data = box_anno(df, var = "bio_perc", group_by = "RCP",
-                              y = 108),
-              aes(x, y, label = RCP, fill = NULL)) +
+    geom_text(data = box_anno(df, var = "bio_perc", group_by = group_by,
+                              y = text_y2),
+              aes_string("x", "y", label = label, fill = NULL)) +
     labs(y = ylab2) +
     scale_fill_manual(values = color, name = "") +
-    scale_y_continuous(breaks = seq(0, 100, by = 25))
+    scale_y_continuous(breaks = seq(0, 100, by = 25),
+                       limits = c(0, text_y2 + text_y2*shift_ylim)) 
+    
   
   # doing this so the left axis is aligned, and figures are the same height
   rbind(ggplotGrob(g1), ggplotGrob(g2))
@@ -749,13 +756,56 @@ g_comp <- function(df, color, text_y = 600, ylab2 = lab_perc_bio0) {
 
 jpeg("figures/biomass/comp_stacked-bar_RCP8.5-M_c4on.jpeg",
      width = 8, height = 6, units = 'in', res = 600)
-# All pfts
 
 grid::grid.draw(
-  cbind(g_comp(comp2, color =  cols_pft5_other),
+  cbind(g_comp(comp2, color =  cols_pft5_other),# All pfts
         g_comp(comp_herb1, color =  cols_herb, text_y = 180,
                ylab2 = "% of biomass"))
 )
+
+dev.off()
+
+
+# * all scenarios ---------------------------------------------------------
+# stacked bar charts for the appendix that show all climate scenarios. 
+
+# all plant functional types
+comp2_all2 <- comp2_all %>% 
+  ungroup() %>% 
+  arrange(RCP, years, graze) %>% 
+  mutate(
+    id = paste(RCP, years, graze, sep = "_"),
+    id = factor(id, levels = unique(id)),
+    years = ifelse(years == 'Current', "", as.character(years)),
+         RCP_years = paste(RCP, years, sep = "\n"))
+
+g <- g_comp(comp2_all2, color =  cols_pft5_other, label = "RCP_years", 
+       group_by = "RCP_years", xintercept = 0.5 + 4*1:4, text_y = 630,
+       text_y2 = 113, shift_ylim = 0.05)
+
+jpeg("figures/biomass/comp_stacked-bar_pft5_all-scenarios_c4on.jpeg",
+     width = 8, height = 6, units = 'in', res = 600)
+
+grid::grid.draw(g)
+
+dev.off()
+
+# herbaceous functional type
+# composition of just key herbaceous PFTs
+comp_herb_all <- comp2_all2 %>% 
+  filter(PFT %in% c('C3Pgrass', 'C4Pgrass', 'Pforb', "Cheatgrass")) %>% 
+  # this df is already grouped
+  group_by(id) %>% 
+  mutate(bio_perc = biomass/(sum(biomass))*100)
+
+g2 <- g_comp(comp_herb_all, color =  cols_pft5_other, label = "RCP_years", 
+             group_by = "RCP_years", xintercept = 0.5 + 4*1:4, text_y = 190,
+             text_y2 = 113, shift_ylim = 0.05)
+
+jpeg("figures/biomass/comp_stacked-bar_herb_all-scenarios_c4on.jpeg",
+     width = 8, height = 6, units = 'in', res = 600)
+
+grid::grid.draw(g2)
 
 dev.off()
 

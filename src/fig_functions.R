@@ -277,7 +277,7 @@ id2graze <- function(x) {
   out <- case_when(
     str_detect(x, "Light") ~ "Light",
     str_detect(x, "Moderate") ~ "Moderate",
-    str_detect(x, "VeryHeavy") ~ "Very Heavy",
+    str_detect(x, "Very[ ]{0,1}Heavy") ~ "Very Heavy",
     str_detect(x, "Heavy") ~ "Heavy"
     
   )
