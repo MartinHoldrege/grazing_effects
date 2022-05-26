@@ -594,7 +594,7 @@ g <- ggplot(df, aes(x = RCP, y = bio_es, fill = graze)) +
                  repeat.tick.labels = FALSE) +
   scale_fill_graze(exclude = 'Heavy') +
   labs(x = lab_rcp,
-       y = lab_es1) +
+       y = lab_es1_heavy) +
   theme_box_pft5()+
   add_sec_axis(name = "% Change relative to heavy grazing") +
   # this restricts 

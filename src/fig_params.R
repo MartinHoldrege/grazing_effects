@@ -89,6 +89,7 @@ lab_mat <- expression("MAT ("*degree*C*")")
 # effect size
 lab_es0 <- expression("ln("*frac(biomass, reference~group~biomass)*")")
 lab_es1 <- expression("ln("*frac(biomass, light~grazing~biomass)*")")
+lab_es1_heavy <- expression("ln("*frac(biomass, heavy~grazing~biomass)*")")
 lab_es0_indivs <- expression("ln("*frac(individuals, reference~group~individuals)*")")
 lab_es_on_off <- expression("ln("*frac(biomass~C4off, biomass~C4on)*")")
 lab_es_on_off_indivs <- expression("ln("*frac(individuals~C4off, individuals~C4on)*")")
