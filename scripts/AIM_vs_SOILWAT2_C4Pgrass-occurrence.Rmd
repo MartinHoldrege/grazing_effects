@@ -1,0 +1,141 @@
+---
+title: "Comparing AIM C4 grass data to SOILWAT2 output"
+subtitle: "Comparing PL96 vs PL96&TS76 SOILWAT2 implementation"
+author: "Martin Holdrege"
+date: "`r lubridate::today()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+---
+
+Purpose: compare AIM perennial C4 grass occurrence data to
+where SOILWAT2 is simulating c4pgrass present, and compare two implementations
+of the equation that dictates where C4 grasses are simulated as present
+(i.e. PL96 (original version) and PL96&TS76 (potential new version))
+
+
+# Dependencies
+
+```{r warning = FALSE, message = FALSE}
+source("src/general_functions.R")
+library(tidyverse)
+library(terra)
+library(sf)
+library(knitr)
+```
+
+# Read in data 
+
+### SOILWAT2 gridded data
+
+SOILWAT2 data (c4 grass cover) from Daniel
+
+```{r }
+pl96a <- rast("data_raw/SOILWAT2/grassC4frac-PL96_yr_SOILWAT2_wUS-gm_historical_gn_19790101-20201231-clim.nc")
+pl96_ts76a <- rast("data_raw/SOILWAT2/grassC4frac-PL96&TS76_yr_SOILWAT2_wUS-gm_historical_gn_19790101-20201231-clim.nc")
+```
+
+### AIM
+
+2011-2015 AIM vegetation data that Rachel Renne has compiled
+
+```{r }
+aim1 <- read_csv("data_raw/AIM/LMF_ALL.data.2011-2015.FINAL_v2.csv",
+                 show_col_types = FALSE)
+```
+
+# Data processing 
+
+## AIM
+
+the WBG and WRG columns are c4 perennial bunch grasses and c4 perennial 
+rhizomatous grasses, respectively. 
+
+```{r }
+aim2 <- aim1 %>% 
+  select(PLOTKEY, latitude, longitude, WBG, WRG) %>% 
+  #' are C4 P grasses present?
+  mutate(C4Pgrass = ifelse(WBG > 0 | WRG > 0, "present", "absent")) 
+
+```
+
+Percent of AIM sites where C4 grasses are present:
+
+```{r}
+mean(aim2$C4Pgrass == "present") * 100 #' % of sites w/ c4pgrass present
+```
+
+Creating a SpatVector (terra package)
+for some reason logical data column gets converted to character (can't 
+force it to be logical)
+
+```{r }
+aim_sv1 <- vect(aim2, geom = c("longitude", "latitude"),
+                crs = "EPSG:4326") #' crs is wgs 1984, lat/lon
+```
+
+
+## Extract data for each AIM site
+
+Extracting soilwat2 cover values for each AIM site
+
+```{r warning = FALSE}
+aim_sv2 <- aim_sv1
+
+# The 2nd column contains values extracted from the raster for each AIM site
+
+aim_sv2$pl96_cover <- extract(pl96a, aim_sv1)[, 2] # c4pgrass cover
+aim_sv2$pl96ts76_cover <- extract(pl96_ts76a, aim_sv1)[, 2] # c4pgrass cover
+
+
+aim_sf3 <- aim_sv2 %>% 
+  sf::st_as_sf() %>% 
+  # presence/absence for aim data
+  rename(aim = C4Pgrass) %>% 
+  mutate(
+    # presence/absence for soilwat2 data at the aim points
+    pl96 = ifelse(pl96_cover > 0, "present", "absent"),
+    pl96ts76 = ifelse(pl96ts76_cover > 0, "present", "absent")
+  ) %>% 
+  select(-matches('cover'))
+
+```
+
+
+
+# Summarise AIM data
+
+Contingency table showing C4pgrass presence absence in observed (aim data),
+and modeled (SOILWAT2) for all AIM plots
+
+```{r warning = FALSE}
+aim_4 <- st_drop_geometry(aim_sf3)
+con1_pl96 <- table(aim_4[, c("aim", "pl96")])
+con1_pl96ts76 <- table(aim_4[, c("aim", "pl96ts76")])
+
+
+
+```
+
+Percent correctly classified
+
+```{r}
+round(pcc(con1_pl96))
+round(pcc(con1_pl96ts76))
+```
+
+Contingency tables
+
+```{r comment = ""}
+
+addmargins(con1_pl96) # counts
+addmargins(con1_pl96ts76) 
+proportions(con1_pl96, 2) %>% 
+  round(3)# column percents
+proportions(con1_pl96ts76, 2) %>% 
+  round(3) # column percents
+```
+
+
