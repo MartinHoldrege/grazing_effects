@@ -8,7 +8,9 @@
 
 # dependencies ------------------------------------------------------------
 
+library(tidyverse)
 library(DBI)
+source("src/general_functions.R")
 
 # connect to databases ----------------------------------------------------
 
@@ -48,26 +50,26 @@ q2 <- paste("SELECT *",
 bio1 <- map_dfr(db_test, dbGetQuery, statement = q1) %>% 
   # 2023 implementation where only the fire module has been updated
   # (flexible eind etc. not changed here)
-  mutate(run = '23FireOnly')
+  mutate(run = '2023FireOnly')
 
 bio_orig1 <- dbGetQuery(db_orig, q2)  %>% 
   # 2022 implimentation, with cheatgrass fire equation
-  mutate(run = '22CheatgrassFire')
+  mutate(run = '2022CheatgrassFire')
 
-bio2 <- bind_rows(bio_orig1) %>% 
+bio2 <- bind_rows(bio1, bio_orig1) %>% 
   as_tibble() %>% 
-  mutate(RCP = ifelse(GCM == "Current", "Current", RCP),
-         years = ifelse(GCM == "Current", "Current", years))
+  mutate(RCP = rcp2factor(RCP),
+         years = years2factor(years),
+         id = paste(RCP, years, sep = "_"))
 
 
 # summarize ---------------------------------------------------------------
-
 
 # * fire ------------------------------------------------------------------
 # summarize just the results on fire frequency
 
 fire1 <- bio2 %>% 
-  group_by(site, run, RCP, years, GCM) %>% 
+  group_by(id, site, run, RCP, years, GCM) %>% 
   # average across years of a given simulation
   summarize(WildFire = mean(WildFire),
             .groups = 'drop_last') %>% 
@@ -75,4 +77,15 @@ fire1 <- bio2 %>%
   summarize(WildFire = median(WildFire)) %>% 
   # % wildfire probability (calculating from # fires out of 200 years)
   mutate(prob = WildFire/200*100)# 
+
+
+# figures -----------------------------------------------------------------
+
+# *fire -------------------------------------------------------------------
 fire1
+
+ggplot(fire1, aes(id, prob, color = run, shape = run, fill = run)) +
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  labs(x = "Scenario",
+       y = "Observed fire probability (%) in STEPWAT2")
