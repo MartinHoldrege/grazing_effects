@@ -11,6 +11,11 @@
 library(tidyverse)
 library(DBI)
 source("src/general_functions.R")
+theme_set(theme_classic())
+
+# params ------------------------------------------------------------------
+
+path <- "D:/USGS/large_files/stepwat/"
 
 # connect to databases ----------------------------------------------------
 
@@ -26,11 +31,24 @@ test_dbs <- paste0("Output_site_", sites, ".sqlite")
 names(test_dbs) <- paste0("site_", sites)
 path_test_runs <- file.path(db_loc, paste())
 
+# new wildfire module implemented
+path_test_runs1 <- list.files(file.path(path, "WildfireMay2023TestRuns"),
+                             pattern = ".sqlite",
+                             full.names = TRUE)
+
+# run where not wildfire was implemented
+path_test_runs2 <- list.files(file.path(path, "WildfireMay2023TestRuns/NoWildfireDatabases"),
+                              pattern = ".sqlite",
+                              full.names = TRUE)
+
 db_orig <- dbConnect(RSQLite::SQLite(), path_orig)
 
-db_test <- map(test_dbs, function(x) {
-  path <- file.path(db_loc, x)
-  dbConnect(RSQLite::SQLite(), path)
+db_test1 <- map(path_test_runs1, function(x) {
+  dbConnect(RSQLite::SQLite(), x)
+})
+
+db_test2 <- map(path_test_runs2, function(x) {
+  dbConnect(RSQLite::SQLite(), x)
 })
 
 # db queries --------------------------------------------------------------
@@ -47,16 +65,20 @@ q2 <- paste("SELECT *",
             paste(sites, collapse = ' OR site == '), ");")
 
 # separately querying the two tables
-bio1 <- map_dfr(db_test, dbGetQuery, statement = q1) %>% 
+bio1 <- map_dfr(db_test1, dbGetQuery, statement = q1) %>% 
+  # run where no fire probability was measured
+  mutate(run = '2023Fire')
+
+bio1a <- map_dfr(db_test2, dbGetQuery, statement = q1) %>% 
   # 2023 implementation where only the fire module has been updated
   # (flexible eind etc. not changed here)
-  mutate(run = '2023FireOnly')
+  mutate(run = '2023NoFire')
 
 bio_orig1 <- dbGetQuery(db_orig, q2)  %>% 
   # 2022 implimentation, with cheatgrass fire equation
   mutate(run = '2022CheatgrassFire')
 
-bio2 <- bind_rows(bio1, bio_orig1) %>% 
+bio2 <- bind_rows(bio1, bio1a, bio_orig1) %>% 
   as_tibble() %>% 
   mutate(RCP = rcp2factor(RCP),
          years = years2factor(years),
@@ -84,8 +106,24 @@ fire1 <- bio2 %>%
 # *fire -------------------------------------------------------------------
 fire1
 
+cap1 <- paste("Simulations run for", length(sites), "sites")
+pdf("figures/fire/compare-fire-implementations_v1.pdf",
+    width = 6, height = 5)
 ggplot(fire1, aes(id, prob, color = run, shape = run, fill = run)) +
   geom_point() +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
   labs(x = "Scenario",
-       y = "Observed fire probability (%) in STEPWAT2")
+       y = "Observed fire probability (%) in STEPWAT2",
+       caption = cap1)
+
+
+ggplot(fire1, aes(run, prob, group = site)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~id) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  labs(x = "Scenario",
+       y = "Observed fire probability (%) in STEPWAT2",
+       caption = cap1)
+dev.off()
+
