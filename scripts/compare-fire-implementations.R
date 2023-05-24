@@ -11,7 +11,9 @@
 library(tidyverse)
 library(DBI)
 source("src/general_functions.R")
+source("src/fig_params.R")
 theme_set(theme_classic())
+
 
 # params ------------------------------------------------------------------
 
@@ -101,20 +103,40 @@ fire1 <- bio2 %>%
   mutate(prob = WildFire/200*100)# 
 
 
+# *biomass ----------------------------------------------------------------
+PFTs <- c("sagebrush", "a.cool.forb", "a.warm.forb", "p.cool.forb", "p.warm.forb",
+          "a.cool.grass", "p.cool.grass", "p.warm.grass")
+
+# median biomass across GCMs
+bio_med1 <- bio2 %>% 
+  select(run, site, GCM, years, RCP, Year, all_of(PFTs), id) %>% 
+  pivot_longer(cols = all_of(PFTs),
+               values_to = "biomass",
+               names_to = "PFT") %>% 
+  group_by(id, site, run, RCP, years, PFT, GCM) %>% 
+  summarise(biomass = mean(biomass), .groups = "drop_last") %>% 
+  summarize(biomass = median(biomass))
+
+
+
 # figures -----------------------------------------------------------------
 
-# *fire -------------------------------------------------------------------
+
 fire1
 
 cap1 <- paste("Simulations run for", length(sites), "sites")
 pdf("figures/fire/compare-fire-implementations_v1.pdf",
     width = 6, height = 5)
-ggplot(fire1, aes(id, prob, color = run, shape = run, fill = run)) +
-  geom_point() +
+
+# *fire -------------------------------------------------------------------
+
+ggplot(fire1, aes(id, prob, color = run, shape = run, fill = run, group = run)) +
+  geom_point(position = position_dodge(width = 0.5)) +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
   labs(x = "Scenario",
        y = "Observed fire probability (%) in STEPWAT2",
        caption = cap1)
+
 
 
 ggplot(fire1, aes(run, prob, group = site)) +
@@ -122,8 +144,36 @@ ggplot(fire1, aes(run, prob, group = site)) +
   geom_line() +
   facet_wrap(~id) +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
-  labs(x = "Scenario",
+  labs(x = "Model run",
        y = "Observed fire probability (%) in STEPWAT2",
        caption = cap1)
+
+
+# * biomass ---------------------------------------------------------------
+g <- ggplot(bio_med1, aes(id, biomass, color = run, shape = run, fill = run, group = run)) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  facet_wrap(~PFT, scales = 'free_y') +
+  labs(x = "Scenario",
+       y = lab_bio0,
+       caption = cap1)
+
+g + geom_point(position = position_dodge(width = 0.5)) 
+
+
+
+for(x in PFTs) {
+  g <- ggplot(bio_med1[bio_med1$PFT == x, ], aes(run, biomass, group = site)) +
+    geom_point() +
+    geom_line() +
+    facet_wrap(~id) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+    labs(x = "Model run",
+         y = lab_bio0,
+         subtitle = x,
+         caption = cap1)
+  print(g)
+}
+
+
 dev.off()
 
