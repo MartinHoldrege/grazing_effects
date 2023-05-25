@@ -10,14 +10,21 @@
 
 library(tidyverse)
 library(DBI)
+library(sf)
 source("src/general_functions.R")
 source("src/fig_params.R")
+source("../cheatgrass_fire/src/basemaps.R") # for basemaps_g
 theme_set(theme_classic())
 
 
 # params ------------------------------------------------------------------
 
 path <- "D:/USGS/large_files/stepwat/"
+
+
+# site locations ----------------------------------------------------------
+
+sites1 <- read_csv(file.path(path, "WildfireMay2023TestRuns/STEPWAT2.testing.sites.csv"))
 
 # connect to databases ----------------------------------------------------
 
@@ -175,5 +182,14 @@ for(x in PFTs) {
 }
 
 
-dev.off()
+# *map of site locations ------------------------------------------------------
 
+sites2 <- sf::st_as_sf(sites1, coords = c("X_WGS84", "Y_WGS84"),
+                       crs = sf::st_crs("EPSG:4326"))
+
+ggplot() +
+  geom_sf(data = sites2) +
+  basemap_g(bbox) +
+  labs(title = 'locations of test sites')
+
+dev.off()
