@@ -33,12 +33,7 @@ sites1 <- read_csv(file.path(path, "WildfireMay2023TestRuns/STEPWAT2.testing.sit
 path_orig <- "data_raw/Output.biomass.200sites.grazing.cheatgrass.Nov2021.sqlite"
 
 sites <- c(1, 4, 21,
-           25, 84, 87, 89) # sites for which test runs were done
-# where test dbs are located
-db_loc <- "D:/USGS/large_files/stepwat/WildfireMay2023TestRuns"
-test_dbs <- paste0("Output_site_", sites, ".sqlite")
-names(test_dbs) <- paste0("site_", sites)
-path_test_runs <- file.path(db_loc, paste())
+           25, 84, 87, 89, 178) # sites for which test runs were done (only some done for 178)
 
 # new wildfire module implemented
 path_test_runs1 <- list.files(file.path(path, "WildfireMay2023TestRuns"),
@@ -50,6 +45,8 @@ path_test_runs2 <- list.files(file.path(path, "WildfireMay2023TestRuns/NoWildfir
                               pattern = ".sqlite",
                               full.names = TRUE)
 
+path_test_runs3 <- file.path(path, "WildfireEindJuly2023TestRuns/Output_Compiled.sqlite")
+
 db_orig <- dbConnect(RSQLite::SQLite(), path_orig)
 
 db_test1 <- map(path_test_runs1, function(x) {
@@ -59,6 +56,8 @@ db_test1 <- map(path_test_runs1, function(x) {
 db_test2 <- map(path_test_runs2, function(x) {
   dbConnect(RSQLite::SQLite(), x)
 })
+
+db_test3 <- dbConnect(RSQLite::SQLite(), path_test_runs3)
 
 # db queries --------------------------------------------------------------
 
@@ -83,11 +82,15 @@ bio1a <- map_dfr(db_test2, dbGetQuery, statement = q1) %>%
   # (flexible eind etc. not changed here)
   mutate(run = '2023NoFire')
 
+bio1b <- dbGetQuery(db_test3, q1) %>% 
+  mutate(run = '2023FireEind')
+
 bio_orig1 <- dbGetQuery(db_orig, q2)  %>% 
   # 2022 implimentation, with cheatgrass fire equation
   mutate(run = '2022CheatgrassFire')
 
-bio2 <- bind_rows(bio1, bio1a, bio_orig1) %>% 
+
+bio2 <- bind_rows(bio1, bio1a, bio1b, bio_orig1) %>% 
   as_tibble() %>% 
   mutate(RCP = rcp2factor(RCP),
          years = years2factor(years),
@@ -132,8 +135,8 @@ bio_med1 <- bio2 %>%
 fire1
 
 cap1 <- paste("Simulations run for", length(sites), "sites")
-pdf("figures/fire/compare-fire-implementations_v1.pdf",
-    width = 6, height = 5)
+pdf("figures/fire/compare-fire-implementations_v2.pdf",
+    width = 8, height = 6)
 
 # *fire -------------------------------------------------------------------
 
@@ -184,8 +187,12 @@ for(x in PFTs) {
 
 # *map of site locations ------------------------------------------------------
 
-sites2 <- sf::st_as_sf(sites1, coords = c("X_WGS84", "Y_WGS84"),
+# kyle added a site to the great basin, adding coords here
+sites2 <- tibble(X_WGS84 = -117.82083, Y_WGS84 = 39.3125) %>% 
+  bind_rows(sites1) %>% 
+  sf::st_as_sf(coords = c("X_WGS84", "Y_WGS84"),
                        crs = sf::st_crs("EPSG:4326"))
+
 
 ggplot() +
   geom_sf(data = sites2) +
