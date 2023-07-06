@@ -94,8 +94,9 @@ bio2 <- bind_rows(bio1, bio1a, bio1b, bio_orig1) %>%
   as_tibble() %>% 
   mutate(RCP = rcp2factor(RCP),
          years = years2factor(years),
-         id = paste(RCP, years, sep = "_"))
-
+         id = paste(RCP, years, sep = "_"),
+         # sequential ordering of site numbers
+         site_simple = as.factor(as.numeric(factor(site))))
 
 # summarize ---------------------------------------------------------------
 
@@ -103,7 +104,7 @@ bio2 <- bind_rows(bio1, bio1a, bio1b, bio_orig1) %>%
 # summarize just the results on fire frequency
 
 fire1 <- bio2 %>% 
-  group_by(id, site, run, RCP, years, GCM) %>% 
+  group_by(id, site, site_simple, run, RCP, years, GCM) %>% 
   # average across years of a given simulation
   summarize(WildFire = mean(WildFire),
             .groups = 'drop_last') %>% 
@@ -119,11 +120,11 @@ PFTs <- c("sagebrush", "a.cool.forb", "a.warm.forb", "p.cool.forb", "p.warm.forb
 
 # median biomass across GCMs
 bio_med1 <- bio2 %>% 
-  select(run, site, GCM, years, RCP, Year, all_of(PFTs), id) %>% 
+  select(run, site, site_simple, GCM, years, RCP, Year, all_of(PFTs), id) %>% 
   pivot_longer(cols = all_of(PFTs),
                values_to = "biomass",
                names_to = "PFT") %>% 
-  group_by(id, site, run, RCP, years, PFT, GCM) %>% 
+  group_by(id, site, site_simple, run, RCP, years, PFT, GCM) %>% 
   summarise(biomass = mean(biomass), .groups = "drop_last") %>% 
   summarize(biomass = median(biomass))
 
@@ -132,11 +133,32 @@ bio_med1 <- bio2 %>%
 # figures -----------------------------------------------------------------
 
 
-fire1
+shapes <- scale_shape_manual(values = seq(0, length(sites)))
+base <- function() {
+  list(theme(legend.position = 'top'),
+       shapes)
+}
 
 cap1 <- paste("Simulations run for", length(sites), "sites")
 pdf("figures/fire/compare-fire-implementations_v2.pdf",
     width = 8, height = 6)
+
+# *map of site locations ------------------------------------------------------
+
+# kyle added a site to the great basin, adding coords here
+sites2 <- tibble(X_WGS84 = -117.82083, Y_WGS84 = 39.3125,
+                 `Site(new)` = 178) %>% 
+  bind_rows(sites1) %>% 
+  mutate(site_simple = as.numeric(as.factor(`Site(new)`))) %>% 
+  sf::st_as_sf(coords = c("X_WGS84", "Y_WGS84"),
+               crs = sf::st_crs("EPSG:4326"))
+
+
+ggplot() +
+  geom_sf_text(data = sites2, aes(label = site_simple)) +
+  #geom_text()
+  basemap_g(bbox) +
+  labs(title = 'locations of test sites')
 
 # *fire -------------------------------------------------------------------
 
@@ -147,16 +169,23 @@ ggplot(fire1, aes(id, prob, color = run, shape = run, fill = run, group = run)) 
        y = "Observed fire probability (%) in STEPWAT2",
        caption = cap1)
 
+ggplot(fire1, aes(id, prob, color = run, shape = run, fill = run, group = run)) +
+  geom_text(aes(label = site_simple), position = position_dodge(width = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  labs(x = "Scenario",
+       y = "Observed fire probability (%) in STEPWAT2",
+       caption = cap1)
 
 
-ggplot(fire1, aes(run, prob, group = site)) +
+ggplot(fire1, aes(run, prob, group = site_simple, color = site_simple, shape = site_simple)) +
   geom_point() +
   geom_line() +
   facet_wrap(~id) +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
   labs(x = "Model run",
        y = "Observed fire probability (%) in STEPWAT2",
-       caption = cap1)
+       caption = cap1) +
+  base()
 
 
 # * biomass ---------------------------------------------------------------
@@ -168,11 +197,13 @@ g <- ggplot(bio_med1, aes(id, biomass, color = run, shape = run, fill = run, gro
        caption = cap1)
 
 g + geom_point(position = position_dodge(width = 0.5)) 
-
+g + geom_text(aes(label = site_simple), position = position_dodge(width = 0.5)) 
 
 
 for(x in PFTs) {
-  g <- ggplot(bio_med1[bio_med1$PFT == x, ], aes(run, biomass, group = site)) +
+  g <- ggplot(bio_med1[bio_med1$PFT == x, ], aes(run, biomass, group = site,
+                                                 color = site_simple,
+                                                 shape =site_simple)) +
     geom_point() +
     geom_line() +
     facet_wrap(~id) +
@@ -180,23 +211,13 @@ for(x in PFTs) {
     labs(x = "Model run",
          y = lab_bio0,
          subtitle = x,
-         caption = cap1)
+         caption = cap1) +
+    base()
   print(g)
 }
 
 
-# *map of site locations ------------------------------------------------------
 
-# kyle added a site to the great basin, adding coords here
-sites2 <- tibble(X_WGS84 = -117.82083, Y_WGS84 = 39.3125) %>% 
-  bind_rows(sites1) %>% 
-  sf::st_as_sf(coords = c("X_WGS84", "Y_WGS84"),
-                       crs = sf::st_crs("EPSG:4326"))
-
-
-ggplot() +
-  geom_sf(data = sites2) +
-  basemap_g(bbox) +
-  labs(title = 'locations of test sites')
 
 dev.off()
+
