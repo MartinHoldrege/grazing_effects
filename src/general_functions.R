@@ -34,6 +34,18 @@ graze2factor <- function(x) {
   out
 }
 
+# convert grazing names into naming convention that is appropriate
+# for convention used in filenames
+graze2filename <- function(x) {
+  
+  y <- graze2factor(c("24", "41", "58", "74"))
+  stopifnot(all(x %in% y))
+  
+  factor(x, levels = levels(y),
+         labels = c('grazL', 'grazM', 'grazH', 'grazVH'))
+
+}
+
 
 # converting time period (e.g. mid, vs. end of century)
 # into a factor
@@ -70,7 +82,7 @@ rcp2factor <- function(x) {
   x2[is.na(x2)] <- "Current" # in model output NA is the current time period
   
   levels <- c("Current", "RCP45", "RCP85")
-  labels = c("Current", "RCP4.5", "RCP8.5")
+  labels = c("Current", "RCP45", "RCP85")
 
   # assign factor levels
   if(all(x2 %in% levels)) {
@@ -651,14 +663,14 @@ pcc <- function(x){
 #' on c4on simulations (by default)
 filter_rcp_c4 <- function(df, PFT = FALSE, current = TRUE,
                           c4string = "c4on") {
-  rcp_levs <- c("Current", "RCP8.5")
+  rcp_levs <- c("Current", "RCP85")
   year_levs <- c("Current", "2030-2060")
   
   if (current) {
-    rcp_levs <- c("Current", "RCP8.5")
+    rcp_levs <- c("Current", "RCP85")
     year_levs <- c("Current", "2030-2060")
   } else {
-    rcp_levs <- "RCP8.5"
+    rcp_levs <- "RCP85"
     year_levs <- "2030-2060"
   }
   
@@ -696,13 +708,13 @@ filter_rcp_c4 <- function(df, PFT = FALSE, current = TRUE,
 join_subsetcells <- function(step_dat, sc_dat) {
   
   # join in cell number info
-  out <- sc_dat[, c("cellnumbers", "site_id")] %>% 
+  out <- sc_dat[, c("cellnumber", "site_id")] %>% 
     rename(site = site_id) %>% 
     inner_join(step_dat, by = "site") %>% 
     dplyr::select(-site)
   
   # rownames needed for interpolatePoints()
-  rownames(out) <- out$cellnumbers
+  rownames(out) <- out$cellnumber
   
   stopifnot(nrow(out) == 200) # check for join issues
   

@@ -12,19 +12,25 @@
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
-library(readr)
 library(DBI)
 
 # connect to db -----------------------------------------------------------
 
+path_sw <- "D:/USGS/large_files/stepwat/" # db files stored on hard-drive
+
+# naming convention:
+# Wildfire – 0/1
+# Grazing intensity –  L, M, H, VH
+# Site-specific eind – 0/1
+# C4 grass expansion under future conditions – 0/1
+# CO2 – 0/1
+
 db_paths <- c(
-  # simulation run for 98 sites that don't have c4 grasses under current conditions
-  # and the ability of c4 grasses to move to 'new' sites is turned off
-  "data_raw/Output.biomass.200sites.grazing.cheatgrass.c4grassesoff.Nov2021.sqlite",
-  # regular simulation run
-  "data_raw/Output.biomass.200sites.grazing.cheatgrass.Nov2021.sqlite")
-              
-names(db_paths) <- c("c4off", "c4on")
+  # first full run done by Kyle in 2023 (new dynamic eind implementation, 
+  # and new fire equation, co2 water use efficiency adjustment is turned off)
+  "fire1_eind1_c4grass1_co20" =
+    file.path(path_sw, "WildfireJuly2023Runs/Output_Compiled.sqlite"))
+
 
 db_connects <- map(db_paths, function(x) dbConnect(RSQLite::SQLite(), x))
 
@@ -42,7 +48,7 @@ cols <- map2(db_connects, tables, dbListFields)
 
 cols
 
-stopifnot(cols[[1]] == cols[[2]]) # the two tables should have exactly the same
+#stopifnot(cols[[1]] == cols[[2]]) # the two tables should have exactly the same
 # structure
 
 # db queries --------------------------------------------------------------
@@ -60,22 +66,22 @@ bio1 <- map(db_connects, dbGetQuery, statement = q1)
 
 # add in sites that were not included in the c4off run because they contain
 # c4 grasses under current conditions
-sites <- unique(bio1$c4on$site)
+#sites <- unique(bio1$c4on$site)
 
-stopifnot(sites %in% 1:200) # check
+#stopifnot(sites %in% 1:200) # check
 
-c4sites <- sites[!sites %in% bio1$c4off$site]
-stopifnot(length(c4sites) == 102)
+# c4sites <- sites[!sites %in% bio1$c4off$site]
+# stopifnot(length(c4sites) == 102)
 
 bio1a <- bio1
-bio1a$c4off <- bind_rows(bio1$c4off, bio1$c4on[bio1$c4on$site %in% c4sites, ])
+#bio1a$c4off <- bind_rows(bio1$c4off, bio1$c4on[bio1$c4on$site %in% c4sites, ])
 
 # now should have complete set of sites
-stopifnot(sort(unique(bio1a$c4off$site)) == sites) 
+#stopifnot(sort(unique(bio1a$c4off$site)) == sites) 
 
 
-# now creating single df from the c4 on and c4 off simulation runs
-bio2 <- bind_rows(bio1a, .id = "c4")%>% 
+# now creating single df from the different runs
+bio2 <- bind_rows(bio1a, .id = "run")%>% 
   as_tibble()
 
 names(bio2)
@@ -91,7 +97,9 @@ bio2 %>%
 # additionally RgroupTreatment col is redundant to the [grazing]] intensity
 # column
 
-group_cols <- c("c4", 'GCM', 'years', 'RCP', 'intensity', 'site')
+group_cols <- c("run", 'GCM', 'years', 'RCP', 
+                'intensity', # the grazing intensity
+                'site')
 map(bio2[, group_cols], unique)
 
 # * avg across years --------------------------------------------------------
@@ -102,13 +110,13 @@ bio3 <- bio2 %>%
     # numeric columns not interested in
     # only including biomass and indivs (# of individuals), columns
     # doesn't look like indivs has standard deviation in this column
-    -matches("_(std)|(Pfire)|(PRstd)|(PR)|(RSize)$"),
+    -matches("_(std)|(Pfire)|(PRstd)|(PR)|(RSize)|(graz)$"),
     -matches("StdDev"),
     -Year, # will avg across years
     -SpeciesTreatment, # sites have different spp. treatments (i.e. different
     # cheatgrass params based on location)
     -RGroupTreatment, # this variable is redundant with [grazing] intensity column
-    -c(SoilTreatment, dst, grazing) # cols with only 1 unique variable
+    -c(SoilTreatment, grazing) # cols with only 1 unique variable
   ) %>% 
   # avg across years
   group_by(across(all_of(group_cols))) %>% 
@@ -138,7 +146,10 @@ bio3$n <- NULL
 # save files --------------------------------------------------------------
 
 # mean biomass across years for each site/scenario/treatment combination
-write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT.csv")
+# original version of this file (bio_mean_by_site-PFT.csv) was created with
+# data from the 2021/2022 implementationof stepwat (old cheatgrass fire, no C02,
+# and no dynamic eind implementation)
+write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v2.csv")
 
 
 # dbDisconnect()
