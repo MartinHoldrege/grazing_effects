@@ -15,6 +15,8 @@
 
 rerun <- FALSE # re-create rasters that have already been interpolated?
 test_run <- FALSE
+date <- "20230712" # for appending to select file names
+
 # dependencies ------------------------------------------------------------
 
 source("scripts/02_summarize_bio.R") # creates dataframes of stepwat2 output
@@ -166,19 +168,39 @@ match1 <- multivarmatch(
 )
 
 
-# examining match ~~~
-test <- template
+# *plotting interpolation quality -----------------------------------------
 
+interp <- template
+
+set.seed(1234)
 # map of where site_ids are interpolated to
-test[as.numeric(match1$target_cell)] <- match1 %>% 
+interp[as.numeric(match1$target_cell)] <- match1 %>% 
   mutate(subset_cell = as.numeric(subset_cell)) %>% 
   left_join(sc1, by = c("subset_cell" = "cellnumber")) %>% 
-  pull(site_id)
-#plot(test)
-# ~~~
+  pull(site_id) %>% 
+  factor() %>% 
+  forcats::fct_shuffle()
+
+pal <- colorRampPalette(rev(RColorBrewer::brewer.pal(10, 'RdBu')))(200)
+jpeg(paste0("figures/interpolation_quality/interpolation_areas_", date, ".jpeg"),
+     res = 600, units = 'in', width = 8, height = 8)
+  plot(interp, main = 'interpolation areas (site numbers jumbled)',
+       col = pal)
+dev.off()
+
 
 # proportion cells with decent matching quality
 mean(match1$matching_quality < 1.5) # ~93%
+
+match_quality <- template
+match_quality[as.numeric(match1$target_cell)] <- match1$matching_quality
+
+jpeg(paste0("figures/interpolation_quality/matching_quality_", date, ".jpeg"),
+     res = 600, units = 'in', width = 8, height = 8)
+plot(match_quality, main = 'matching quality', breaks = c(0, 0.5, 1, 1.5, 2, 3, 4, 5, 10),
+     col = rev(RColorBrewer::brewer.pal(10, 'RdBu'))[3:10])
+dev.off()
+
 
 # interpolation ---------------------------------------------------------
 # use matches from multivarmatch to interpolate the STEPWAT2 output
