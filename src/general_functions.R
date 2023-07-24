@@ -767,24 +767,6 @@ cross_threshold <- function(graze, above) {
   min_graze
 }
 
-#' create dataframe of raster information
-#'
-#' @param rast raster (with named layers)
-#' @param into columns the components of the layer names will be seperated
-#' into
-#'
-#' @return dataframe
-create_rast_info <- function(rast,
-                            into = c("c4", "PFT", "type", "RCP", "years", 
-                                     "graze", "GCM")) {
-  out <- tibble(id = names(rast),
-         id2 = id) %>% 
-    separate(col = id2,
-             into = into,
-             sep = "_") %>% 
-    df_factor() 
-  out
-}
 
 
 #' Percent area crossing threshold
@@ -814,5 +796,51 @@ calc_pcent_by_thresh <- function(lyr, r) {
   names(x) <- levels[area[[1]]]
   
   out <- as.data.frame(as.list(x))
+  out
+}
+
+
+#' create dataframe of raster information
+#'
+#' @param rast raster (with named layers), or vector of file names
+#' @param run regular expression the defines the run
+#' @param into columns the components of the layer names will be seperated
+#' into
+#'
+#' @return dataframe\
+#' @example
+#' path <- "grazing_effects/data_processed/interpolated_rasters/biomass/fire1_eind1_c4grass1_co20_Aforb_biomass_RCP45_2030-2060_Light_inmcm4.tif"
+#' create_rast_info(path)
+create_rast_info <- function(x,
+                             run_regex = "fire\\d_eind\\d_c4grass\\d_co2\\d",
+                             into = c("PFT", "type", "RCP", "years", 
+                                      "graze", "GCM")) {
+  
+  if(isTRUE('SpatRaster' %in% class(x))) {
+    y <- names(x)
+  } else if (is.character(x)) {
+    y <- stringr::str_replace(basename(x), ".tif$", "")
+  } else {
+    stop("incorrect input type (spatraster or vector needed)")
+  }
+  
+  lookup_graze <- c("Light" = "grazL",
+                    "Moderate" = "grazM",
+                    "Heavy" = "grazH",
+                    "VeryHeavy" = "grazVH")
+  run <- stringr::str_extract(y, run_regex)  
+  out <- tibble(id = y) %>% 
+    mutate(run = str_extract(id, run_regex),
+           to_split = str_replace(id, paste0(run_regex, "_"), "")) %>% 
+    separate(col = 'to_split',
+             into = into,
+             sep = "_") %>% 
+    mutate(run2 = paste(run, lookup_graze[graze], sep = ")")) %>% 
+    df_factor() %>% 
+    select(run, all_of(into), everything())
+  
+  if(!all(complete.cases(out))) {
+    stop('some parsings failed (NAs created)')
+  }
   out
 }

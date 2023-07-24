@@ -11,6 +11,9 @@
 
 # this script takes ~ 10 min to run
 
+
+
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse) 
@@ -18,13 +21,17 @@ library(terra)
 source("src/mapping_functions.R")
 source("src/general_functions.R")
 
+# params ------------------------------------------------------------------
+
+run <- c('fire1_eind1_c4grass1_co20')
+
 # read in data ------------------------------------------------------------
 
 # * rasters ---------------------------------------------------------------
 
 # data up-scaled for each GCM, and for c4on and c4off
 bio_files <- list.files("data_processed/interpolated_rasters/biomass/",
-                        pattern = "^c4.*tif$",
+                        pattern = run,
                         full.names = TRUE)
 length(bio_files)
 
@@ -46,12 +53,7 @@ num.cores <- parallel::detectCores(logical = FALSE)
 # descriptions of layers of raster stack
 r_names <- names(rast1)
 
-rast_info <- tibble(id2 = r_names,
-                   id = r_names) %>% 
-  separate(col = id2,
-           into = c("c4", "PFT", "type", "RCP", "years", "graze", "GCM"),
-           sep = "_") %>% 
-  df_factor() %>% 
+rast_info <- create_rast_info(rast1) %>% 
   mutate(layer_num = 1:nrow(.),
          # remove GCM from the string
          id_noGCM = str_replace(id, "_[^_]*$", "")) %>% 
@@ -97,6 +99,7 @@ med2 <- rast(med1)
 # is current, I'm calculating this using median rasters (which in this case
 # should yield the same answer as calculate for each gcm then taking the median).
 
+if (FALSE) {
 gref_info <- rast_info %>% 
   filter_rcp_c4() %>% 
   select(-GCM, -id, -layer_num) %>% 
@@ -136,110 +139,114 @@ rast_diff_gref <- rast(list(diff_gref2light, diff_gref2moderate))
 
 names(rast_diff_gref) <- names(rast_diff_gref) %>% 
   str_replace("_biomass_", '_bio-diff-gref-cur-heavy_')
-  
+}
 #  c3Pgrass/Pgrass -------------------------------------------------------
 
-grass_info <- rast_info %>% 
-  filter(PFT %in% c("C3Pgrass", "Pgrass"),
-         # just looking at end of century and current for now
-         years %in% c("2070-2100", "Current")) %>% 
-  arrange(PFT, c4, graze, RCP, years) %>% # important so comparing correct lyrs
-  # creates two identical df's except the PFT and id columns are different
-  split(f = .$PFT, drop = TRUE)
-
-
-grass_id <- map(grass_info, function(x) x$id) # id values
-grass_id_noGCM <- map(grass_info, function(x) x$id_noGCM) # id values
-
-# seperate rasters for Pgrass and C3Pgrass
-grass_r1 <- map(grass_id, function(x) rast1[[x]])
-
-# grass ratio 
-gratio_r1 <- grass_r1$C3Pgrass/grass_r1$Pgrass
-
-# check that number of layers has been preserved
-stopifnot(nlyr(gratio_r1) == length(grass_id[[1]]))
+# grass_info <- rast_info %>% 
+#   filter(PFT %in% c("C3Pgrass", "Pgrass"),
+#          # just looking at end of century and current for now
+#          years %in% c("2070-2100", "Current")) %>% 
+#   arrange(PFT, c4, graze, RCP, years) %>% # important so comparing correct lyrs
+#   # creates two identical df's except the PFT and id columns are different
+#   split(f = .$PFT, drop = TRUE)
+# 
+# 
+# grass_id <- map(grass_info, function(x) x$id) # id values
+# grass_id_noGCM <- map(grass_info, function(x) x$id_noGCM) # id values
+# 
+# # seperate rasters for Pgrass and C3Pgrass
+# grass_r1 <- map(grass_id, function(x) rast1[[x]])
+# 
+# # grass ratio 
+# gratio_r1 <- grass_r1$C3Pgrass/grass_r1$Pgrass
+# 
+# # check that number of layers has been preserved
+# stopifnot(nlyr(gratio_r1) == length(grass_id[[1]]))
 
 # ** median ratio ----------------------------------------------------------
 
-# info on the median lyrs
-grass_info_med <- grass_info$C3Pgrass %>% 
-  arrange(graze, RCP, years, c4) %>% 
-  select(-id, -GCM, -layer_num) %>% 
-  filter(!duplicated(.))
-
-# split into list
-gratio_r_l <- split(gratio_r1, grass_id_noGCM$C3Pgrass)
-
-# naming so layers will be identifiable, C3Pgrass is in name
-# but this actuall C3Pgrass/Pgrass ratio
-names(gratio_r_l) <- unique(grass_id_noGCM$C3Pgrass)
-
-# take median across GCMs
-gratio_med1 <- map(gratio_r_l, app, fun = "median")
-
-# this is operation takes a few minutes
-gratio_med2 <- rast(gratio_med1) # put back into one SpatRaster
-nlyr(gratio_med2)
-names(gratio_med2)
+# # info on the median lyrs
+# grass_info_med <- grass_info$C3Pgrass %>% 
+#   arrange(graze, RCP, years, c4) %>% 
+#   select(-id, -GCM, -layer_num) %>% 
+#   filter(!duplicated(.))
+# 
+# # split into list
+# gratio_r_l <- split(gratio_r1, grass_id_noGCM$C3Pgrass)
+# 
+# # naming so layers will be identifiable, C3Pgrass is in name
+# # but this actuall C3Pgrass/Pgrass ratio
+# names(gratio_r_l) <- unique(grass_id_noGCM$C3Pgrass)
+# 
+# # take median across GCMs
+# gratio_med1 <- map(gratio_r_l, app, fun = "median")
+# 
+# # this is operation takes a few minutes
+# gratio_med2 <- rast(gratio_med1) # put back into one SpatRaster
+# nlyr(gratio_med2)
+# names(gratio_med2)
 
 # ** Pgrass ----------------------------------------------------------------
 
-Pgrass_id_noGCM <- names(med2) %>% 
-  str_subset("_Pgrass_") %>% #on Pgrass
-  str_subset("_2030-2060_", negate = TRUE) # not mid century
-
-# information on Pgrass, medians across GCMs (same as info for C3Pgrass)
-Pgrass_info_med<- grass_info_med %>% 
-  mutate(id_noGCM = str_replace(id_noGCM, "_C3Pgrass","_Pgrass")) %>% 
-  select(-PFT)
-
-Pgrass_target_lyrs <- Pgrass_info_med %>% 
-  filter(RCP != "Current") %>% 
-  pull(id_noGCM)
-
-Pgrass_ref_lyrs <- create_ref_id(Pgrass_target_lyrs)
-
-# scaled % change relative to current grazing of the same intensity
-rast_d_Pgrass <- rast_diff(rast = med2,
-                           target_layer = Pgrass_target_lyrs,
-                           ref_layer = create_ref_id(Pgrass_target_lyrs))
-
-names(rast_d_Pgrass)
+# Pgrass_id_noGCM <- names(med2) %>% 
+#   str_subset("_Pgrass_") %>% #on Pgrass
+#   str_subset("_2030-2060_", negate = TRUE) # not mid century
+# 
+# # information on Pgrass, medians across GCMs (same as info for C3Pgrass)
+# Pgrass_info_med<- grass_info_med %>% 
+#   mutate(id_noGCM = str_replace(id_noGCM, "_C3Pgrass","_Pgrass")) %>% 
+#   select(-PFT)
+# 
+# Pgrass_target_lyrs <- Pgrass_info_med %>% 
+#   filter(RCP != "Current") %>% 
+#   pull(id_noGCM)
+# 
+# Pgrass_ref_lyrs <- create_ref_id(Pgrass_target_lyrs)
+# 
+# # scaled % change relative to current grazing of the same intensity
+# rast_d_Pgrass <- rast_diff(rast = med2,
+#                            target_layer = Pgrass_target_lyrs,
+#                            ref_layer = create_ref_id(Pgrass_target_lyrs))
+# 
+# names(rast_d_Pgrass)
 
 
 # save files ---------------------------------------------------------
 
 # * info files ------------------------------------------------------------
 
-saveRDS(rast_info, 
-        "data_processed/interpolated_rasters/raster_info.RDS")
-
-saveRDS(grass_info_med,
-        "data_processed/interpolated_rasters/grass_info_med.RDS")
-
-# info on median pgrass
-saveRDS(Pgrass_info_med,
-        "data_processed/interpolated_rasters/Pgrass_info_med.RDS")
+# saveRDS(rast_info, 
+#         "data_processed/interpolated_rasters/raster_info.RDS")
+# 
+# saveRDS(grass_info_med,
+#         "data_processed/interpolated_rasters/grass_info_med.RDS")
+# 
+# # info on median pgrass
+# saveRDS(Pgrass_info_med,
+#         "data_processed/interpolated_rasters/Pgrass_info_med.RDS")
 
 # * rasters ---------------------------------------------------------------
 
 # median across GCMs, for all future scenarios
-writeRaster(med2, "data_processed/interpolated_rasters/bio_future_median_across_GCMs.tif",
+
+
+writeRaster(med2, 
+            file.path("data_processed/interpolated_rasters", 
+                      paste0(run, "_bio_future_median_across_GCMs.tif")),
             overwrite = TRUE)
 
 
 # c3/total grass ratio
-writeRaster(gratio_med2, "data_processed/interpolated_rasters/C3Pgrass-Pgrass-ratio_by-scenario_median.tif",
-            overwrite = TRUE)
+# writeRaster(gratio_med2, "data_processed/interpolated_rasters/C3Pgrass-Pgrass-ratio_by-scenario_median.tif",
+#             overwrite = TRUE)
 
 # scaled percent change from current to future (wgraze), for Pgrass
 
-writeRaster(rast_d_Pgrass, "data_processed/interpolated_rasters/Pgrass_bio-diff-wgraze_median.tif",
-            overwrite = TRUE)
+# writeRaster(rast_d_Pgrass, "data_processed/interpolated_rasters/Pgrass_bio-diff-wgraze_median.tif",
+#             overwrite = TRUE)
 
 # # scaled % change from current light grazing to future (RCP8.5-mid) heavy graze
 
-writeRaster(rast_diff_gref,
-            "data_processed/interpolated_rasters/bio-diff-gref-cur-heavy_median.tif",
-            overwrite = TRUE)
+# writeRaster(rast_diff_gref,
+#             "data_processed/interpolated_rasters/bio-diff-gref-cur-heavy_median.tif",
+#             overwrite = TRUE)
