@@ -93,6 +93,37 @@ med1 <- map(rast_gcm_l, app, fun = "median")
 
 med2 <- rast(med1)
 
+
+# delta biomass cref ------------------------------------------------------
+# change in biomass (absolulte, not relative) relative to ambient climate (c)
+# conditions, calculated within a grazing level
+# naming: bio-rdiff-cref, biomass raw difference climate refence (i.e. difference
+# from historical conditions)
+
+rast_info_med <- create_rast_info(med2, 
+                                 into = c("PFT", "type", "RCP", "years", 
+                                          "graze")) %>% 
+  mutate(id3 = paste(run2, PFT, sep = "_"))
+
+info_med_l <- split(rast_info_med, f = rast_info_med$id3)
+
+diff_cref1 <- map(info_med_l, function(df) {
+  id_current <- df$id[df$RCP == 'Current']
+  stopifnot(length(id) ==1)
+  ids_future <- df$id[df$RCP != 'Current']
+  
+  delta <- med2[[ids_future]] - med2[[id_current]]
+  new_names <- names(delta) %>% 
+    str_replace("biomass", "bio-rdiff-cref")
+  names(delta) <- new_names
+  delta
+})
+
+diff_cref2 <- rast(diff_cref1)
+names(diff_cref2) <- map(diff_cref1, names) %>% 
+  unlist()
+
+
 # delta biomass gref  -----------------------------------------------------------
 # delta biomass from current heavy to future light or moderate grazing
 # specifically, future is RCP 8.5. Because the reference level
@@ -140,6 +171,8 @@ rast_diff_gref <- rast(list(diff_gref2light, diff_gref2moderate))
 names(rast_diff_gref) <- names(rast_diff_gref) %>% 
   str_replace("_biomass_", '_bio-diff-gref-cur-heavy_')
 }
+
+
 #  c3Pgrass/Pgrass -------------------------------------------------------
 
 # grass_info <- rast_info %>% 
@@ -233,6 +266,12 @@ names(rast_diff_gref) <- names(rast_diff_gref) %>%
 writeRaster(med2, 
             file.path("data_processed/interpolated_rasters", 
                       paste0(run, "_bio_future_median_across_GCMs.tif")),
+            overwrite = TRUE)
+
+# difference in biomass (raw) relative to current conditions (within a grazing level)
+writeRaster(diff_cref2, 
+            file.path("data_processed/interpolated_rasters", 
+                      paste0(run, "_bio-rdiff-cref_median.tif")),
             overwrite = TRUE)
 
 

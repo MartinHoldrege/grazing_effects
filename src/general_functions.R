@@ -835,7 +835,7 @@ create_rast_info <- function(x,
     separate(col = 'to_split',
              into = into,
              sep = "_") %>% 
-    mutate(run2 = paste(run, lookup_graze[graze], sep = ")")) %>% 
+    mutate(run2 = paste(run, lookup_graze[graze], sep = "_")) %>% 
     df_factor() %>% 
     select(run, all_of(into), everything())
   
