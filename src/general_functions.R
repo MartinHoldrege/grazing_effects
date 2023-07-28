@@ -219,7 +219,8 @@ pft_all_factor <- function(x) {
               "Shrub", 
               "Pgrass",
               "Pherb",
-              "Aforb")
+              "Aforb",
+              "Aherb")
   
   # add a 'total' factor level, if the input includes it
   if("Total" %in% x) {

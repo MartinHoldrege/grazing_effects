@@ -41,6 +41,8 @@ cols_map_bio_d <- c(rev(c("#ffeda0","#fed976","#feb24c","#fc4e2a","#e31a1c",
           "#deebf7","#c6dbef","#9ecae1","#4292c6",
           "#08519c","#08306b")
 
+cols_map_bio_dr <- colorRampPalette(cols_map_bio_d, interpolate = 'spline')
+
 # Standard color ramp for current biomass:
 cols_map_bio <- colorRampPalette(c("#f7fcb9","#d9f0a3","#addd8e","#78c679","#41ab5d",
                            "#238443","#005a32"), interpolate = "spline")
@@ -55,6 +57,8 @@ lab_change0 <- "% Change relative to light grazing"
 
 # biomass
 lab_bio0 <- expression("Biomass ("*gm^-2*")")
+lab_bio1 <- expression(~Delta*" Biomass ("*gm^-2*")")
+lab_bio1b <- "\u0394 Biomass" # delta biomass
 lab_bio2 <- expression(~Delta*" Biomass (scaled %)")
 lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
 lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
