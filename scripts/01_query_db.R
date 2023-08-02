@@ -29,8 +29,10 @@ db_paths <- c(
   # first full run done by Kyle in 2023 (new dynamic eind implementation, 
   # and new fire equation, co2 water use efficiency adjustment is turned off)
   "fire1_eind1_c4grass1_co20" =
-    file.path(path_sw, "WildfireJuly2023Runs/Output_Compiled.sqlite"))
-
+    file.path(path_sw, "WildfireJuly2023Runs/Output_Compiled.sqlite"),
+  # co2 functionality turned on
+  "fire1_eind1_c4grass1_co21" =
+    file.path(path_sw, "Wildfire.CO2.August2023Runs/Output_fire1_grazL_eind1_c4grass1_co21.sqlite"))
 
 db_connects <- map(db_paths, function(x) dbConnect(RSQLite::SQLite(), x))
 
