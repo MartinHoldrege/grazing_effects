@@ -32,7 +32,10 @@ db_paths <- c(
     file.path(path_sw, "WildfireJuly2023Runs/Output_Compiled.sqlite"),
   # co2 functionality turned on
   "fire1_eind1_c4grass1_co21" =
-    file.path(path_sw, "Wildfire.CO2.August2023Runs/Output_fire1_grazL_eind1_c4grass1_co21.sqlite"))
+    file.path(path_sw, "Wildfire.CO2.August2023Runs/Output_fire1_grazL_eind1_c4grass1_co21.sqlite"),
+  # no co2, no co2
+  "fire0_eind1_c4grass1_co20" =
+    file.path(path_sw, "NoWildfireJuly2023Runs/Output_fire0_grazL_eind1_c4grass1_co20.sqlite"))
 
 db_connects <- map(db_paths, function(x) dbConnect(RSQLite::SQLite(), x))
 
