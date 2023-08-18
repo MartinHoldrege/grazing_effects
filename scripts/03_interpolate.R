@@ -14,7 +14,7 @@
 # params ------------------------------------------------------------------
 
 rerun <- FALSE # re-create rasters that have already been interpolated?
-test_run <- FALSE
+test_run <- FALSE # TRUE # 
 date <- "20230712" # for appending to select file names
 
 # dependencies ------------------------------------------------------------
@@ -136,6 +136,19 @@ pft5_bio_w1 <- pft5_bio1 %>%
 pft5_bio_w2 <- join_subsetcells(step_dat = pft5_bio_w1, sc_dat = sc1)
 
 
+# * wildfire --------------------------------------------------------------
+
+fire_w1 <- fire0 %>% 
+  ungroup() %>% 
+  # don't want to bother upscale fire prob on runs where fire not simulated
+  filter(!str_detect(run, 'fire0')) %>% 
+  mutate(id = paste(run, "fire-prob", id, GCM, sep = "_")) %>% 
+  dplyr::select(site, id, fire_prob) %>% 
+  pivot_wider(id_cols = "site",
+              names_from = "id",
+              values_from = "fire_prob") %>% 
+  join_subsetcells(sc_dat = sc1)
+
 # code removed for following sections--see 2022 commits to get code
 # *crossing threshold ----------------------------------------------------
 
@@ -219,55 +232,38 @@ dev.off()
 # to run this in parallel
 
 
-# what have already been upscaled?
-already_done1 <- list.files("data_processed/interpolated_rasters/biomass",
-                           pattern = ".tif$", full.names = TRUE)  
-
 # if file was corrupted, and really small then re-create
 min_size <- file.size(path_template)*0.2 # 0.5 multiplier is arbitrary, and maybe not strict enough
 
-already_done2 <- already_done1[file.size(already_done1) > min_size] %>% 
-  basename()
-already_done2 <- str_replace(already_done2, ".tif", "")
+# which columns haven't already been upscaled
+todo2 <- which_todo(df = pft5_bio_w2,
+                   path = "data_processed/interpolated_rasters/biomass",
+                   pattern = ".tif$",
+                    min_size = min_size,
+                   rerun = rerun)
 
-
-todo1 <- names(pft5_bio_w2)
-
-# recreate existing files?
-if(rerun) {
-  todo2 <- todo1
-} else {
-  todo2 <- todo1[!todo1 %in% already_done2]
-}
-
-if(test_run) {
-  todo2 <- todo2[1:3]
-}
-pft5_bio_w3 <- pft5_bio_w2[, todo2]
+todo2
 
 # num cores, this includes logical cores (threads)
 num.cores <- parallel::detectCores() 
 
 registerDoParallel(num.cores)
 
-# making list of columns to use each time through dopar loop
-n <- ncol(pft5_bio_w3)
-by = 50 # each time through loop 50 variables will be up-scaled
-vecs <- seq(from = 2, to = n, by = by)
-vecs_l <- map(vecs, function(x) {
-  to <- x + by - 1
+# if all have been upscaled then todo just includes 'cellnumbers'
+if(length(todo2) > 1) {
   
-  # for the last set of columns
-  if(to > n) {
-    to <- n
-  }
-  x:to # column numbers
-})
 
-# check that all columns accounted for
-stopifnot(unlist(vecs_l) == 2:n)
+if(test_run) {
+  todo2 <- todo2[1:3]
+}
+pft5_bio_w3 <- pft5_bio_w2[, todo2]
 
 
+
+# making list of columns to use each time through dopar loop
+vecs_l <- col_nums_parallel(pft5_bio_w3, by = 50)
+
+print('biomass start')
 print(Sys.time())
 
 # seperately running interpolation on different sets of columns
@@ -286,8 +282,52 @@ foreach (x = vecs_l) %dopar% {
     overwrite = TRUE
   )
 }
+
+print('biomass done')
+print(Sys.time())
+}
+# * fire ------------------------------------------------------------------
+
+# which columns haven't already been upscaled
+todo3 <- which_todo(df = fire_w1,
+                    path = "data_processed/interpolated_rasters/fire",
+                    pattern = ".tif$",
+                    min_size = min_size,
+                    rerun = rerun)
+
+# if all have been upscaled then todo just includes 'cellnumbers'
+if(length(todo3) > 1) {
+if(test_run) {
+  todo3 <- todo3[1:3]
+}
+fire_w2 <- fire_w1[, todo3]
+
+
+# making list of columns to use each time through dopar loop
+vecs_l2 <- col_nums_parallel(fire_w2, by = 20)
+
+print('fire start')
+print(Sys.time())
+
+# seperately running interpolation on different sets of columns
+foreach (x = vecs_l2) %dopar% {
+  rMultivariateMatching::interpolatePoints(
+    matches = match1,
+    output_results = fire_w2[, c(1, x)], 
+    exclude_poor_matches = FALSE,
+    subset_cell_names = "subset_cell",
+    quality_name = "matching_quality",
+    matching_distance = 1.5,
+    raster_template = template,
+    plotraster = FALSE,
+    saveraster = TRUE,
+    filepath = "./data_processed/interpolated_rasters/fire",
+    overwrite = TRUE
+  )
+}
+print('fire end')
 print(Sys.time())
 
 # When you're done, clean up the cluster
 stopImplicitCluster()
-
+}

@@ -404,19 +404,25 @@ pcent <- 0.05 # 5th percentile is the reference level
 
 # wildfire ----------------------------------------------------------------
 
-# * return interval -------------------------------------------------------
+# * probability/return interval ------------------------------------------
 
-fire1 <- bio4 %>% 
+# one row for each GCM
+fire0 <- bio4 %>% 
   # fire return interval. WildFire is the mean number of fires in a given year
   # across 200 iterations
-  mutate(fire_return = 1/(WildFire/200)) %>% 
+  mutate(fire_prob = WildFire/200*100, # annual wildfire probability
+         fire_return = 1/(WildFire/200)) %>% 
   # taking average for each plot (otherwise value is repeated for each PFT)
   group_by(across(all_of(group_cols[group_cols != "PFT"]))) %>% 
-  summarize(fire_return = mean(fire_return), .groups = "drop_last") %>% 
-  # median across GCMs
-  summarize(fire_return = median(fire_return, na.rm = TRUE), .groups = "drop") %>% 
+  summarize(fire_return = mean(fire_return),
+            fire_prob = mean(fire_prob), 
+            .groups = "drop_last") %>% 
   # if no fires occurred then set fire return interval to NA
   mutate(fire_return = ifelse(is.infinite(fire_return), NA, fire_return))
+
+# median across GCMs
+fire_med1 <- fire0 %>% 
+  summarize(fire_return = median(fire_return, na.rm = TRUE), .groups = "drop")
 
 
 # * change in interval ----------------------------------------------------
