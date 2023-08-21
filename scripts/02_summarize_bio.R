@@ -10,11 +10,21 @@
 # Consider calculating agreement metrics (proportion of
 # GCMs that 'agree' on the direction of change for a given site)
 
+
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
 library(dtplyr) # to speed up a couple slow chunks
 source("src/general_functions.R")
+
+
+# params ------------------------------------------------------------------
+
+n_years <- 50 # number of years of data from simulations we're using (i.e. 
+# years 101-150)
+
+n_iter <- 200 # number of iterations run
 
 # read in files -----------------------------------------------------------
 
@@ -410,15 +420,16 @@ pcent <- 0.05 # 5th percentile is the reference level
 fire0 <- bio4 %>% 
   # fire return interval. WildFire is the mean number of fires in a given year
   # across 200 iterations
-  mutate(fire_prob = WildFire/200*100, # annual wildfire probability
-         fire_return = 1/(WildFire/200)) %>% 
+  mutate(fire_prob = WildFire/n_iter*100) %>%  # annual wildfire probability 
   # taking average for each plot (otherwise value is repeated for each PFT)
   group_by(across(all_of(group_cols[group_cols != "PFT"]))) %>% 
-  summarize(fire_return = mean(fire_return),
+  summarize(n_fires = sum(WildFire),
             fire_prob = mean(fire_prob), 
             .groups = "drop_last") %>% 
+  # 200 iterations occured and we're using the last 5 years of data
   # if no fires occurred then set fire return interval to NA
-  mutate(fire_return = ifelse(is.infinite(fire_return), NA, fire_return))
+  mutate(fire_return = (n_years*n_iter)/n_fires,
+         fire_return = ifelse(is.infinite(fire_return), NA, fire_return))
 
 # median across GCMs
 fire_med1 <- fire0 %>% 

@@ -144,6 +144,8 @@ bio3 <- bio2 %>%
 
 # Check: if grouping above missed a variable,
 # then would expect value other than 50 years, per set of grouping variables
+# also note--if this isn't true (e.g. if simulations run for 300 not 150 years,
+# then fire return interval calculation (next script) needs to be adusted)
 stopifnot(bio3$n == 50) 
 
 bio3$n <- NULL
