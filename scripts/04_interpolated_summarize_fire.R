@@ -101,7 +101,7 @@ diff_cref1 <- map(info_med_l, function(df) {
   
   delta <- med2[[ids_future]] - med2[[id_current]]
   new_names <- names(delta) %>% 
-    str_replace("bio-prob", "bio-prob-rdiff-cref")
+    str_replace("fire-prob", "fire-prob-rdiff-cref")
   names(delta) <- new_names
   delta
 })

@@ -693,6 +693,16 @@ filter_rcp_c4 <- function(df, PFT = FALSE, current = TRUE,
   out
 }
 
+# misc functions ---------------------------------------------------------------
+
+filter_clim_extremes <- function(df) {
+  # for exploratory reasons just looking at the most and least
+  # extreme scenarios
+  df %>% 
+    filter(RCP == "Current" | (RCP == 'RCP45' & years == '2030-2060') |
+             (RCP == 'RCP85' & years == '2070-2100'))
+}
+
 
 # joins -------------------------------------------------------------------
 
