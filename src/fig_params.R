@@ -33,6 +33,10 @@ cols_pft5_other <- c("Other" = "darkgrey",
                      "Sagebrush" = "#01665e")
 
 cols_herb <- cols_pft5_other[c("Cheatgrass","Pforb", "C4Pgrass", "C3Pgrass")]
+
+# fire probability
+cols_firep <- RColorBrewer::brewer.pal(11, "RdYlBu")[9:2]
+
 # * for maps --------------------------------------------------------------
 
 # Create color ramp that represents the proportional changes in biomass...
@@ -82,9 +86,13 @@ lab_rcp <- "Scenario"
 # grazing
 lab_graze <- "Grazing"
 
-#fire
+#fire (return interval)
 lab_fire0 <- "Fire return interval (years)"
 lab_fire1 <- "Change in fire return interval (years)"
+
+# fire probability
+lab_firep0 <- "Annual fire probability (%)"
+lab_firep1 <- expression(Delta~"# fires/century")
 
 # climate
 lab_map <- "MAP (mm)"

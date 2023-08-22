@@ -433,7 +433,9 @@ fire0 <- bio4 %>%
 
 # median across GCMs
 fire_med1 <- fire0 %>% 
-  summarize(fire_return = median(fire_return, na.rm = TRUE), .groups = "drop")
+  summarize(fire_return = median(fire_return, na.rm = TRUE),
+            fire_prob = mean(fire_prob),
+            .groups = "drop")
 
 
 # * change in interval ----------------------------------------------------
