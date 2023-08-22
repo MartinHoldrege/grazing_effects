@@ -29,7 +29,7 @@ run <- c('fire0_eind1_c4grass1_co20')
 
 # * rasters ---------------------------------------------------------------
 
-# data up-scaled for each GCM, and for c4on and c4off
+# data up-scaled for each GCM
 bio_files <- list.files("data_processed/interpolated_rasters/biomass/",
                         pattern = run,
                         full.names = TRUE)
@@ -41,7 +41,6 @@ length(bio_files)
 # this is kind of a 'raster stack', where each layers is a tif
 # it's not actually loaded into memory
 rast1 <- terra::rast(bio_files) # class SpatRast
-
 
 # params ------------------------------------------------------------------
 
