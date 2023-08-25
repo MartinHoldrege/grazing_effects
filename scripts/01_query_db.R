@@ -125,8 +125,9 @@ bio3 <- bio2 %>%
   ) %>% 
   # avg across years
   group_by(across(all_of(group_cols))) %>% 
-  summarise(across(.cols = where(is.numeric),
+  summarise(across(.cols = where(is.numeric) & !matches("WildFire"),
                    .fns = mean),
+            WildFire = sum(WildFire),
             n = n(),
             .groups = "drop") %>% 
   # long format

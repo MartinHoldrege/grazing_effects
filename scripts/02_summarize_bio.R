@@ -420,22 +420,29 @@ pcent <- 0.05 # 5th percentile is the reference level
 fire0 <- bio4 %>% 
   # fire return interval. WildFire is the mean number of fires in a given year
   # across 200 iterations
-  mutate(fire_prob = WildFire/n_iter*100) %>%  # annual wildfire probability 
-  # taking average for each plot (otherwise value is repeated for each PFT)
-  group_by(across(all_of(group_cols[group_cols != "PFT"]))) %>% 
-  summarize(n_fires = sum(WildFire),
-            fire_prob = mean(fire_prob), 
-            .groups = "drop_last") %>% 
-  # 200 iterations occured and we're using the last 5 years of data
-  # if no fires occurred then set fire return interval to NA
-  mutate(fire_return = (n_years*n_iter)/n_fires,
-         fire_return = ifelse(is.infinite(fire_return), NA, fire_return))
+  filter(PFT == 'sagebrush') %>% 
+  select(-PFT) %>% 
+  # number of fires over all iterations and years
+  rename(n_fires = WildFire) %>% 
+  # WildFire is the sum of wildfires across iterations and years
+  mutate(fire_prob = n_fires/(n_iter*n_years)*100,
+         fire_return = (n_years*n_iter)/n_fires,
+         fire_return = ifelse(is.infinite(fire_return), NA, fire_return)) %>%  # annual wildfire
+  select(all_of(group_cols[group_cols != "PFT"]), matches("fire"))
+
 
 # median across GCMs
 fire_med1 <- fire0 %>% 
-  summarize(fire_return = median(fire_return, na.rm = TRUE),
-            fire_prob = mean(fire_prob),
-            .groups = "drop")
+  group_by(run, years, RCP, graze, id, site) %>% 
+  # recalculating fire return here
+  summarize(fire_prob = median(fire_prob, na.rm = TRUE),
+            n_fires = median(n_fires),
+            .groups = "drop") %>% 
+  # recalculate fire return because taking the median screws up the math 
+  # (because 'Infinite' fire returns are removed with na.rm = TRUE)
+  mutate(fire_return = (n_years*n_iter)/n_fires,
+         fire_return = ifelse(is.infinite(fire_return), NA, fire_return))
+
 
 
 # * change in interval ----------------------------------------------------
