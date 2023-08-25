@@ -90,47 +90,30 @@ fire_allyrs <- bio2 %>%
          id = str_replace(id, " ", ""),
          scenario_label = ifelse(RCP == "Current", "(Historical)", paste0("(",RCP,", ",years, ")"))) %>% 
   dplyr::select(-intensity) %>% 
-  mutate(fire_prob = WildFire/n_iter*100) %>%  # annual wildfire probability 
-    # taking average for each plot (otherwise value is repeated for each PFT)
     group_by(run, years, RCP, id,
              graze, scenario_label,
              site, GCM) %>% # GCM last (so drop last works)
     summarize(n_fires = sum(WildFire),
-              fire_prob = mean(fire_prob), 
               .groups = "drop_last") %>% 
-    # 200 iterations occured and we're using the last 5 years of data
+    # 200 iterations occured and we're using the last 50 years of data
     # if no fires occurred then set fire return interval to NA
     mutate(fire_return = (n_years*n_iter)/n_fires,
-           fire_return = ifelse(is.infinite(fire_return), NA, fire_return))
+           fire_return = ifelse(is.infinite(fire_return), NA, fire_return),
+           fire_prob = n_fires/(n_years*n_iter)*100)
   
 # median across GCMs
 fire_allyrs_med1 <- fire_allyrs %>% 
-  summarize(fire_return = median(fire_return, na.rm = TRUE),
-            fire_prob = median(fire_prob),
+  summarize(fire_prob = median(fire_prob),
+            n_fires = median(n_fires),
             .groups = "drop")  %>% 
-  rename(fire_return_150 = fire_return,
-         fire_prob_150 = fire_prob)
+  mutate(fire_return = (n_years*n_iter)/n_fires) 
 
 
 # combine 50 and 150 yr fire data -----------------------------------------
 
 med2 <- fire_med1 %>% # object from 02_summarize_bio.R where fire was calculated from 50 years
-  rename(fire_return_50 = fire_return,
-         fire_prob_50 = fire_prob) %>% 
-  inner_join(fire_allyrs_med1, by = join_by(run, years, RCP, graze, id, site))
-
-
-# data checking -----------------------------------------------------------
-
-test1 <- med2 %>% 
-  mutate(fire_prob_50b = 1/fire_return_50*100,
-          fire_return_50b = 1/(fire_prob_50/100))
-test1 %>% 
-    filter(abs(fire_return_50 - fire_return_50b) > 1)
-
-fire0 %>% 
-  mutate(fire_probb = n_fires/(200*50)*100) %>% 
-  filter(fire_prob > 0)
+  inner_join(fire_allyrs_med1, by = join_by(run, years, RCP, graze, id, site),
+             suffix = c("_50", "_150"))
 
 # figures -----------------------------------------------------------------
 
@@ -167,3 +150,4 @@ fig_l <- map(med2_l, function(df) {
 pdf("figures/fire/fire_50_vs_150_yrs_v1.pdf")
 print(fig_l)
 dev.off()
+
