@@ -10,8 +10,8 @@
 # dependencies ------------------------------------------------------------
 
 library(DBI)
-theme_set(theme_classic())
 source("scripts/02_summarize_bio.R")
+theme_set(theme_classic())
 # params ------------------------------------------------------------------
 
 n_iter <- 200 # number of iterations run
@@ -61,7 +61,8 @@ cols
 # table is small enough to fit in memory, so just loading the whole table
 # then summarizing with R below
 q1 <- paste("SELECT *",
-            "FROM BIOMASS")
+            "FROM BIOMASS", 
+            "WHERE Year < 51;")
 
 # separately querying the two tables
 bio1 <- map(db_connects, dbGetQuery, statement = q1)
@@ -125,7 +126,7 @@ med2_l <- med2 %>%
 fig_l <- map(med2_l, function(df) {
   g <- ggplot(df) +
     labs(caption = paste('simulation settings:', df$run[1]),
-         subtitle = 'Comparing fire data from the entire simulation (150 yrs) vs last 50 yrs') +
+         subtitle = 'Comparing fire data from the first 50 years vs last 50 yrs of simulation') +
     geom_abline(slope = 1, intercept = 0) +
     facet_wrap(~scenario_label)
   
@@ -134,7 +135,7 @@ fig_l <- map(med2_l, function(df) {
   g_fri <- g + 
     geom_point(aes(fire_return_50, fire_return_150)) +
     labs(x = 'FRI (years) of last 50 years',
-         y = 'FRI (years) of entire 150 years')
+         y = 'FRI (years) of first 50 years')
   
   g_fri2 <- g_fri +
     coord_cartesian(xlim = c(0, 200), ylim = c(0, 200))
@@ -142,12 +143,12 @@ fig_l <- map(med2_l, function(df) {
   g_prob <- g + 
     geom_point(aes(fire_prob_50, fire_prob_150)) +
     labs(x = 'Fire probability (%) of last 50 years',
-         y = 'Fire probability (%) of entire 150 years')
+         y = 'Fire probability (%) of first 50 years')
   
   return(list(g_prob, g_fri, g_fri2))
 })
 
-pdf("figures/fire/fire_50_vs_150_yrs_v1.pdf")
+pdf("figures/fire/fire_50_vs_last_50_yrs_v1.pdf")
 print(fig_l)
 dev.off()
 
