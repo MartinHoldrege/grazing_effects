@@ -16,6 +16,8 @@
 rerun <- FALSE # re-create rasters that have already been interpolated?
 test_run <- FALSE # TRUE # 
 date <- "20230712" # for appending to select file names
+run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
+# rerun unless climate variables are changed/updated)
 
 # dependencies ------------------------------------------------------------
 
@@ -148,6 +150,23 @@ fire_w1 <- fire0 %>%
               names_from = "id",
               values_from = "fire_prob") %>% 
   join_subsetcells(sc_dat = sc1)
+
+
+# * climate ---------------------------------------------------------------
+# climate data doesn't have a 'run' name attached b/ runs have same climate
+# but date attached in case in future runs are based on a different climate
+# dataset
+clim_all_w1 <- clim_all2 %>% 
+  pivot_longer(cols = c("MAP", "MAT")) %>% 
+  ungroup() %>% 
+  mutate(id = paste(name, "climate", RCP, years, GCM, '20230919', sep = "_")) %>% 
+  dplyr::select(site, id, value) %>% 
+  pivot_wider(id_cols = "site",
+              names_from = "id",
+              values_from = "value")
+
+# joining in cell numbers
+clim_all_w2 <- join_subsetcells(step_dat = clim_all_w1, sc_dat = sc1)
 
 # code removed for following sections--see 2022 commits to get code
 # *crossing threshold ----------------------------------------------------
@@ -330,4 +349,23 @@ print(Sys.time())
 
 # When you're done, clean up the cluster
 stopImplicitCluster()
+}
+
+
+# * climate ---------------------------------------------------------------
+
+if (run_climate) {
+  rMultivariateMatching::interpolatePoints(
+    matches = match1,
+    output_results = clim_all_w2, 
+    exclude_poor_matches = FALSE,
+    subset_cell_names = "subset_cell",
+    quality_name = "matching_quality",
+    matching_distance = 1.5,
+    raster_template = template,
+    plotraster = FALSE,
+    saveraster = TRUE,
+    filepath = "./data_processed/interpolated_rasters/climate",
+    overwrite = TRUE
+  )
 }

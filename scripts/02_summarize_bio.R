@@ -83,14 +83,22 @@ bio4 <- bio4a %>%
 
 
 # climate -----------------------------------------------------------------
-# current climate
 
-clim1 <- bio4 %>% 
+
+clim_all1 <- bio4 %>% 
   # arbitrarily filtering for one graze and PFT, so rows aren't duplicated
-  filter(years == "Current", graze == "Light", PFT == "sagebrush",
+  filter(graze == "Light", PFT == "sagebrush",
          run == "fire1_eind1_c4grass1_co20") %>% 
-  select(site, PPT, Temp)
+  select(site, PPT, Temp, years, RCP, GCM)
 
+# current climate only
+clim1 <- clim_all1 %>% 
+  filter(years == "Current") %>% 
+  select(site, PPT, Temp,)
+
+clim_all2 <- clim_all1 %>% 
+  rename(MAP = PPT,
+         MAT = Temp)
 
 # total biomass by PFT ----------------------------------------------------
 # creating dataframes where biomass is grouped into PFT's of interest

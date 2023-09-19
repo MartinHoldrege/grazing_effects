@@ -68,6 +68,10 @@ lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
 lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
 lab_perc_bio0 <- "% of total biomass"
 
+# cover
+lab_cov0 <-  "Cover (%)"
+lab_cov1 <- expression(~Delta*" Cover (%)")
+
 # number of individuals
 lab_indivs0 <- expression("# of individuals ("*m^-2*")")
 lab_indivs2 <- expression(~Delta*" # of individuals (scaled %)")
