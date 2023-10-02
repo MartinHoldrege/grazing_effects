@@ -373,6 +373,8 @@ id_remove_c4 <- function(x){
 #' @param within_GCM logical, if TRUE comparisons will be made within a GCM, e.g.
 #' comparing heavy to light grazing, within a GCM/RCP/years. ref_graze must be 
 #' specified if set to TRUE
+#' @param divide_by_max should the delta be dived by max current (i.e. to 
+#' calculate scaled percent change, if not just calculating normal % change)
 #'
 #' @return dataframe of percent change in biomass from current conditions,
 #' scaled by maximum current biomass
@@ -381,6 +383,7 @@ scaled_change <- function(df,
                           by = c("PFT", "graze"),
                           ref_graze = NULL,
                           percent = TRUE,
+                          divide_by_max = TRUE,
                           effect_size = FALSE, 
                           within_GCM = FALSE) {
   
@@ -447,9 +450,12 @@ scaled_change <- function(df,
     ungroup() %>% 
     # note using ifelse() instead of if() here caused problems--
     mutate(!!diff_var := 
-             if(percent) { 
+             if(percent & divide_by_max) { 
                # % scaled change
                (.data[[var]] - .data$current)/.data$max_value*100
+             } else if (percent & !divide_by_max) {
+               # regular % change
+               (.data[[var]] - .data$current)/.data$current*100
              } else if (effect_size) {
                # log response ratio
                log(.data[[var]]/.data$current)
@@ -513,6 +519,7 @@ scaled_change_2var <- function(df,
                                ref_graze = NULL,
                                percent = TRUE,
                                effect_size = FALSE, 
+                               divid_by_max = TRUE,
                                within_GCM = FALSE) {
   
   stopifnot(length(vars) ==2)
@@ -528,6 +535,7 @@ scaled_change_2var <- function(df,
                        ref_graze = ref_graze,
                        percent = percent,
                        effect_size = effect_size,
+                       divid_by_max = divid_by_max,
                        within_GCM = within_GCM)
   
   # scaled change of 2nd variable
@@ -537,6 +545,7 @@ scaled_change_2var <- function(df,
                            ref_graze = ref_graze,
                            percent = percent,
                            effect_size = effect_size,
+                           divid_by_max = divid_by_max,
                            within_GCM = within_GCM)
   names <- names(df_var2)
   diff_var2 <- names[length(names)] # name of the last column
