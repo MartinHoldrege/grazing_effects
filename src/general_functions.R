@@ -519,7 +519,7 @@ scaled_change_2var <- function(df,
                                ref_graze = NULL,
                                percent = TRUE,
                                effect_size = FALSE, 
-                               divid_by_max = TRUE,
+                               divide_by_max = TRUE,
                                within_GCM = FALSE) {
   
   stopifnot(length(vars) ==2)
@@ -535,7 +535,7 @@ scaled_change_2var <- function(df,
                        ref_graze = ref_graze,
                        percent = percent,
                        effect_size = effect_size,
-                       divid_by_max = divid_by_max,
+                       divide_by_max = divide_by_max,
                        within_GCM = within_GCM)
   
   # scaled change of 2nd variable
@@ -545,7 +545,7 @@ scaled_change_2var <- function(df,
                            ref_graze = ref_graze,
                            percent = percent,
                            effect_size = effect_size,
-                           divid_by_max = divid_by_max,
+                           divide_by_max = divide_by_max,
                            within_GCM = within_GCM)
   names <- names(df_var2)
   diff_var2 <- names[length(names)] # name of the last column

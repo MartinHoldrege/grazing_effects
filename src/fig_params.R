@@ -70,7 +70,8 @@ lab_perc_bio0 <- "% of total biomass"
 
 # cover
 lab_cov0 <-  "Cover (%)"
-lab_cov1 <- expression(~Delta*" Cover (%)")
+lab_cov1 <- expression(~Delta*" Cover (percentage point)")
+lab_cov2 <- expression("% Change in cover")
 
 # number of individuals
 lab_indivs0 <- expression("# of individuals ("*m^-2*")")
@@ -101,6 +102,10 @@ lab_firep1 <- expression(Delta~"# fires/century")
 # climate
 lab_map <- "MAP (mm)"
 lab_mat <- expression("MAT ("*degree*C*")")
+lab_map0 <- lab_map
+lab_mat0 <- lab_mat
+lab_map1 <- expression(Delta~"MAP (mm)")
+lab_mat1 <- expression(Delta~"MAT ("*degree*C*")")
 
 # effect size
 lab_es0 <- expression("ln("*frac(biomass, reference~group~biomass)*")")
