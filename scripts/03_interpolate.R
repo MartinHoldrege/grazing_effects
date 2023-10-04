@@ -200,16 +200,26 @@ match1 <- multivarmatch(
 )
 
 
+
 # *plotting interpolation quality -----------------------------------------
 
 interp <- template
 
-set.seed(1234)
-# map of where site_ids are interpolated to
-interp[as.numeric(match1$target_cell)] <- match1 %>% 
+interp_ordered <- template
+
+tmp_site_id <- match1 %>% 
   mutate(subset_cell = as.numeric(subset_cell)) %>% 
   left_join(sc1, by = c("subset_cell" = "cellnumber")) %>% 
-  pull(site_id) %>% 
+  pull(site_id)
+
+# for each pixels this raster shows which stepwat site the data was drawn
+# from for interpolation
+interp_ordered[as.numeric(match1$target_cell)] <- tmp_site_id
+writeRaster(interp_ordered, "data_processed/interpolation_data/interp_locations_200sites.tif")
+
+set.seed(1234)
+# map of where site_ids are interpolated to
+interp[as.numeric(match1$target_cell)] <- tmp_site_id %>% 
   factor() %>% 
   forcats::fct_shuffle()
 
