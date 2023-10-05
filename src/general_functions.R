@@ -390,8 +390,12 @@ scaled_change <- function(df,
   # checking arguments
   stopifnot(
     is.data.frame(df),
-    c("RCP", "years", "graze", by) %in% names(df)
+    c("RCP", "years", by) %in% names(df)
     )
+  
+  if(within_GCM | !is.null(ref_graze)){
+    stopifnot('graze' %in% names(df))
+  }
   
   if(percent & effect_size) {
     stop("percent and effect_size args can't both be TRUE")
@@ -513,6 +517,7 @@ scaled_change <- function(df,
 
 }
 
+# applying scaled_change() function two or more vars
 scaled_change_2var <- function(df, 
                                vars = c("biomass", "indivs"), 
                                by = c("PFT", "graze"),
@@ -522,13 +527,15 @@ scaled_change_2var <- function(df,
                                divide_by_max = TRUE,
                                within_GCM = FALSE) {
   
-  stopifnot(length(vars) ==2)
+  stopifnot(length(vars) >= 2,
+            # if not unique names then will have problems
+            length(unique(vars)) == length(vars))
   if("biomass" == vars[2]) {
     # this is because biomass variables are renamed
     stop("if one of vars is biomass, it must be the first")
   }
   
-  # scaled change of first variable
+  # change of first variable
   out <- scaled_change(df = df,
                        var = vars[1],
                        by = by,
@@ -538,26 +545,26 @@ scaled_change_2var <- function(df,
                        divide_by_max = divide_by_max,
                        within_GCM = within_GCM)
   
+  # change of additional variables
+  other_vars <- map(vars[2:length(vars)], function(x) {
+    tmp <- scaled_change(df = df,
+                  var = x,
+                  by = by,
+                  ref_graze = ref_graze,
+                  percent = percent,
+                  effect_size = effect_size,
+                  divide_by_max = divide_by_max,
+                  within_GCM = within_GCM)
+    # last col is the diff col
+    df_one_col <- tmp[ncol(tmp)]
+    df_one_col
+  }) %>% 
+    list_cbind(name_repair = 'check_unique')
   # scaled change of 2nd variable
-  df_var2 <- scaled_change(df = df,
-                           var = vars[2],
-                           by = by,
-                           ref_graze = ref_graze,
-                           percent = percent,
-                           effect_size = effect_size,
-                           divide_by_max = divide_by_max,
-                           within_GCM = within_GCM)
-  names <- names(df_var2)
-  diff_var2 <- names[length(names)] # name of the last column
-  
-  # make sure will not be overwriting an existing column
-  stopifnot(!(diff_var2) %in% names(out))
-  
-  # adding 2nd diff var column, to first dataframe
-  out[[diff_var2]] <- df_var2[[diff_var2]]
-  
+
+  # adding all the diff_var cols together
+  out <- bind_cols(out, other_vars, .name_repair = 'check_unique')
   out
-  
 }
 
 # outliers ----------------------------------------------------------------

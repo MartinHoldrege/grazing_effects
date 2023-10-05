@@ -115,6 +115,12 @@ lab_es0_indivs <- expression("ln("*frac(individuals, reference~group~individuals
 lab_es_on_off <- expression("ln("*frac(biomass~C4off, biomass~C4on)*")")
 lab_es_on_off_indivs <- expression("ln("*frac(individuals~C4off, individuals~C4on)*")")
 
+# SEI
+lab_sei1 <- expression(Delta~"SEI")
+
+# Q
+lab_q1 <- expression(Delta~"Q")
+
 # mapping figure dimensions ------------------------------------------------
 
 # parameters used for layout
