@@ -47,6 +47,8 @@ path_test_runs2 <- list.files(file.path(path, "WildfireMay2023TestRuns/NoWildfir
 
 path_test_runs3 <- file.path(path, "WildfireEindJuly2023TestRuns/Output_Compiled.sqlite")
 
+path_test_runs4 <- file.path(path, "WildfireNov2023TestRuns/Output_Compiled_Nov2023test.sqlite")
+
 db_orig <- dbConnect(RSQLite::SQLite(), path_orig)
 
 db_test1 <- map(path_test_runs1, function(x) {
@@ -58,6 +60,7 @@ db_test2 <- map(path_test_runs2, function(x) {
 })
 
 db_test3 <- dbConnect(RSQLite::SQLite(), path_test_runs3)
+db_test4 <- dbConnect(RSQLite::SQLite(), path_test_runs4)
 
 # db queries --------------------------------------------------------------
 
@@ -75,28 +78,32 @@ q2 <- paste("SELECT *",
 # separately querying the two tables
 bio1 <- map_dfr(db_test1, dbGetQuery, statement = q1) %>% 
   # run where no fire probability was measured
-  mutate(run = '2023Fire')
+  mutate(run = '2023Fire1')
 
 bio1a <- map_dfr(db_test2, dbGetQuery, statement = q1) %>% 
-  # 2023 implementation where only the fire module has been updated
+  # fire 2023 implementation where only the fire module has been updated
   # (flexible eind etc. not changed here)
   mutate(run = '2023NoFire')
 
 bio1b <- dbGetQuery(db_test3, q1) %>% 
-  mutate(run = '2023FireEind')
+  mutate(run = '2023Fire1Eind')
+
+bio1c <- dbGetQuery(db_test4, q1) %>% 
+  mutate(run = '2023Fire2Eind')
 
 bio_orig1 <- dbGetQuery(db_orig, q2)  %>% 
   # 2022 implimentation, with cheatgrass fire equation
   mutate(run = '2022CheatgrassFire')
 
-
-bio2 <- bind_rows(bio1, bio1a, bio1b, bio_orig1) %>% 
+bio2 <- bind_rows(bio1, bio1a, bio1b, bio1c, bio_orig1) %>% 
   as_tibble() %>% 
   mutate(RCP = rcp2factor(RCP),
          years = years2factor(years),
          id = paste(RCP, years, sep = "_"),
          # sequential ordering of site numbers
-         site_simple = as.factor(as.numeric(factor(site))))
+         site_simple = as.factor(as.numeric(factor(site))),
+         run = factor(run),
+         run = fct_relevel(run, '2023NoFire')) 
 
 # summarize ---------------------------------------------------------------
 
@@ -139,9 +146,10 @@ base <- function() {
        shapes)
 }
 
-cap1 <- paste("Simulations run for", length(sites), "sites")
-pdf("figures/fire/compare-fire-implementations_v2.pdf",
-    width = 8, height = 6)
+cap1 <- paste("Simulations run for", length(sites), "sites"
+              ,"\nFire2 refers to the newest fire equation")
+pdf("figures/fire/compare-fire-implementations_v3.pdf",
+    width = 10, height = 8)
 
 # *map of site locations ------------------------------------------------------
 
@@ -151,7 +159,8 @@ sites2 <- tibble(X_WGS84 = -117.82083, Y_WGS84 = 39.3125,
   bind_rows(sites1) %>% 
   mutate(site_simple = as.numeric(as.factor(`Site(new)`))) %>% 
   sf::st_as_sf(coords = c("X_WGS84", "Y_WGS84"),
-               crs = sf::st_crs("EPSG:4326"))
+               crs = sf::st_crs("EPSG:4326")) %>% 
+  sf::st_transform(crs = crs)
 
 
 ggplot() +
@@ -187,6 +196,16 @@ ggplot(fire1, aes(run, prob, group = site_simple, color = site_simple, shape = s
        caption = cap1) +
   base()
 
+
+ggplot(fire1, aes(id, prob, color = site_simple, group = site_simple)) + 
+  geom_line()+
+  geom_point(aes(shape = site_simple)) +
+  facet_wrap(~run) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  labs(x = "Scenario",
+       y = "Observed fire probability (%) in STEPWAT2",
+       caption = cap1) +
+  base()
 
 # * biomass ---------------------------------------------------------------
 g <- ggplot(bio_med1, aes(id, biomass, color = run, shape = run, fill = run, group = run)) +
