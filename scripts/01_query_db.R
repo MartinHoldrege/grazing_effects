@@ -28,14 +28,17 @@ path_sw <- "D:/USGS/large_files/stepwat/" # db files stored on hard-drive
 db_paths <- c(
   # first full run done by Kyle in 2023 (new dynamic eind implementation, 
   # and new fire equation, co2 water use efficiency adjustment is turned off)
-  "fire1_eind1_c4grass1_co20" =
-    file.path(path_sw, "WildfireJuly2023Runs/Output_Compiled.sqlite"),
-  # co2 functionality turned on
-  "fire1_eind1_c4grass1_co21" =
-    file.path(path_sw, "Wildfire.CO2.August2023Runs/Output_fire1_grazL_eind1_c4grass1_co21.sqlite"),
-  # no co2, no co2
+  # (rerun Nov 2023, new fire equation)
+  "fire1_eind1_c4grass1_co20_2311" =
+    file.path(path_sw, "WildfireNov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass1.co20.sqlite"),
+  # co2 functionality turned on (run Nov 2023, new fire equation)
+  "fire1_eind1_c4grass1_co21_2311" =
+    file.path(path_sw, "WildfireCO2Nov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass1.co21.sqlite"),
+  # no co2, no fire 
   "fire0_eind1_c4grass1_co20" =
     file.path(path_sw, "NoWildfireJuly2023Runs/Output_fire0_grazL_eind1_c4grass1_co20.sqlite"))
+
+stopifnot(map_lgl(db_paths, file.exists))
 
 db_connects <- map(db_paths, function(x) dbConnect(RSQLite::SQLite(), x))
 
@@ -157,7 +160,7 @@ bio3$n <- NULL
 # original version of this file (bio_mean_by_site-PFT.csv) was created with
 # data from the 2021/2022 implementationof stepwat (old cheatgrass fire, no C02,
 # and no dynamic eind implementation)
-write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v2.csv")
+write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v3.csv")
 
 
-# dbDisconnect()
+map(db_connects, dbDisconnect) # disconnect

@@ -215,7 +215,8 @@ tmp_site_id <- match1 %>%
 # for each pixels this raster shows which stepwat site the data was drawn
 # from for interpolation
 interp_ordered[as.numeric(match1$target_cell)] <- tmp_site_id
-writeRaster(interp_ordered, "data_processed/interpolation_data/interp_locations_200sites.tif")
+writeRaster(interp_ordered, "data_processed/interpolation_data/interp_locations_200sites.tif",
+            overwrite = TRUE)
 
 set.seed(1234)
 # map of where site_ids are interpolated to

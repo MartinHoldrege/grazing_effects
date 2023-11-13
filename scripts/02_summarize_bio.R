@@ -30,7 +30,7 @@ n_iter <- 200 # number of iterations run
 
 # site level means of biomass across years, for each treatment and PFT
 # created in 01_query_db.R script
-bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v2.csv",
+bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v3.csv",
                  show_col_types = FALSE)
 
 # parse -------------------------------------------------------------------
@@ -88,7 +88,7 @@ bio4 <- bio4a %>%
 clim_all1 <- bio4 %>% 
   # arbitrarily filtering for one graze and PFT, so rows aren't duplicated
   filter(graze == "Light", PFT == "sagebrush",
-         run == "fire1_eind1_c4grass1_co20") %>% 
+         run == "fire0_eind1_c4grass1_co20") %>% 
   select(site, PPT, Temp, years, RCP, GCM)
 
 # current climate only

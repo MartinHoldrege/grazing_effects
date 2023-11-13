@@ -23,7 +23,7 @@ source("src/general_functions.R")
 
 # params ------------------------------------------------------------------
 
-run <- c('fire0_eind1_c4grass1_co20')
+run <- c('fire1_eind1_c4grass1_co21_2311')
 
 # read in data ------------------------------------------------------------
 

@@ -830,7 +830,9 @@ calc_pcent_by_thresh <- function(lyr, r) {
 #' create dataframe of raster information
 #'
 #' @param rast raster (with named layers), or vector of file names
-#' @param run regular expression the defines the run
+#' @param run regular expression the defines the run, the 
+#' "(_\\d{4}){0,1}" part of the default regex is meant to optionally match
+#' the two digit year and month code that started to be appendix to newer run ids
 #' @param into columns the components of the layer names will be seperated
 #' into
 #'
@@ -839,7 +841,7 @@ calc_pcent_by_thresh <- function(lyr, r) {
 #' path <- "grazing_effects/data_processed/interpolated_rasters/biomass/fire1_eind1_c4grass1_co20_Aforb_biomass_RCP45_2030-2060_Light_inmcm4.tif"
 #' create_rast_info(path)
 create_rast_info <- function(x,
-                             run_regex = "fire\\d_eind\\d_c4grass\\d_co2\\d",
+                             run_regex = "fire\\d_eind\\d_c4grass\\d_co2\\d(_\\d{4}){0,1}",
                              into = c("PFT", "type", "RCP", "years", 
                                       "graze", "GCM")) {
   
@@ -864,7 +866,7 @@ create_rast_info <- function(x,
              sep = "_") %>% 
     mutate(run2 = paste(run, lookup_graze[graze], sep = "_")) %>% 
     df_factor() %>% 
-    select(run, all_of(into), everything())
+    dplyr::select(run, all_of(into), everything())
   
   if(!all(complete.cases(out))) {
     stop('some parsings failed (NAs created)')
