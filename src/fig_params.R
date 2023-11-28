@@ -121,6 +121,10 @@ lab_sei1 <- expression(Delta~"SEI")
 # Q
 lab_q1 <- expression(Delta~"Q")
 
+# area
+lab_areakm0 <- expression("Area ("*km^2*")")
+lab_areaperc0 <- "Area (%)"
+
 # mapping figure dimensions ------------------------------------------------
 
 # parameters used for layout
