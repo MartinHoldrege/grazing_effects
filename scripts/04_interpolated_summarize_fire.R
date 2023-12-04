@@ -17,7 +17,7 @@ source("src/general_functions.R")
 
 # params ------------------------------------------------------------------
 
-runs <- c('fire1_eind1_c4grass1_co20_2311', 'fire1_eind1_c4grass1_co21_2311')
+runs <- c('fire1_eind1_c4grass0_co20_2311')
 
 # some terra operations can be done in parallel and need 
 # to know num of cores
