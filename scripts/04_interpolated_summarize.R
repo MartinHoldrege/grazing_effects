@@ -12,8 +12,6 @@
 # this script takes ~ 10 min to run
 
 
-
-
 # dependencies ------------------------------------------------------------
 
 library(tidyverse) 
@@ -23,7 +21,7 @@ source("src/general_functions.R")
 
 # params ------------------------------------------------------------------
 
-run <- c('fire1_eind1_c4grass1_co21_2311')
+run <- c('fire1_eind1_c4grass0_co20_2311')
 
 # read in data ------------------------------------------------------------
 

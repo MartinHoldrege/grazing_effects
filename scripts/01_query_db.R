@@ -36,7 +36,11 @@ db_paths <- c(
     file.path(path_sw, "WildfireCO2Nov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass1.co21.sqlite"),
   # no co2, no fire 
   "fire0_eind1_c4grass1_co20" =
-    file.path(path_sw, "NoWildfireJuly2023Runs/Output_fire0_grazL_eind1_c4grass1_co20.sqlite"))
+    file.path(path_sw, "NoWildfireJuly2023Runs/Output_fire0_grazL_eind1_c4grass1_co20.sqlite"),
+  # fire, NO c4 grass expansion, no co2
+  "fire1_eind1_c4grass0_co20_2311" =
+    file.path(path_sw, "WildfireC4grassesOffNov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass0.co20.sqlite")
+  )
 
 stopifnot(map_lgl(db_paths, file.exists))
 
