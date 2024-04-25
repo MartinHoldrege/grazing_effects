@@ -123,6 +123,7 @@ lab_q1 <- expression(Delta~"Q")
 
 # area
 lab_areakm0 <- expression("Area ("*km^2*")")
+lab_areaha0 <- "Area (million ha)"
 lab_areaperc0 <- "Area (%)"
 
 # mapping figure dimensions ------------------------------------------------
