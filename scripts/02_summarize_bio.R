@@ -30,7 +30,7 @@ n_iter <- 200 # number of iterations run
 
 # site level means of biomass across years, for each treatment and PFT
 # created in 01_query_db.R script
-bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v3.csv",
+bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v4.csv",
                  show_col_types = FALSE)
 
 # parse -------------------------------------------------------------------

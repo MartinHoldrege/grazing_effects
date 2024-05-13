@@ -29,6 +29,7 @@ db_paths <- c(
   # first full run done by Kyle in 2023 (new dynamic eind implementation, 
   # and new fire equation, co2 water use efficiency adjustment is turned off)
   # (rerun Nov 2023, new fire equation)
+  # these all are for light grazing
   "fire1_eind1_c4grass1_co20_2311" =
     file.path(path_sw, "WildfireNov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass1.co20.sqlite"),
   # co2 functionality turned on (run Nov 2023, new fire equation)
@@ -39,7 +40,12 @@ db_paths <- c(
     file.path(path_sw, "NoWildfireJuly2023Runs/Output_fire0_grazL_eind1_c4grass1_co20.sqlite"),
   # fire, NO c4 grass expansion, no co2
   "fire1_eind1_c4grass0_co20_2311" =
-    file.path(path_sw, "WildfireC4grassesOffNov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass0.co20.sqlite")
+    file.path(path_sw, "WildfireC4grassesOffNov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass0.co20.sqlite"),
+  # additional runs w/ other grazing levels
+  "fire1_eind1_c4grass1_co20_2402" = 
+    file.path(path_sw, "WildfireGrazingFeb2024Runs/Output_fire1_grazMHVH_eind1_c4grass1_co20.sqlite"),
+  "fire1_eind1_c4grass0_co20_2402" = 
+    file.path(path_sw, "WildfireGrazingFeb2024Runs/Output_fire1_grazMHVH_eind1_c4grass1_co20.sqlite")
   )
 
 stopifnot(map_lgl(db_paths, file.exists))
@@ -164,7 +170,7 @@ bio3$n <- NULL
 # original version of this file (bio_mean_by_site-PFT.csv) was created with
 # data from the 2021/2022 implementationof stepwat (old cheatgrass fire, no C02,
 # and no dynamic eind implementation)
-write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v3.csv")
+write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v4.csv")
 
 
 map(db_connects, dbDisconnect) # disconnect
