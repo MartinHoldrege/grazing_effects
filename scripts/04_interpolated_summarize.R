@@ -21,15 +21,20 @@ source("src/general_functions.R")
 
 # params ------------------------------------------------------------------
 
-run <- c('fire1_eind1_c4grass0_co20_2311')
+# multiple runs may need to listed if different runs done for different
+# grazing levels
+runs <- c('fire1_eind1_c4grass0_co20_2311',
+         'fire1_eind1_c4grass0_co20_2402')
+run <- runs[[1]] # used for output file naming
 
 # read in data ------------------------------------------------------------
 
 # * rasters ---------------------------------------------------------------
 
 # data up-scaled for each GCM
+regex <- if(length(runs) == 1) runs else paste0('(', paste(runs, collapse = ')|('), ")")
 bio_files <- list.files("data_processed/interpolated_rasters/biomass/",
-                        pattern = run,
+                        pattern = regex,
                         full.names = TRUE)
 length(bio_files)
 
@@ -50,12 +55,10 @@ num.cores <- parallel::detectCores(logical = FALSE)
 # descriptions of layers of raster stack
 r_names <- names(rast1)
 
-rast_info <- create_rast_info(rast1) %>% 
-  mutate(layer_num = 1:nrow(.),
-         # remove GCM from the string
-         id_noGCM = str_replace(id, "_[^_]*$", "")) %>% 
+rast_info <- create_rast_info(rast1, id_noGCM = TRUE) %>% 
+  mutate(layer_num = 1:nrow(.)) %>% 
   # the ordering is important for later creation of spatraster dataset
-  arrange(id)
+  arrange(id_noGCM, id)
 
 
 # median by GCM -----------------------------------------------------------
@@ -78,6 +81,7 @@ length(rast_gcm_l)
 # class(sds_gcm)
 # 
 # check that the number of layers in each dataset is correct
+
 stopifnot(map_dbl(rast_gcm_l, nlyr) == rast_info %>%
             group_by(id_noGCM) %>%
             summarise(n = n()) %>%
@@ -86,10 +90,7 @@ stopifnot(map_dbl(rast_gcm_l, nlyr) == rast_info %>%
 
 # note these median rasters now inlcude the median under current
 # conditions (i.e. medians of one value). 
-med1 <- map(rast_gcm_l, app, fun = "median")
-
-med2 <- rast(med1)
-
+med2 <- rast(map(rast_gcm_l, app, fun = "median"))
 
 # delta biomass cref ------------------------------------------------------
 # change in biomass (absolulte, not relative) relative to ambient climate (c)
@@ -127,29 +128,28 @@ names(diff_cref2) <- map(diff_cref1, names) %>%
 # is current, I'm calculating this using median rasters (which in this case
 # should yield the same answer as calculate for each gcm then taking the median).
 
-if (FALSE) {
 gref_info <- rast_info %>% 
-  filter_rcp_c4() %>% 
+  filter_clim_extremes() %>% 
   select(-GCM, -id, -layer_num) %>% 
   distinct() %>% 
   filter((RCP == 'Current' & graze == "Heavy")|
-           (RCP == 'RCP8.5' & graze %in% c("Light", "Moderate")))
+           (RCP == 'RCP45' & graze %in% c("Light", "Moderate")))
 
 gref_info <- split(gref_info, 
                    paste(gref_info$RCP, gref_info$graze, sep = "_")) %>% 
   map(function(x) arrange(x, PFT))
 
 stopifnot(
-  gref_info$Current_Heavy$PFT == gref_info$RCP8.5_Moderat$PFT,
-  gref_info$Current_Heavy$PFT ==  gref_info$RCP8.5_Light$PFT,
+  gref_info$Current_Heavy$PFT == gref_info$RCP45_Moderat$PFT,
+  gref_info$Current_Heavy$PFT ==  gref_info$RCP45_Light$PFT,
   # this only works if there is one raster per PFT (i.e. reference raster)
   unique(gref_info$Current_Heavy$PFT) == gref_info$Current_Heavy$PFT
   )
 
 # current heavy and future light or moderate grazing
 current_heavy <- subset(med2, subset = gref_info$Current_Heavy$id_noGCM)
-future_light <- subset(med2, subset = gref_info$RCP8.5_Light$id_noGCM)
-future_moderate <- subset(med2, subset = gref_info$RCP8.5_Moderate$id_noGCM)
+future_light <- subset(med2, subset = gref_info$RCP45_Light$id_noGCM)
+future_moderate <- subset(med2, subset = gref_info$RCP45_Moderate$id_noGCM)
 
 # max under current conditions
 max_heavy <- t(minmax(current_heavy))[, 2]
@@ -167,8 +167,6 @@ rast_diff_gref <- rast(list(diff_gref2light, diff_gref2moderate))
 
 names(rast_diff_gref) <- names(rast_diff_gref) %>% 
   str_replace("_biomass_", '_bio-diff-gref-cur-heavy_')
-}
-
 
 #  c3Pgrass/Pgrass -------------------------------------------------------
 
@@ -259,7 +257,6 @@ names(rast_diff_gref) <- names(rast_diff_gref) %>%
 
 # median across GCMs, for all future scenarios
 
-
 writeRaster(med2, 
             file.path("data_processed/interpolated_rasters", 
                       paste0(run, "_bio_future_median_across_GCMs.tif")),
@@ -282,7 +279,7 @@ writeRaster(diff_cref2,
 #             overwrite = TRUE)
 
 # # scaled % change from current light grazing to future (RCP8.5-mid) heavy graze
-
-# writeRaster(rast_diff_gref,
-#             "data_processed/interpolated_rasters/bio-diff-gref-cur-heavy_median.tif",
-#             overwrite = TRUE)
+writeRaster(rast_diff_gref,
+            file.path("data_processed/interpolated_rasters",
+            paste(run, "_bio-diff-gref-cur-heavy_median.tif")),
+            overwrite = TRUE)

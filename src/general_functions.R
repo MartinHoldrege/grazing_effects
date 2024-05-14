@@ -834,7 +834,8 @@ calc_pcent_by_thresh <- function(lyr, r) {
 #' the two digit year and month code that started to be appendix to newer run ids
 #' @param into columns the components of the layer names will be seperated
 #' into
-#'
+#' @param id_noGCM logical, create a column that provides the layer id but
+#' with the GCM removed (for grouping/summarizing across GCMs)
 #' @return dataframe\
 #' @example
 #' path <- "grazing_effects/data_processed/interpolated_rasters/biomass/fire1_eind1_c4grass1_co20_Aforb_biomass_RCP45_2030-2060_Light_inmcm4.tif"
@@ -842,7 +843,8 @@ calc_pcent_by_thresh <- function(lyr, r) {
 create_rast_info <- function(x,
                              run_regex = "fire\\d_eind\\d_c4grass\\d_co2\\d(_\\d{4}){0,1}",
                              into = c("PFT", "type", "RCP", "years", 
-                                      "graze", "GCM")) {
+                                      "graze", "GCM"),
+                             id_noGCM = FALSE) {
   
   if(isTRUE('SpatRaster' %in% class(x))) {
     y <- names(x)
@@ -866,6 +868,26 @@ create_rast_info <- function(x,
     mutate(run2 = paste(run, lookup_graze[graze], sep = "_")) %>% 
     df_factor() %>% 
     dplyr::select(run, all_of(into), everything())
+  
+  if(id_noGCM) {
+    out <- out %>% 
+      mutate(
+        id_noGCM = str_replace(id, "_[^_]*$", ""),
+        # remove the year-month from run name,
+        # this is b/ different year-month runs may have been
+        # done for different grazing levels, but still represent all
+        # the same other run parameters
+        id_noGCM = str_replace(id_noGCM, '(?<=co2[01])_\\d{4}', ''))
+    
+    check <- out %>% 
+      group_by(id_noGCM) %>% 
+      summarize(n = n())
+    
+    # should only be 1 (for current conditions), or 13 (for futures)
+    if(!all(check$n %in% c(1, 13))) {
+      stop('wrong number of id_noGCMs replicates')
+    }
+  }
   
   if(!all(complete.cases(out))) {
     stop('some parsings failed (NAs created)')

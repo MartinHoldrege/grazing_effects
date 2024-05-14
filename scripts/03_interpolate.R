@@ -16,7 +16,7 @@
 rerun <- FALSE # re-create rasters that have already been interpolated?
 test_run <- FALSE # TRUE # 
 date <- "20230712" # for appending to select file names
-run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
+run_climate <- TRUE # whether to upscale the climate data (doesn't need to be
 # rerun unless climate variables are changed/updated)
 
 # dependencies ------------------------------------------------------------

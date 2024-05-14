@@ -33,6 +33,9 @@ n_iter <- 200 # number of iterations run
 bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v4.csv",
                  show_col_types = FALSE)
 
+# climate seasonality (file created in 01_summarize_clim.R)
+seas1 <- read_csv('data_processed/site_means/clim_seasonality.csv')
+
 # parse -------------------------------------------------------------------
 # Convert columns to useful factors
 
@@ -89,12 +92,13 @@ clim_all1 <- bio4 %>%
   # arbitrarily filtering for one graze and PFT, so rows aren't duplicated
   filter(graze == "Light", PFT == "sagebrush",
          run == "fire0_eind1_c4grass1_co20") %>% 
-  select(site, PPT, Temp, years, RCP, GCM)
+  select(site, PPT, Temp, years, RCP, GCM) %>% 
+  left_join(seas1, by = join_by(site, years, RCP, GCM))
 
 # current climate only
 clim1 <- clim_all1 %>% 
   filter(years == "Current") %>% 
-  select(site, PPT, Temp,)
+  select(site, PPT, Temp)
 
 clim_all2 <- clim_all1 %>% 
   rename(MAP = PPT,
