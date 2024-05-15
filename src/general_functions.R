@@ -97,7 +97,18 @@ rcp2factor <- function(x) {
   out
 }
 
+epoch2factor <- function(x) {
+  x2 <- update_yr(x) 
+  factor(x2, levels = c('2031-2060', '2071-2100'))
+}
 
+# doesn't create a factor, but just to update the correct
+# epoch label for use in figures
+update_yr <- function(x) {
+  x %>% 
+    str_replace('2030', '2031') %>% 
+    str_replace('2070', '2071')
+}
 
 # * PFTs ------------------------------------------------------------------
 
