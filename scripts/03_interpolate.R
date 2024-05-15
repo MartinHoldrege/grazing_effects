@@ -157,7 +157,9 @@ fire_w1 <- fire0 %>%
 # but date attached in case in future runs are based on a different climate
 # dataset
 clim_all_w1 <- clim_all2 %>% 
-  pivot_longer(cols = c("MAP", "MAT")) %>% 
+  pivot_longer(cols = c(
+    #"MAP", "MAT", # comment out variables that have already interpolated
+    'PTcor', 'psp')) %>% 
   ungroup() %>% 
   mutate(id = paste(name, "climate", RCP, years, GCM, '20230919', sep = "_")) %>% 
   dplyr::select(site, id, value) %>% 
