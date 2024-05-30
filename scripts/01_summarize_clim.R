@@ -33,13 +33,21 @@ psp <- clim1 %>%
   group_by(site, GCM, years, RCP, Year) %>% 
   summarize(psp = sum(PRECIP_ppt_Mean[Month %in% c(6, 7, 8)])/
               sum(PRECIP_ppt_Mean),
+            # correlation between monthly t and p, calculated fo each year
+            PTcor2 = stats::cor(TEMP_avg_C_Mean, PRECIP_ppt_Mean),
+            AP = sum(PRECIP_ppt_Mean),
+            AT = mean(TEMP_avg_C_Mean),
             .groups = 'drop_last') %>% 
-  summarize(psp = mean(psp))
+  summarize(psp = mean(psp),
+            PTcor2 = mean(PTcor2),
+            MAP = mean(AP),
+            MAT = mean(AT))
+
 
 avg1 <- clim1 %>% 
   group_by(site, GCM, years, RCP, Month) %>% 
   summarize(temp = mean(TEMP_avg_C_Mean),
-            ppt = mean(PRECIP_ppt_Mean),
+            ppt = mean(PRECIP_ppt_Mean), 
             .groups = 'drop_last')
 # precipitation seasonality (correlationg between mean monthly ppt and temp)
 seas <- avg1 %>% 
