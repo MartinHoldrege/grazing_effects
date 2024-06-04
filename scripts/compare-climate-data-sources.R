@@ -18,6 +18,7 @@ library(sf)
 library(tidyverse)
 library(patchwork)
 source('src/paths.R')
+source('src/mapping_functions.R')
 theme_set(theme_bw())
 
 # read in data ------------------------------------------------------------
@@ -41,6 +42,16 @@ db_clim1 <- read_csv('data_processed/site_means/dbWeather_200sites.csv')
 # calculated in the daymet_normals.js script, in the SEI repository
 day1 <- rast("data_raw/daymet_monthly_normals_1981-2010.tif")
 
+# * stepwat maps ------------------------------------------------------------------
+# interpolated climate data
+files <- paste0(c('MAP', 'MAT', 'PTcor'), "_climate_Current_Current_Current_20230919.tif")
+
+sw_r1 <- rast(file.path('data_processed/interpolated_rasters/climate',
+                        files))
+
+names(sw_r1) <- names(sw_r1) %>% 
+  str_extract("^[[:alpha:]]+")
+
 
 # * grid-met --------------------------------------------------------------
 # ~ 4 km gridded data (from Daniel)
@@ -50,6 +61,16 @@ grid1 <- rast(file.path(
   c('gridmet_ppt_annualClimatologies.nc', 'gridmet_tmmn_annualClimatologies.nc',
     'gridmet_tmmx_annualClimatologies.nc')
 ))
+
+
+# functions ---------------------------------------------------------------
+
+range_lab <- function(x, unit = "") {
+  as.numeric(minmax(x)) %>% 
+    round() %>% 
+    paste(collapse = ' to ') %>% 
+    paste0('\n(range:', ., unit, ')')
+}
 
 # summarize across GCMs ---------------------------------------------------
 
@@ -61,6 +82,7 @@ sw_clim_med <- sw_clim1 %>%
   summarise(PTcor_stepwat = median(PTcor),
             MAT_stepwat = median(MAT),
             MAP_stepwat = median(MAP)*10) # median across GCMs, convert to mm
+
 # extract clim at points --------------------------------------------------
 
 # convert site locations to sf object
@@ -172,6 +194,40 @@ comb_long <- comb %>%
   pivot_wider(names_from = 'data_source') %>% 
   ungroup()
 
+
+# compare rasters ---------------------------------------------------------
+# stepwat interpolated climate data vs daymet v3 climate data
+
+
+# *prep daymet data --------------------------------------------------------
+day1 <- extend(day1, sw_r1) %>% 
+  crop(sw_r1) %>% 
+  project(crs(sw_r1))
+nms <- names(day1) %>% 
+  sort()
+
+tmean <- (day1[[str_subset(nms, '^tmax')]] + day1[[str_subset(nms, '^tmin')]])/2
+prcp <- day1[[str_subset(nms, '^prcp')]]
+
+# P-T correlation (type 1)
+day_ptcor <- app(c(tmean, prcp), fun = function(x) {
+  # first 12 layers are temp, remains ones are prcp
+  cor(x[1:12], x[13:24])
+})
+
+day_map <- app(prcp, fun = sum)
+day_mat <- app(tmean, fun = mean)
+
+# * differences -----------------------------------------------------------
+
+# stewpat minus daymet differences
+map_diff_sd <- sw_r1[['MAP']] - day_map
+mat_diff_sd <- sw_r1[['MAT']] - day_mat
+ptcor_diff_sd <- sw_r1[['PTcor']] - day_ptcor
+
+# Next--check units on sw_r1 MAP and MAT
+# create 3 maps
+
 # figures -----------------------------------------------------------------
 
 # *comparing stepwat weather to gridmet -----------------------------------
@@ -219,7 +275,8 @@ base <- function() {
   )
 }
 
-pdf('figures/climate/clim_comparison-between-sources.pdf')
+pdf('figures/climate/clim_comparison-between-sources.pdf',
+    width = 8, height = 8)
 
 g3
 g4
@@ -328,5 +385,35 @@ comb_long %>%
   labs(x = 'RR dataset',
        y = 'GridMet')
 
+
+# * maps ------------------------------------------------------------------
+cols_diff <- rev(RColorBrewer::brewer.pal(9, 'RdYlBu'))
+cols_diff[5] <- 'grey'
+
+m1 <- plot_map_inset(r = map_diff_sd,
+               colors = cols_diff,
+               limits = c(-300, 300),
+               scale_name = 'mm',
+               tag_label = paste('Interpolated minus DayMet MAP',
+                                 range_lab(map_diff_sd, 'mm')))
+
+m2 <- plot_map_inset(r = mat_diff_sd,
+               colors = cols_diff,
+               limits = c(-5, 5),
+               scale_name = 'C',
+               tag_label = paste('Interpolated minus DayMet MAT',
+                                 range_lab(mat_diff_sd, 'C')))
+
+m3 <- plot_map_inset(r = ptcor_diff_sd,
+               colors = cols_diff,
+               limits = c(-1, 1),
+               scale_name = '',
+               tag_label = paste('Interpolated minus DayMet P-T correlation',
+                                 range_lab(ptcor_diff_sd)))
+design <- "
+  12
+  3#
+"
+m1 + m2 + m3 + plot_layout(design = design)
 dev.off()
 
