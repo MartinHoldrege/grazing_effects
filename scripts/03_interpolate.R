@@ -15,7 +15,10 @@
 
 rerun <- FALSE # re-create rasters that have already been interpolated?
 test_run <- FALSE # TRUE # 
-date <- "20240604" # for appending to select file names
+date <- "20240605" # for appending to select file names
+version <- 'v2'
+# v1--1st version of criteria (i.e. based on calculating mathcing criteria across the region)
+# v2--second version of criteria (i.e. basing matching criteria just on 200 sites)
 run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- TRUE # create a climate interpolation, not interpolating
 # stepwat climat outpute but using the exact values used for the matching
@@ -73,13 +76,15 @@ tc2 <- tc1[, c("cellnumber", 'site_id', 'x', 'y', bioclim_vars)]
 
 # criteria for matchingvars function (here using 10% of range of data)
 # this is for scaling the variables
-criteria <- map_dbl(tc2[, bioclim_vars], function(x) {
+# for v2, switching to base matching variables on the grid-cells with sites
+criteria <- map_dbl(tc2[!is.na(tc2$site_id), bioclim_vars], function(x) {
   (max(x) - min(x))*0.1
 })
 
 criteria
 
-write_csv(as.data.frame(criteria), paste0("data_processed/interpolation_data/criteria-for-interp_", date, '.csv'))
+write_csv(as.data.frame(criteria), 
+          paste0("data_processed/interpolation_data/criteria-for-interp_", date, "_", version, '.csv'))
 
 # * subset cell data ------------------------------------------------------
 # location and climate data for the 200 sites where simulations were actually
