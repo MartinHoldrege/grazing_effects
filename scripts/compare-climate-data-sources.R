@@ -42,6 +42,10 @@ db_clim1 <- read_csv('data_processed/site_means/dbWeather_200sites.csv')
 # calculated in the daymet_normals.js script, in the SEI repository
 day1 <- rast("data_raw/daymet_monthly_normals_1981-2010.tif")
 
+# daymet bioclim variables (file created in interpolation_data.R)
+day_table1 <- read_csv("data_processed/interpolation_data/clim_for_interpolation.csv",
+                       col_types = cols(.default = "d"))
+
 # * stepwat maps ------------------------------------------------------------------
 # interpolated climate data
 files <- paste0(c('MAP', 'MAT', 'PTcor'), "_climate_Current_Current_Current_20230919.tif")
@@ -417,3 +421,53 @@ design <- "
 m1 + m2 + m3 + plot_layout(design = design)
 dev.off()
 
+
+# climate envelope --------------------------------------------------------
+# figures showing study are climate envelope along with the locations of the 200
+# points (to see how representative they are)
+
+day_table2 <- day_table1 %>% 
+  dplyr::select(bio1, bio12, ptcor, site_id) %>% 
+  rename(MAT = bio1, MAP = bio12, PTcor = ptcor)
+
+day_sites1 <- day_table2 %>% 
+  filter(!is.na(site_id))
+#day_table2 <- sample_n(day_table2, 1e5) # for testing
+
+# * figures ---------------------------------------------------------------
+
+b <- c(0, 1e-7, 0.001, 0.01, 0.1, 0.2, 0.3,0.5,1)
+base_density <- function(breaks = b) {
+
+  colors <- c('transparent',
+              RColorBrewer::brewer.pal(length(breaks), 'Greens')[-c(1:2)])
+  
+  list(geom_density_2d_filled(breaks = breaks,
+                              # density is fraction of max
+                              contour_var = 'ndensity'),
+       scale_fill_manual(values = colors),
+       labs(caption = paste('Points show 200 STEPWAT2 sites,',
+                            '\nshading shows climate envelope of the entire',
+                            'study are used for the SCD manuscript interpolations.',
+                            '\nData from DayMet V3')),
+       theme(legend.position = 'none')
+       )
+}
+
+pdf('figures/climate/climate-envelope_v1.pdf')
+
+ggplot(day_table2, aes(MAT, MAP)) +
+  base_density() +
+  geom_point(data = day_sites1, alpha = 0.3) 
+
+ggplot(day_table2, aes(MAT, PTcor)) +
+  base_density(breaks = breaks*3) +
+  geom_point(data = day_sites1, alpha = 0.3) +
+  labs(y = 'Correlation between monthly precip and temp')
+
+ggplot(day_table2, aes(MAP, PTcor)) +
+  base_density() +
+  geom_point(data = day_sites1, alpha = 0.3)  +
+  labs(y = 'Correlation between monthly precip and temp')
+
+dev.off()
