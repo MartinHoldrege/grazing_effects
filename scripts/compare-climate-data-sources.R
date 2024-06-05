@@ -6,6 +6,9 @@
 # seem different between the two data sources. If the data don't match well for the 200 
 # sites that means it isn't an interpolation problem
 
+# also compare interpolated values to gridded climate product to see errors
+# introduced by interpolation
+
 # Author: Martin Holdrege
 
 # script started: May 24, 2024
@@ -48,7 +51,8 @@ day_table1 <- read_csv("data_processed/interpolation_data/clim_for_interpolation
 
 # * stepwat maps ------------------------------------------------------------------
 # interpolated climate data
-files <- paste0(c('MAP', 'MAT', 'PTcor'), "_climate_Current_Current_Current_20230919.tif")
+clim_vars <- c('MAP', 'MAT', 'PTcor')
+files <- paste0(clim_vars, "_climate_Current_Current_Current_20230919.tif")
 
 sw_r1 <- rast(file.path('data_processed/interpolated_rasters/climate',
                         files))
@@ -56,7 +60,23 @@ sw_r1 <- rast(file.path('data_processed/interpolated_rasters/climate',
 names(sw_r1) <- names(sw_r1) %>% 
   str_extract("^[[:alpha:]]+")
 
+# interpolated daymet data (interpolated same way as stepwat output)
+# matching criteria based on climate envelope of entire study region
+files <- paste0(clim_vars, "_daymet-climate_20240604_orig-criteria.tif")
+day_interp_v1 <- rast(file.path('data_processed/interpolated_rasters/climate',
+                                files))
+# interpolation based on matching criteria using climate envelope of 200 sw sites
+files <- paste0(clim_vars, "_daymet-climate_20240605_v2.tif")
+day_interp_v2 <- rast(file.path('data_processed/interpolated_rasters/climate',
+                                files))
+day_interp1 <- c(day_interp_v1, day_interp_v2)
 
+clim_version <- function(x) paste(str_extract(x, "^[[:alpha:]]+"), 
+                                  str_extract(x, 'v\\d+$'), sep = "_")
+names(day_interp1) <- names(day_interp1) %>% 
+  str_replace('orig-criteria', 'v1') %>% 
+  clim_version()
+  
 # * grid-met --------------------------------------------------------------
 # ~ 4 km gridded data (from Daniel)
 grid1 <- rast(file.path(
@@ -229,9 +249,13 @@ map_diff_sd <- sw_r1[['MAP']] - day_map
 mat_diff_sd <- sw_r1[['MAT']] - day_mat
 ptcor_diff_sd <- sw_r1[['PTcor']] - day_ptcor
 
-# Next--check units on sw_r1 MAP and MAT
-# create 3 maps
+# daymet (interpolated) minus daymet
+day_interp2 <- crop(day_interp1, sw_r1)
+map_diff_dd <- day_interp2[[c('MAP_v1', "MAP_v2")]]  - day_map
+mat_diff_dd <- day_interp2[[c('MAT_v1', "MAT_v2")]]  - day_mat
+ptcor_diff_dd <- day_interp2[[c('PTcor_v1', "PTcor_v2")]]  - day_ptcor
 
+diff_dd <- c(map_diff_dd, mat_diff_dd, ptcor_diff_dd)
 # figures -----------------------------------------------------------------
 
 # *comparing stepwat weather to gridmet -----------------------------------
@@ -394,33 +418,48 @@ comb_long %>%
 cols_diff <- rev(RColorBrewer::brewer.pal(9, 'RdYlBu'))
 cols_diff[5] <- 'grey'
 
-m1 <- plot_map_inset(r = map_diff_sd,
-               colors = cols_diff,
-               limits = c(-300, 300),
-               scale_name = 'mm',
-               tag_label = paste('Interpolated minus DayMet MAP',
-                                 range_lab(map_diff_sd, 'mm')))
-
-m2 <- plot_map_inset(r = mat_diff_sd,
-               colors = cols_diff,
-               limits = c(-5, 5),
-               scale_name = 'C',
-               tag_label = paste('Interpolated minus DayMet MAT',
-                                 range_lab(mat_diff_sd, 'C')))
-
-m3 <- plot_map_inset(r = ptcor_diff_sd,
-               colors = cols_diff,
-               limits = c(-1, 1),
-               scale_name = '',
-               tag_label = paste('Interpolated minus DayMet P-T correlation',
-                                 range_lab(ptcor_diff_sd)))
-design <- "
+diff_maps <- function(r_map, r_mat, r_ptcor) {
+  m1 <- plot_map_inset(r = r_map,
+                       colors = cols_diff,
+                       limits = c(-300, 300),
+                       scale_name = 'mm',
+                       tag_label = paste('Interpolated minus DayMet MAP',
+                                         range_lab(r_map, 'mm')))
+  
+  m2 <- plot_map_inset(r = r_mat,
+                       colors = cols_diff,
+                       limits = c(-5, 5),
+                       scale_name = 'C',
+                       tag_label = paste('Interpolated minus DayMet MAT',
+                                         range_lab(r_mat, 'C')))
+  
+  m3 <- plot_map_inset(r = r_ptcor,
+                       colors = cols_diff,
+                       limits = c(-1, 1),
+                       scale_name = '',
+                       tag_label = paste('Interpolated minus DayMet P-T correlation',
+                                         range_lab(r_ptcor)))
+  design <- "
   12
   3#
 "
-m1 + m2 + m3 + plot_layout(design = design)
-dev.off()
+  out <- m1 + m2 + m3 + plot_layout(design = design)
+  out
+}
 
+diff_maps(map_diff_sd, mat_diff_sd, ptcor_diff_sd) + 
+  plot_annotation(subtitle = 'Interpolated STEPWAT2 output',
+                  caption = " ")
+
+diff_maps(diff_dd[['MAP_v1']], diff_dd[['MAT_v1']], diff_dd[['PTcor_v1']]) + 
+  plot_annotation(subtitle = 'Interpolated Daymet v3 values',
+                  caption = 'Matching criteria based on entire study area')
+
+diff_maps(diff_dd[['MAP_v2']], diff_dd[['MAT_v2']], diff_dd[['PTcor_v2']]) + 
+  plot_annotation(subtitle = 'Interpolated Daymet v3 values',
+                  caption = 'Matching criteria based on 200 sites')
+
+dev.off()
 
 # climate envelope --------------------------------------------------------
 # figures showing study are climate envelope along with the locations of the 200
@@ -432,7 +471,7 @@ day_table2 <- day_table1 %>%
 
 day_sites1 <- day_table2 %>% 
   filter(!is.na(site_id))
-#day_table2 <- sample_n(day_table2, 1e5) # for testing
+
 
 # * figures ---------------------------------------------------------------
 

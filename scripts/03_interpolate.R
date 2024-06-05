@@ -401,7 +401,7 @@ daymet1 <- tc1 %>%
 # criteria refers to the criteria used for interpolation
 # original criteria= using 0.1 of the range of variables across expansive scd study area
 
-names(daymet1)[-1] <- paste0(names(daymet1)[-1], "_daymet-climate_", date, "_orig-criteria")
+names(daymet1)[-1] <- paste0(names(daymet1)[-1], "_daymet-climate_", date, "_", version)
 rMultivariateMatching::interpolatePoints(
   matches = match1,
   output_results = daymet1, 
