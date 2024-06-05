@@ -82,6 +82,25 @@ bioclim <- dismo::biovars(prec = prcp,
                           tmax = tmax
                           )
 bioclim2 <- rast(bioclim) # convert back to spatraster
+
+
+# * calculate PTcor --------------------------------------------------------
+# correlation between monthly precip and temperature (not a bio clim variable)
+
+# Continue here!
+
+tmean <- (tmin + tmax)/2
+
+# P-T correlation (type 1)
+ptcor <- app(c(terra::rast(tmean), terra::rast(prcp)), fun = function(x) {
+  # first 12 layers are temp, remains ones are prcp
+  cor(x[1:12], x[13:24])
+})
+
+names(ptcor) <- 'ptcor'
+
+bioclim2 <- c(bioclim2, ptcor)
+
 stopifnot(all(cells(bioclim2) == cells(id1)))
 
 df_bioclim1 <- as.data.frame(bioclim2, cells = TRUE) %>% 

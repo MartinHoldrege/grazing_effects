@@ -101,6 +101,8 @@ clim1 <- clim_all1 %>%
   select(site, PPT, Temp)
 
 clim_all2 <- clim_all1 %>% 
+  select(-MAP, -MAT) %>%  # these just based on monthly averages so, averaging
+# temp could be wrong
   rename(MAP = PPT,
          MAT = Temp)
 

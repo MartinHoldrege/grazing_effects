@@ -15,8 +15,11 @@
 
 rerun <- FALSE # re-create rasters that have already been interpolated?
 test_run <- FALSE # TRUE # 
-date <- "20230712" # for appending to select file names
-run_climate <- TRUE # whether to upscale the climate data (doesn't need to be
+date <- "20240604" # for appending to select file names
+run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
+run_climate_daymet <- TRUE # create a climate interpolation, not interpolating
+# stepwat climat outpute but using the exact values used for the matching
+
 # rerun unless climate variables are changed/updated)
 
 # dependencies ------------------------------------------------------------
@@ -76,6 +79,7 @@ criteria <- map_dbl(tc2[, bioclim_vars], function(x) {
 
 criteria
 
+write_csv(as.data.frame(criteria), paste0("data_processed/interpolation_data/criteria-for-interp_", date, '.csv'))
 
 # * subset cell data ------------------------------------------------------
 # location and climate data for the 200 sites where simulations were actually
@@ -381,5 +385,30 @@ if (run_climate) {
     filepath = "./data_processed/interpolated_rasters/climate",
     overwrite = TRUE
   )
+}
+
+if(run_climate_daymet){
+daymet1 <- tc1 %>% 
+  filter(!is.na(site_id)) %>% 
+  dplyr::select(cellnumber, ptcor, bio1, bio12) %>% 
+  rename(PTcor = ptcor, MAT = bio1, MAP = bio12)
+
+# criteria refers to the criteria used for interpolation
+# original criteria= using 0.1 of the range of variables across expansive scd study area
+
+names(daymet1)[-1] <- paste0(names(daymet1)[-1], "_daymet-climate_", date, "_orig-criteria")
+rMultivariateMatching::interpolatePoints(
+  matches = match1,
+  output_results = daymet1, 
+  exclude_poor_matches = FALSE,
+  subset_cell_names = "subset_cell",
+  quality_name = "matching_quality",
+  matching_distance = 1.5,
+  raster_template = template,
+  plotraster = FALSE,
+  saveraster = TRUE,
+  filepath = "./data_processed/interpolated_rasters/climate",
+  overwrite = TRUE
+)
 }
 
