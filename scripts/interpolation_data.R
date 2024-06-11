@@ -39,6 +39,11 @@ compareGeom(met1, palm_mask2, crs = TRUE, ext = TRUE, rowcol = TRUE, res = TRUE)
 scd_mask <- classify(scd_snap1, rcl = rbind(c(2, 1), c(3, 1)))
 
 # resample to 1k resolution to match met data
+
+# this provides the proportion of cells in the 1km2 that are 'scd' cells
+scd_prop_cells <- resample(scd_mask, met1,method = 'average')
+
+
 # conservatively using 'max' method so any 30x30 pixel considered sagebrush
 # makes the larger 1x1km pixel be considered sagebrush (so won't be missing
 # interpolated data anywhere)
@@ -87,8 +92,6 @@ bioclim2 <- rast(bioclim) # convert back to spatraster
 # * calculate PTcor --------------------------------------------------------
 # correlation between monthly precip and temperature (not a bio clim variable)
 
-# Continue here!
-
 tmean <- (tmin + tmax)/2
 
 # P-T correlation (type 1)
@@ -99,7 +102,11 @@ ptcor <- app(c(terra::rast(tmean), terra::rast(prcp)), fun = function(x) {
 
 names(ptcor) <- 'ptcor'
 
-bioclim2 <- c(bioclim2, ptcor)
+
+# combine layers ----------------------------------------------------------
+names(scd_prop_cells) <- 'prop_scd'
+scd_prop_cells <- crop(scd_prop_cells, bioclim2)
+bioclim2 <- c(bioclim2, ptcor, scd_prop_cells)
 
 stopifnot(all(cells(bioclim2) == cells(id1)))
 

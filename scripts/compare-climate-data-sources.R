@@ -466,7 +466,8 @@ dev.off()
 # points (to see how representative they are)
 
 day_table2 <- day_table1 %>% 
-  dplyr::select(bio1, bio12, ptcor, site_id) %>% 
+  # prop_scd is the proportion of the 1km grid cell fill w/ 30 cm scd cells
+  dplyr::select(bio1, bio12, ptcor, site_id, prop_scd) %>% 
   rename(MAT = bio1, MAP = bio12, PTcor = ptcor)
 
 day_sites1 <- day_table2 %>% 
@@ -485,28 +486,68 @@ base_density <- function(breaks = b) {
                               # density is fraction of max
                               contour_var = 'ndensity'),
        scale_fill_manual(values = colors),
-       labs(caption = paste('Points show 200 STEPWAT2 sites,',
-                            '\nshading shows climate envelope of the entire',
-                            'study are used for the SCD manuscript interpolations.',
-                            '\nData from DayMet V3')),
        theme(legend.position = 'none')
        )
 }
 
-pdf('figures/climate/climate-envelope_v1.pdf')
+mask_descripts <- list(
+  list(prop_scd = NA, 
+       description = 'study are used for the SCD ms interpolations (includes Palmquist).'),
+  list(prop_scd = 0, 
+       description = '1 km cells containing > 0% SCD 30 m cells'),
+  list(prop_scd = 0.1, 
+       description = '1 km cells containing > 10% SCD 30 m cells'),
+  list(prop_scd = 0.5, 
+       description = '1 km cells containing > 50% SCD 30 m cells')
+)
 
-ggplot(day_table2, aes(MAT, MAP)) +
-  base_density() +
-  geom_point(data = day_sites1, alpha = 0.3) 
 
-ggplot(day_table2, aes(MAT, PTcor)) +
-  base_density(breaks = breaks*3) +
-  geom_point(data = day_sites1, alpha = 0.3) +
-  labs(y = 'Correlation between monthly precip and temp')
+figs <- map(mask_descripts, function(l) {
+  prop <- l$prop_scd
+  study_area <- l$description
+  df <- if(is.na(prop)) {
+    day_table2
+  } else {
+    day_table2 %>% 
+      filter(prop_scd > prop)
+  }
+  out <- list()
+  a <- ggplot(df, aes(MAT, MAP)) +
+    base_density() +
+    geom_point(data = day_sites1, alpha = 0.3) +
+    coord_cartesian(xlim = range(day_table2$MAT, na.rm = TRUE),
+                    ylim = range(day_table2$MAP, na.rm = TRUE))
 
-ggplot(day_table2, aes(MAP, PTcor)) +
-  base_density() +
-  geom_point(data = day_sites1, alpha = 0.3)  +
-  labs(y = 'Correlation between monthly precip and temp')
+  b <- ggplot(df, aes(MAT, PTcor)) +
+    base_density(breaks = b*3) +
+    geom_point(data = day_sites1, alpha = 0.3) +
+    labs(y = 'Correlation between monthly precip and temp')+
+    coord_cartesian(xlim = range(day_table2$MAT, na.rm = TRUE),
+                    ylim = range(day_table2$PTcor, na.rm = TRUE))
+
+  c <- ggplot(df, aes(MAP, PTcor)) +
+    base_density() +
+    geom_point(data = day_sites1, alpha = 0.3)  +
+    labs(y = 'Correlation between monthly precip and temp')+
+    coord_cartesian(xlim = range(day_table2$MAP, na.rm = TRUE),
+                    ylim = range(day_table2$PTcor, na.rm = TRUE))
+  design <- "
+    12
+    3#
+    "
+  
+  caption = paste('Points show 200 STEPWAT2 sites,',
+                       '\nshading shows climate envelope of the',
+                       study_area,
+                       '\nData from DayMet V3')
+  a + b + c + plot_layout(design = design) +
+    plot_annotation(caption = caption) +
+    theme(plot.caption = element_text(size = rel(0.6)))
+
+})
+
+pdf('figures/climate/climate-envelope_v2.pdf', height = 8, width = 8)
+figs
 
 dev.off()
+
