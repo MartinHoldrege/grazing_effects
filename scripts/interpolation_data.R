@@ -126,7 +126,8 @@ site2 <- as.data.frame(terra::extract(id1, vect(sf_site1), bind = TRUE)) %>%
   rename(cellnumber = SEIv11_2017_2020_30_20211228_Q5sc3_Albers_2bit)
 
 df_bioclim2 <- df_bioclim1 %>% 
-  left_join(site2, by = 'cellnumber')
+  left_join(site2, by = 'cellnumber') %>% 
+  filter(!is.na(bio1))
 
 # save outputs ------------------------------------------------------------
 

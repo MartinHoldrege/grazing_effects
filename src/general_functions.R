@@ -969,3 +969,46 @@ which_todo <- function(df, path, pattern, min_size, rerun = FALSE) {
   
   todo2
 }
+
+
+#' calculating matching quality
+#' 
+#' @description
+#' for calculating matching quality for different matching criteria
+#' then used in multivarmatch()
+#' 
+#'
+#' @param match output of of multivarmatch, that contain target_cell and subset_cell columns
+#' @param tc contains bioclim_vars columuns for each cell number
+#' @param bioclim_vars vector of names of the bioclim_vars
+#' @param crit matching criteria
+#'
+#' @return dataframe with cellnumber and matching quality
+matchqual <- function(match, tc, bioclim_vars, crit) {
+  tc2 <- tc
+  
+  match <- match1 %>% 
+    mutate(target_cell = as.numeric(target_cell),
+           subset_cell = as.numeric(subset_cell))
+  
+  target <- match %>% 
+    left_join(tc2, by = c('target_cell' = 'cellnumber')) %>% 
+    rename(cellnumber = target_cell) %>% 
+    dplyr::select(cellnumber, all_of(bioclim_vars))
+  
+  subset <- match %>% 
+    left_join(tc2, by = c('subset_cell' = 'cellnumber')) %>% 
+    rename(cellnumber = subset_cell) %>% 
+    dplyr::select(cellnumber, all_of(bioclim_vars))
+  
+  diff_norm <- target
+  
+  for(var in bioclim_vars) {
+    # normalized squared difference
+    diff_norm[[var]] <- ((target[[var]] - subset[[var]])/crit[var])^2
+  }
+  # euclidean distance
+  diff_norm$matching_quality <- sqrt(rowSums(diff_norm[bioclim_vars]))
+  
+  diff_norm[, c('cellnumber', 'matching_quality')]
+}

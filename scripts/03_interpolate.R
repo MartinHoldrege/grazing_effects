@@ -16,11 +16,11 @@
 rerun <- FALSE # re-create rasters that have already been interpolated?
 test_run <- FALSE # TRUE # 
 date <- "20240605" # for appending to select file names
-version <- 'v2'
+version <- 'v1'
 # v1--1st version of criteria (i.e. based on calculating mathcing criteria across the region)
 # v2--second version of criteria (i.e. basing matching criteria just on 200 sites)
 run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
-run_climate_daymet <- TRUE # create a climate interpolation, not interpolating
+run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
 # stepwat climat outpute but using the exact values used for the matching
 
 # rerun unless climate variables are changed/updated)
@@ -77,19 +77,24 @@ tc2 <- tc1[, c("cellnumber", 'site_id', 'x', 'y', bioclim_vars)]
 # criteria for matchingvars function (here using 10% of range of data)
 # this is for scaling the variables
 # for v2, switching to base matching variables on the grid-cells with sites
-criteria <- map_dbl(tc2[!is.na(tc2$site_id), bioclim_vars], function(x) {
+criteria <- map_dbl(tc2[, bioclim_vars], function(x) {
+  (max(x) - min(x))*0.1
+})
+criteria_v2 <- map_dbl(tc2[!is.na(tc2$site_id), bioclim_vars], function(x) {
   (max(x) - min(x))*0.1
 })
 
+if(version != 'v1') {
+  criteria <- criteria_v2
+}
 criteria
 
-write_csv(as.data.frame(criteria), 
+write_csv(data.frame(variable = names(criteria), criteria = criteria), 
           paste0("data_processed/interpolation_data/criteria-for-interp_", date, "_", version, '.csv'))
 
 # * subset cell data ------------------------------------------------------
 # location and climate data for the 200 sites where simulations were actually
 # done
-
 
 # sc stands for 'subset cell'
 sc1 <-  tc2 %>% 
@@ -200,7 +205,7 @@ if(!all(rownames(sc1 %in% rownames(tc2)))) {
 # warning is being thrown, but output looks ok
 #no non-missing arguments to max; returning -In
 match1 <- multivarmatch(
-  matchingvars = dplyr::select(tc2, -site_id),
+  matchingvars = drop_na(dplyr::select(tc2, -site_id)),
   # I'm not sure the site ID column is needed/doing anything here
   subsetcells = sc1[, c("x", "y", "site_id")],
   matchingvars_id = "cellnumber",
@@ -210,8 +215,27 @@ match1 <- multivarmatch(
   subset_in_target = TRUE
 )
 
+# *calculating matching quality for different criteria --------------------
 
+if(FALSE){
+# this is for the SCD climate analysis
+# testing of calculating matching quality
+qual <- matchqual(match = match1, tc = tc2, bioclim_vars = bioclim_vars,
+                        crit = criteria)
 
+stopifnot(all.equal(qual$matching_quality, match1$matching_quality))
+
+# now testing matching quality for different criteria
+qual_v2 <- matchqual(match = match1, tc = tc2, bioclim_vars = bioclim_vars,
+                     crit = criteria_v2)
+
+# interpolation done using v1 (criteria from across the study area, and 
+# matching quality calculated based on criteria from the 200 sites; for
+# SCD appendix)
+qual_v2 %>% 
+  dplyr::select(cellnumber, matching_quality) %>% 
+  write_csv('data_processed/interpolation_data/match-qual_v1-interp_v2-criteria.csv')
+}
 # *plotting interpolation quality -----------------------------------------
 
 interp <- template
