@@ -49,6 +49,7 @@ day1 <- rast("data_raw/daymet_monthly_normals_1981-2010.tif")
 day_table1 <- read_csv("data_processed/interpolation_data/clim_for_interpolation.csv",
                        col_types = cols(.default = "d"))
 
+template <- rast("data_processed/interpolation_data/cellnumbers.tif")
 # * stepwat maps ------------------------------------------------------------------
 # interpolated climate data
 clim_vars <- c('MAP', 'MAT', 'PTcor')
@@ -551,3 +552,27 @@ figs
 
 dev.off()
 
+# maps of masks -----------------------------------------------------------
+
+r_prop_scd <- fill_raster(df = day_table1[, c('cellnumber', 'prop_scd')],
+                          template = template)
+
+figs <- map(mask_descripts, function(l) {
+  prop <- l$prop_scd
+  study_area <- l$description
+  r <- r_prop_scd
+  if(!is.na(prop)){
+    r[r<= prop] <- NA
+  }
+  
+  g <- plot_map_inset(r, colors = cols_diff,
+                 limits = c(0, 1),
+                 scale_name = 'proportion',
+                 tag_label = 'Proportion of 1km cell filled with 30 m SCD cells')
+  g + plot_annotation(caption = study_area)
+  
+})
+
+pdf('figures/study_area/potential_masks.pdf', height = 8, width = 8)
+figs
+dev.off()

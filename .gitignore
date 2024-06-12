@@ -19,6 +19,7 @@ misc/*
 *.csv
 *.RDS
 *.xml
+*.xlsx
 
 # knitted markdown files
 *.html
