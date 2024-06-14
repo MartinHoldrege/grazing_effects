@@ -51,8 +51,8 @@ biome1 <- sf::st_read('data_raw/US_Sagebrush_Biome_2019/US_Sagebrush_Biome_2019.
 # so have better matching potential with daymet (e.g in hot/dry cells in the south);
 
 biome2 <- biome1$geometry
-
-buffer_distance <- 100*1000 # 100 km
+buffer_km <- 0 # put buffer in km here
+buffer_distance <- buffer_km*1000 # buffer in m
 biome_buf1 <- st_buffer(biome2, dist = buffer_distance)
 plot(biome_buf1)
 plot(biome2, add = TRUE)
@@ -86,4 +86,4 @@ bioclim2 <- rast(bioclim) # back to terra object
 
 writeRaster(bioclim2, 
             paste0('data_processed/interpolation_data/',
-                   'gridmet_bioclim-vars_', period, '.tif'))
+                   'gridmet_bioclim-vars_', period, '_', buffer_km, 'buffer.tif'))
