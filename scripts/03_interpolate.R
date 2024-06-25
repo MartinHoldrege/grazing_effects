@@ -19,6 +19,7 @@ date <- "20240605" # for appending to select file names
 version <- 'v1'
 # v1--1st version of criteria (i.e. based on calculating mathcing criteria across the region)
 # v2--second version of criteria (i.e. basing matching criteria just on 200 sites)
+# v3--criteria used in palmquist et al 2021 and renne et al 2024
 run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
 # stepwat climat outpute but using the exact values used for the matching
@@ -220,21 +221,33 @@ match1 <- multivarmatch(
 if(FALSE){
 # this is for the SCD climate analysis
 # testing of calculating matching quality
+ 
+# criteria used in Renne et al 2024 
+criteria_v3 <- c(bio1 = 1.55, 
+                 bio4 = 61.1, 
+                 bio9 = 3.53, 
+                 bio12 = 84.9, 
+                 bio15 = 9.21, 
+                 bio18 = 33.8
+)
 qual <- matchqual(match = match1, tc = tc2, bioclim_vars = bioclim_vars,
                         crit = criteria)
 
 stopifnot(all.equal(qual$matching_quality, match1$matching_quality))
 
 # now testing matching quality for different criteria
-qual_v2 <- matchqual(match = match1, tc = tc2, bioclim_vars = bioclim_vars,
-                     crit = criteria_v2)
+# qual_v2 <- matchqual(match = match1, tc = tc2, bioclim_vars = bioclim_vars,
+#                      crit = criteria_v2)
+qual_v3 <- matchqual(match = match1, tc = tc2, bioclim_vars = bioclim_vars,
+                     crit = criteria_v3)
+
 
 # interpolation done using v1 (criteria from across the study area, and 
 # matching quality calculated based on criteria from the 200 sites; for
 # SCD appendix)
-qual_v2 %>% 
+qual_v3 %>% 
   dplyr::select(cellnumber, matching_quality) %>% 
-  write_csv('data_processed/interpolation_data/match-qual_v1-interp_v2-criteria.csv')
+  write_csv('data_processed/interpolation_data/match-qual_v1-interp_v3-criteria.csv')
 }
 # *plotting interpolation quality -----------------------------------------
 

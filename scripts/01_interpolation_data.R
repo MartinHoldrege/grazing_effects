@@ -12,7 +12,10 @@ source("src/mapping_functions.R")
 
 # mean montly precip, and min and max temp, from daymet.
 # calculated in the daymet_normals.js script, in the SEI repository
-met1 <- rast("data_raw/daymet_monthly_normals_1981-2010.tif")
+v <- 4 # daymet version
+period <- '1991-2020' # period normals calculated for
+met1 <- rast(paste0("data_raw/daymet_v", v, "_monthly_normals_",
+                    period, ".tif"))
 met1
 crs(met1)
 
@@ -131,8 +134,11 @@ df_bioclim2 <- df_bioclim1 %>%
 
 # save outputs ------------------------------------------------------------
 
-write_csv(df_bioclim2, "data_processed/interpolation_data/clim_for_interpolation.csv")
+write_csv(df_bioclim2, 
+          paste0("data_processed/interpolation_data/clim_for_interp_", 
+                 'daymet-v', v, '_', period, ".csv"))
 
 writeRaster(id1, "data_processed/interpolation_data/cellnumbers.tif",
             overwrite = TRUE)
+
 

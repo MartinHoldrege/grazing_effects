@@ -43,15 +43,18 @@ db_clim1 <- read_csv('data_processed/site_means/dbWeather_200sites.csv')
 
 # mean montly precip, and min and max temp, from daymet.
 # calculated in the daymet_normals.js script, in the SEI repository
-day1 <- rast("data_raw/daymet_monthly_normals_1981-2010.tif")
+day1 <- rast("data_raw/daymet_v4_monthly_normals_1991-2020.tif")
 
 # daymet bioclim variables (file created in interpolation_data.R)
-day_table1 <- read_csv("data_processed/interpolation_data/clim_for_interpolation.csv",
+period <- '1991-2020'
+day_table1 <- read_csv(paste0("data_processed/interpolation_data/clim_for_interp_", 
+                       "daymet-v4_", period, ".csv"),
                        col_types = cols(.default = "d"))
 
 template <- rast("data_processed/interpolation_data/cellnumbers.tif")
 # * stepwat maps ------------------------------------------------------------------
 # interpolated climate data
+# [note the interpolated daymet data is daymet v3]
 clim_vars <- c('MAP', 'MAT', 'PTcor')
 files <- paste0(clim_vars, "_climate_Current_Current_Current_20230919.tif")
 
@@ -79,15 +82,11 @@ names(day_interp1) <- names(day_interp1) %>%
   clim_version()
   
 # * grid-met --------------------------------------------------------------
-# ~ 4 km gridded data (from Daniel)
-grid1 <- rast(file.path(
-  path_large,
-  "climate_data/gridmet-clim",
-  c('gridmet_ppt_annualClimatologies.nc', 'gridmet_tmmn_annualClimatologies.nc',
-    'gridmet_tmmx_annualClimatologies.nc')
-))
 
-
+buffer <- 0
+# file created in 00_gridmet_normals.R
+grid1 <- rast(paste0("data_processed/interpolation_data/gridmet_bioclim-vars_19912020_",
+                     buffer, "buffer.tif"))
 # functions ---------------------------------------------------------------
 
 range_lab <- function(x, unit = "") {
@@ -169,19 +168,14 @@ db_clim2 <- db_clim1 %>%
 
 # *gridmet ----------------------------------------------------------------
 
-# some how x and y coords got reversed
-grid2 <- terra::project(grid1, crs(grid1)) %>% 
-  t() %>% 
-  flip(direction = 'vertical') %>% 
-  flip(direction = 'horizontal')
-grid3 <- terra::project(grid2, crs(loc2))
+grid3 <- terra::project(grid1, crs(loc2))
 
 grid4 <- terra::extract(grid3, loc2)
 grid5 <- grid4 %>% 
-  mutate(MAT_grid = (tmmn + tmmx)/2 -273.15,
-         RCP = 'Current') %>% 
-  rename('MAP_grid' = 'ppt') %>% 
-  select(-tmmn, -tmmx) 
+  mutate(RCP = 'Current') %>% 
+  rename('MAT_grid' = 'bio1',
+         'MAP_grid' = 'bio12') %>% 
+  select(-matches('bio\\d+'))
 
 # * daymet ----------------------------------------------------------------
 
@@ -221,7 +215,7 @@ comb_long <- comb %>%
 
 
 # compare rasters ---------------------------------------------------------
-# stepwat interpolated climate data vs daymet v3 climate data
+# stepwat interpolated climate data vs daymet v4 climate data
 
 
 # *prep daymet data --------------------------------------------------------
@@ -341,7 +335,7 @@ comb_long %>%
   facet_wrap(~variable, scales = 'free',
              ncol = 2) +
   geom_abline(slope = 1) +
-  labs(x = 'Daymet V3',
+  labs(x = 'Daymet V4',
        y = 'STEPWAT')
 
 comb_long %>% 
@@ -381,7 +375,7 @@ comb_long %>%
   geom_point() +
   facet_wrap(~variable, scales = 'free') +
   geom_abline(slope = 1) +
-  labs(x = 'DayMet V3',
+  labs(x = 'DayMet V4',
        y = 'Database for STEPWAT')
 
 comb_long %>% 
@@ -391,7 +385,7 @@ comb_long %>%
   geom_point() +
   facet_wrap(~variable, scales = 'free') +
   geom_abline(slope = 1) +
-  labs(x = 'DayMet V3',
+  labs(x = 'DayMet V4',
        y = 'GridMet')
 
 comb_long %>% 
@@ -402,7 +396,7 @@ comb_long %>%
   facet_wrap(~variable, scales = 'free') +
   geom_abline(slope = 1) +
   labs(x = 'RR dataset',
-       y = 'Daymet V3')
+       y = 'Daymet V4')
 
 comb_long %>% 
   select(variable, rr, grid, RCP) %>% 
@@ -453,11 +447,11 @@ diff_maps(map_diff_sd, mat_diff_sd, ptcor_diff_sd) +
                   caption = " ")
 
 diff_maps(diff_dd[['MAP_v1']], diff_dd[['MAT_v1']], diff_dd[['PTcor_v1']]) + 
-  plot_annotation(subtitle = 'Interpolated Daymet v3 values',
+  plot_annotation(subtitle = 'Interpolated Daymet V4 values',
                   caption = 'Matching criteria based on entire study area')
 
 diff_maps(diff_dd[['MAP_v2']], diff_dd[['MAT_v2']], diff_dd[['PTcor_v2']]) + 
-  plot_annotation(subtitle = 'Interpolated Daymet v3 values',
+  plot_annotation(subtitle = 'Interpolated Daymet V4 values',
                   caption = 'Matching criteria based on 200 sites')
 
 dev.off()
@@ -540,16 +534,26 @@ figs <- map(mask_descripts, function(l) {
   caption = paste('Points show 200 STEPWAT2 sites,',
                        '\nshading shows climate envelope of the',
                        study_area,
-                       '\nData from DayMet V3')
+                       '\nData from DayMet V4')
   a + b + c + plot_layout(design = design) +
     plot_annotation(caption = caption) +
     theme(plot.caption = element_text(size = rel(0.6)))
 
 })
 
-pdf('figures/climate/climate-envelope_v2.pdf', height = 8, width = 8)
-figs
+g5 <- as.data.frame(grid3[[c('bio1', 'bio12')]]) %>% 
+  ggplot(aes(bio1, bio12)) +
+  base_density() +
+  geom_point(data = grid5, aes(MAT_grid, MAP_grid), alpha = 0.3) +
+  coord_cartesian(xlim = range(day_table2$MAT, na.rm = TRUE),
+                  ylim = range(day_table2$MAP, na.rm = TRUE)) +
+  labs(subtitle = paste0('Gridmet data, from entire sagebrush polygon (', 
+                         buffer, ' km buffer)'),
+       x = 'MAT', y = 'MAP')
 
+pdf('figures/climate/climate-envelope_v3.pdf', height = 8, width = 8)
+figs
+g5
 dev.off()
 
 # maps of masks -----------------------------------------------------------
