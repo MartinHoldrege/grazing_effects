@@ -6,7 +6,20 @@ library(dplyr)
 # find the nearest gridmet cells to the centroids
 # find the coverage of 
 
-
+#' normalize variables by their criteria
+#'
+#' @param df dataframe, including columns that match criteria
+#' @param criteria named vector 
+apply_criteria <- function(df, criteria) {
+  stopifnot(is.vector(criteria),
+            is.data.frame(df),
+            names(criteria) %in% names(df)) 
+  
+  for (crit in names(criteria)) {
+    df[[crit]] <- df[[crit]]/criteria[crit]
+  }
+  df
+}
   
 #' Bin values into n equal sized bins
 #' 
@@ -117,7 +130,7 @@ starting_centers <- function(df, bin_vars, n, n_categories = 1) {
 #' @param n_categories number of categories to break each cols_for_centers 
 #' into for initial centers
 #' @param iter.max max iterations for kmeans
-#' @param verbose 
+#' @param verbose print progress
 #'
 #' @return
 #' kmeans ojbection
@@ -139,10 +152,11 @@ starting_centers <- function(df, bin_vars, n, n_categories = 1) {
 #'    df[, i] <- df[, i]/criteria[i]
 #'  }
 fit_kmeans <- function(df, k, 
-                       cols_for_centers = names(df),
+                       criteria_vars,
+                       cols_for_centers = criteria_vars,
                        prop_seq = c(0.05, 0.1, 0.2, 0.3, 0.5, 0.75,1),
                        random_centers = FALSE,
-                       digits = NULL,
+                       digits = 4,
                        n_categories = 5, 
                        iter.max = 100,
                        verbose = TRUE
@@ -162,13 +176,13 @@ fit_kmeans <- function(df, k,
   if(random_centers) {
     centers <- k
   } else {
-    centers <- starting_centers(df[rows_sample, ],
+    centers <- starting_centers(df[rows_sample, criteria_vars],
                                 bin_vars = cols_for_centers, 
                                 n = k, 
                                 n_categories = n_categories)
   }
   algorithm <- "Hartigan-Wong" #
-  kmns <- stats::kmeans(df[rows_sample, ], centers = centers,
+  kmns <- stats::kmeans(df[rows_sample, criteria_vars], centers = centers,
                         algorithm = algorithm,
                         iter.max = iter.max,
                         nstart = 1)
@@ -186,7 +200,7 @@ fit_kmeans <- function(df, k,
     if(verbose) {
       print(paste('proportion of data used:', prop_seq[i]))
     }
-    kmns <- stats::kmeans(df[rows_sample, ], 
+    kmns <- stats::kmeans(df[rows_sample, criteria_vars], 
                           algorithm = algorithm,
                           centers = kmns$centers,
                           iter.max = iter.max,
@@ -228,7 +242,7 @@ select_nearest_neighbors <- function(df, kmns, criteria_vars) {
 }
 
 
-#' Title
+#' proportion of data points 'covered' by good matching
 #'
 #' @param df dataframe of 'target cells'
 #' @param sites selected sites (output from select_nearest_neighbors)
@@ -271,6 +285,27 @@ prop_coverage <- function(df, sites, criteria_vars,
   out
 }
 
+#' select k representative sites, and get their coverate
+#'
+#' @param target scaled dataframe providing 'target cells' (e.g. daymet data)
+#' @param potential_sites scaled dataframe (can be same as target), or other
+#' dataset to select sites from (e.g. gridmet)
+#' @param k number of clusters/sites
+#' @param criteria_vars names of variables (columns) used for matching/euclidean distance
+#' @param cols_for_centers column names of variables for selecting initial
+#' centers (samples from an even grid)
+#' @param prop_seq vector of proportion of dataset to fit kmeans to, first fit 
+#' to a small fraction of the dataset, then use those centers to fit to a larger
+#' fraction of the data set and so on
+#' @param random_centers logical, start w/ random centers for kmeans (if F then
+#' start with more evenly spaced points)
+#' @param digits how many significant figures should data have (rounding can help
+#' convergence)
+#' @param n_categories how many groups to breaks the cols_for_centers into for
+#' finding starting centers (if too small a number this is increased in function)
+#' @param iter.max passed to kmeans
+#' @param verbose 
+#' @param cuttoff cuttoff for what is considered 'good' coverage 
 kpoints2 <- function(target, potential_sites, k,
                      criteria_vars,
                      cols_for_centers = criteria_vars,
@@ -281,8 +316,10 @@ kpoints2 <- function(target, potential_sites, k,
                      iter.max = 100,
                      verbose = FALSE,
                      cuttoff = 1) {
-  # find 'center's via kmeans 
+  
+  # find 'center's via kmeans (e.g. centers of daymet)
   kmns <- fit_kmeans(df = target, k = k,
+                     criteria_vars = criteria_vars,
                       cols_for_centers = cols_for_centers, 
                       prop_seq = prop_seq,
                       random_centers = random_centers,
@@ -291,12 +328,18 @@ kpoints2 <- function(target, potential_sites, k,
                       iter.max = iter.max,
                       verbose = verbose)
    
+  # select best sites from potential_sites (e.g. gridment)
    sites <- select_nearest_neighbors(df = potential_sites, kmns = kmns,
-       criteria_vars = criteria_vars)
-   prop <- prop_coverage(df = target, sites = sites, criteria_vars = criteria_vars)
-   out <- list(coverage = coverage,
+                                     criteria_vars = criteria_vars)
+   
+   # how much of the target data is covered (good matching) by the 
+   prop <- prop_coverage(df = target, sites = sites, 
+                         criteria_vars = criteria_vars)
+   
+   out <- list(coverage = prop,
                sites = sites,
-               ifault = kmns$ifault)
+               ifault = kmns$ifault,
+               k = k)
    out
 }
 
