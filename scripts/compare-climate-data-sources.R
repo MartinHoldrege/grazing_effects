@@ -40,7 +40,6 @@ rr_fut1 <- rast(file.path(path_large, 'newRR3-analysis/examples/tmp_examples',
 # climate from the weather data base, summarized in the 00_query_weather_db.R script
 db_clim1 <- read_csv('data_processed/site_means/dbWeather_200sites.csv')
 
-
 # mean montly precip, and min and max temp, from daymet.
 # calculated in the daymet_normals.js script, in the SEI repository
 day1 <- rast("data_raw/daymet_v4_monthly_normals_1991-2020.tif")
@@ -52,6 +51,7 @@ day_table1 <- read_csv(paste0("data_processed/interpolation_data/clim_for_interp
                        col_types = cols(.default = "d"))
 
 template <- rast("data_processed/interpolation_data/cellnumbers.tif")
+
 # * stepwat maps ------------------------------------------------------------------
 # interpolated climate data
 # [note the interpolated daymet data is daymet v3]
@@ -157,14 +157,12 @@ rr_cur2b <- terra::extract(rr_cur1, loc2) %>%
 
 # * database --------------------------------------------------------------
 
-
 stopifnot(! 'RCP' %in% names(db_clim1)) # db_clim1 is just for current climate
 db_clim2 <- db_clim1 %>% 
   select(Site_id, 'MAT_C', 'MAP_mm', matches('CorrTP')) %>% 
   rename( 'MAT_db' = 'MAT_C', 'MAP_db' = 'MAP_mm', PTcor2_db = 'CorrTP2',
           PTcor_db = 'CorrTP') %>% 
   mutate('RCP' = 'Current')
-
 
 # *gridmet ----------------------------------------------------------------
 
@@ -462,7 +460,7 @@ dev.off()
 
 day_table2 <- day_table1 %>% 
   # prop_scd is the proportion of the 1km grid cell fill w/ 30 cm scd cells
-  dplyr::select(bio1, bio12, ptcor, site_id, prop_scd) %>% 
+  dplyr::select(bio1, bio12, ptcor, site_id, matches('^prop')) %>% 
   rename(MAT = bio1, MAP = bio12, PTcor = ptcor)
 
 day_sites1 <- day_table2 %>% 
@@ -485,27 +483,32 @@ base_density <- function(breaks = b) {
        )
 }
 
-mask_descripts <- list(
-  list(prop_scd = NA, 
-       description = 'study are used for the SCD ms interpolations (includes Palmquist).'),
-  list(prop_scd = 0, 
-       description = '1 km cells containing > 0% SCD 30 m cells'),
-  list(prop_scd = 0.1, 
-       description = '1 km cells containing > 10% SCD 30 m cells'),
-  list(prop_scd = 0.5, 
-       description = '1 km cells containing > 50% SCD 30 m cells')
-)
+mask_descripts <- 
+  expand_grid(sage_gt = c(NA, 1, 2, 5),
+              prop_scd = c(0, 0.1, 0.5)) %>% 
+  mutate(description = ifelse(is.na(sage_gt),
+                              paste0('1 km pixels containing \n>', 
+                                     prop_scd*100, '% 30m SCD pixels.'),
+                              paste0('1 km pixels containing \n>', prop_scd*100, 
+                                     '% of 30m SCD pixels that have >', 
+                                     sage_gt, '% sage cover.')))
 
-
-figs <- map(mask_descripts, function(l) {
-  prop <- l$prop_scd
-  study_area <- l$description
-  df <- if(is.na(prop)) {
-    day_table2
+# '1 km cells containing > 10% SCD 30 m cells'
+figs <- pmap(mask_descripts, function(prop_scd, sage_gt, description) {
+  prop <- prop_scd
+  study_area <- description
+ if(is.na(sage_gt)) {
+    study_area <- paste0('1 km pixels contaning >', prop*100, '%\n 30m SCD pixels.')
+    filter_var <- "prop_scd_all"
   } else {
-    day_table2 %>% 
-      filter(prop_scd > prop)
+    study_area <- paste0('1 km pixels contaning >', prop*100, 
+                         '%\n of 30m SCD pixels that have >', sage_gt, '% sage cover.')
+    filter_var <- paste0('prop_sage_gt_', sage_gt)
   }
+
+  df <- day_table2 %>% 
+      filter(.data[[filter_var]] > prop)
+
   out <- list()
   a <- ggplot(df, aes(MAT, MAP)) +
     base_density() +
@@ -531,10 +534,9 @@ figs <- map(mask_descripts, function(l) {
     3#
     "
   
-  caption = paste('Points show 200 STEPWAT2 sites,',
+  caption = paste('Points show 200 STEPWAT2 sites. Data from DayMet V4.',
                        '\nshading shows climate envelope of the',
-                       study_area,
-                       '\nData from DayMet V4')
+                       study_area)
   a + b + c + plot_layout(design = design) +
     plot_annotation(caption = caption) +
     theme(plot.caption = element_text(size = rel(0.6)))
@@ -558,21 +560,28 @@ dev.off()
 
 # maps of masks -----------------------------------------------------------
 
-r_prop_scd <- fill_raster(df = day_table1[, c('cellnumber', 'prop_scd')],
-                          template = template)
-
-figs <- map(mask_descripts, function(l) {
-  prop <- l$prop_scd
-  study_area <- l$description
-  r <- r_prop_scd
-  if(!is.na(prop)){
-    r[r<= prop] <- NA
+figs <- pmap(mask_descripts, function(prop_scd, sage_gt, description) {
+  prop <- prop_scd
+  study_area <- description
+  if(is.na(sage_gt)) {
+    study_area <- paste0('1 km pixels contaning >', prop*100, '%\n 30m SCD pixels.')
+    filter_var <- "prop_scd_all"
+  } else {
+    study_area <- paste0('1 km pixels contaning >', prop*100, 
+                         '%\n of 30m SCD pixels that have >', sage_gt, '% sage cover.')
+    filter_var <- paste0('prop_sage_gt_', sage_gt)
   }
   
+  df <- day_table1 %>% 
+    filter(.data[[filter_var]] > prop)
+  
+  r <- fill_raster(df = df[, c('cellnumber', filter_var)],
+              template = template)
+
   g <- plot_map_inset(r, colors = cols_diff,
                  limits = c(0, 1),
                  scale_name = 'proportion',
-                 tag_label = 'Proportion of 1km cell filled with 30 m SCD cells')
+                 tag_label = 'Proportion of 1km cell filled with 30 m cells')
   g + plot_annotation(caption = study_area)
   
 })
