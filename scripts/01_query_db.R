@@ -13,10 +13,8 @@
 
 library(tidyverse)
 library(DBI)
-
+source('src/paths.R') # db files stored on hard-drive
 # connect to db -----------------------------------------------------------
-
-path_sw <- "D:/USGS/large_files/stepwat/" # db files stored on hard-drive
 
 # naming convention:
 # Wildfire – 0/1
@@ -123,12 +121,12 @@ map(bio2[, group_cols], unique)
 # * avg across years --------------------------------------------------------
 
 # avg across years and make into long form
-bio3 <- bio2 %>% 
+bio2a <- bio2 %>% 
   select(
     # numeric columns not interested in
     # only including biomass and indivs (# of individuals), columns
     # doesn't look like indivs has standard deviation in this column
-    -matches("_(std)|(Pfire)|(PRstd)|(PR)|(RSize)|(graz)$"),
+    -matches("_(std)|(Pfire)|(PRstd)|(PR)|(RSize)$"),
     -matches("StdDev"),
     -Year, # will avg across years
     -SpeciesTreatment, # sites have different spp. treatments (i.e. different
@@ -143,19 +141,45 @@ bio3 <- bio2 %>%
             WildFire = sum(WildFire),
             n = n(),
             .groups = "drop") %>% 
+  #select(-(artr:oppo)) %>% 
   # long format
   pivot_longer(# cols selection needs to be updated as different columns are 
                # selected above
-               cols = sagebrush:oppo_Indivs) %>% 
+               cols = sagebrush:oppo) 
+
+bio3a <- bio2a %>% 
   # determine whether name value belongs to an indivs data or biomass data
-  mutate(PFT = str_replace(name, "_Indivs", ""),
+  mutate(PFT = str_replace(name, "(_Indivs)|(_graz)", ""),
          # create 
-         type = ifelse(str_detect(name, "Indivs"), "indivs", "biomass")) %>% 
+         type = case_when(
+           str_detect(name, "Indivs") ~ "indivs",
+           str_detect(name, 'graz') ~ 'utilization',
+           TRUE ~ 'biomass')) %>% 
   select(-name) %>% 
   # create separate number of individuals (indivs) and biomass columns
   pivot_wider(names_from = "type")
 
+PFT_lookup <- c(artr = "sagebrush", cryp = "a.cool.forb", chen = "a.warm.forb", 
+                phho = "p.cool.forb", arfr = "p.warm.forb", brte = "a.cool.grass", 
+                pssp = "p.cool.grass", bogr = "p.warm.grass", chvi = "shrub", 
+                oppo = "succulents")
 
+stopifnot(unique(bio3a$PFT) %in% c(PFT_lookup, names(PFT_lookup)))
+
+# rows with spp codes
+bio_spp <- bio3a %>% 
+  filter(PFT %in% names(PFT_lookup)) %>% 
+  mutate(PFT4join = PFT_lookup[PFT]) %>% 
+  select(run, GCM, years, RCP, intensity, site, PFT4join, indivs)
+
+# joining in # of indivs column (so don't have duplicated rows, one showing
+# spp code with indivs, and the others show pft code and no indivs)
+bio3 <- bio3a %>% 
+  filter(PFT %in% PFT_lookup) %>% 
+  select(-indivs) %>% 
+  left_join(bio_spp, by = c("run", "GCM", "years", "RCP", "intensity", "site", 
+                            PFT = "PFT4join"))
+  
 # Check: if grouping above missed a variable,
 # then would expect value other than 50 years, per set of grouping variables
 # also note--if this isn't true (e.g. if simulations run for 300 not 150 years,
@@ -171,6 +195,5 @@ bio3$n <- NULL
 # data from the 2021/2022 implementationof stepwat (old cheatgrass fire, no C02,
 # and no dynamic eind implementation)
 write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v4.csv")
-
 
 map(db_connects, dbDisconnect) # disconnect
