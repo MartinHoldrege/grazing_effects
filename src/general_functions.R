@@ -684,30 +684,36 @@ pcc <- function(x){
 #' @param current logical, whether rcp and year columns should inlcude
 #' current, should only be set to false in bio-diff variables, where it 
 #' is the difference relative to current conditions
-#' @param c4 string, c4on or c4off
+#' @param run string defining run parameters
 #'
 #' @return dataframe only including climate scenarios of interest
 #' (the main analysis only includes a subset of scenarios), and focuses 
-#' on c4on simulations (by default)
-filter_rcp_c4 <- function(df, PFT = FALSE, current = TRUE,
-                          c4string = "c4on") {
-  rcp_levs <- c("Current", "RCP85")
-  year_levs <- c("Current", "2030-2060")
+#' on a given run
+filter_rcp_run <- function(df, PFT = FALSE, current = TRUE,
+                          run = "fire1_eind1_c4grass1_co20_2311") {
+  rcp_levs <- c("Current", "RCP45")
+  year_levs <- c("Current", "2070-2100")
+  run_string <- run
   
-  if (current) {
-    rcp_levs <- c("Current", "RCP85")
-    year_levs <- c("Current", "2030-2060")
-  } else {
-    rcp_levs <- "RCP85"
-    year_levs <- "2030-2060"
+  # return the inputs (for labeling purposes)
+  if(is.null(df)) {
+    out <- paste(rcp_levs[2], year_levs[2],
+                 run, sep = "_")
+    return(out)
+  }
+  if (!current) {
+    rcp_levs <- rcp_levs[2]
+    year_levs <- year_levs[2]
   }
   
   stopifnot(rcp_levs %in% df$RCP,
             year_levs %in% df$years)
+  
+  
   out <- df %>% 
     filter(.data$RCP %in% rcp_levs, 
            .data$years %in% year_levs,
-           .data$c4 == c4string) %>%
+           .data$run == run_string) %>%
     droplevels() #drop unused factor levels
   
   # also filter by PFT

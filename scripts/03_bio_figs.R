@@ -18,8 +18,7 @@ source("src/fig_functions.R") # box_ann function defined here
 
 # params ------------------------------------------------------------------
 
-theme_set(theme_classic())
-theme_update(strip.background = element_blank())
+theme_set(theme_custom1())
 line_loc2 <- c(1.5, 3.5) # for figures w/ 2 vertical lines
 
 # width of figs
@@ -31,20 +30,17 @@ hfig_box2 <- 5 # height of 5 panel boxplots
 ncol_box <- 3
 
 # * vectors/dfs for 'looping' ---------------------------------------------
+
 # for looping
-levs_pft <- levels(pft5_bio2$PFT) # all pft levels in the main datafile
+levs_pft <- unique(pft5_bio2$PFT) # all pft levels in the main datafile
 
 # for when need to 'loop' over both pft4 and c4 on and off
-levs_pft_c4 <- expand_grid(pft = factor(levs_pft, levs_pft), 
-                           levs_c4 = unique(pft5_bio2$c4)) %>% 
-  arrange(pft, desc(levs_c4))
+levs_pft_run <- expand_grid(pft = factor(levs_pft, levs_pft), 
+                           run = runs_graze) %>% 
+  arrange(pft, run)
 
-levs_c4 <- unique(levs_pft_c4$levs_c4) %>% 
-  sort(., decreasing = TRUE)
-
-levs_grefs_c4 <- expand_grid(ref_graze = names(pft5_d_grefs), 
-                             levs_c4 = levs_c4)
-
+levs_grefs_run <- expand_grid(ref_graze = names(pft5_d_grefs), 
+                             run = runs_graze)
 # list of pfts
 levs_pft_l <- list(pft5 = pft5_factor(x = NULL, return_levels = TRUE)) # the main 5
 
@@ -75,51 +71,31 @@ pft5_bio_b <- pft5_bio2 %>%
 
 # * boxplot ---------------------------------------------------------------
 
-jpeg("figures/biomass/pub_qual/bio-boxplot_all_c4on.jpeg",
-     res = 600, height = 8, width = wfig_box1, units = "in")
+# boxplots of utilization and biomass for all functional groups
+pdf("figures/biomass/bio-util-boxplot_all.pdf",
+    height = 8, width = wfig_box1)
 
-pft5_bio_b %>% 
-  filter(c4 == "c4on") %>% 
-  ggplot(aes(x = id, y = biomass, fill = RCP)) +
-  box1()
-
-dev.off()
-
-jpeg("figures/biomass/pub_qual/bio-boxplot_all_c4off.jpeg",
-     res = 600, height = 8, width = wfig_box1, units = "in")
-
-pft5_bio_b %>% 
-  filter(c4 == "c4off") %>% 
-  ggplot(aes(x = id, y = biomass, fill = RCP)) +
-  box1()
-
+figs_l <- map(runs_graze, function(x) {
+  out <- list()
+  df <-  filter(pft5_bio_b, run == x)
+  
+  out$bio <- ggplot(df, aes(x = id, y = biomass, fill = RCP)) +
+    box1() +
+    labs(caption = x)
+  
+  out$util <- ggplot(df, aes(x = id, y = utilization, fill = RCP)) +
+    box1(var = 'utilization',
+         y = lab_util0) +
+    labs(caption = x)
+  out
+})
+map(figs_l, \(x) x$bio)
+map(figs_l, \(x) x$util)
 dev.off()
 
 # c4 on and off in side by side panels 
 # for each pft
-pdf("figures/biomass/bio_boxplot_c4off_and_on.pdf",
-     height = 9, width = 6)
-
-map(levs_pft_l, function(x) {
-  df <- pft5_bio2 %>% 
-    filter(PFT %in% x)
-  out <- list()
-  out[[1]] <- df %>%  # removing 0s
-    mutate(biomass = ifelse(biomass == 0, NA, biomass)) %>% 
-    ggplot(aes(x = id, y = biomass, fill = RCP)) +
-    box1(add_facet_wrap = FALSE) +
-    facet_rep_grid(PFT ~ c4, scales = "free_y") +
-    labs(caption = "Note: 0 biomass values not shown")
-  
-  # showing 0s
-  out[[2]] <- ggplot(df, aes(x = id, y = biomass, fill = RCP)) +
-    box1(add_facet_wrap = FALSE) +
-    facet_rep_grid(PFT ~ c4, scales = "free_y") +
-    labs(caption = "Note: 0 biomass values are shown")
-  out
-})
-
-dev.off()
+# code removed [see pre '24 commit]
 
 # ** fewer scenarios ------------------------------------------------------
 
@@ -127,12 +103,11 @@ dev.off()
 # for possible use in manuscript
 
 df <- pft5_bio_b %>% 
-  filter_rcp_c4(PFT = TRUE)
+  filter_rcp_run(PFT = TRUE)
 
-n_zero <- pft5_bio2 %>% 
-  filter_rcp_c4(PFT = TRUE) %>% 
+n_zero <- df %>% 
   group_by(RCP, PFT, graze) %>% 
-  summarize(n_zero = sum(biomass == 0, na.rm =TRUE),
+  summarize(n_zero = sum(biomass == 0 | is.na(biomass), na.rm =TRUE),
             .groups = 'drop_last')
 
 # check
@@ -154,86 +129,101 @@ n_zero2 <- n_zero %>%
          )
 n_zero2
 
-g <- ggplot(df, aes(x = RCP, y = biomass, fill = graze)) +
+g0 <- ggplot(df, aes(x = RCP, fill = graze)) +
   facet_rep_wrap(~ PFT, scales = "free", ncol = 3) +
-  # currently seems like I need to restrict the named color vector to the names
-  # being plotted, see https://github.com/tidyverse/ggplot2/pull/4619
   scale_fill_graze() +
-  labs(x = lab_rcp,
-       y = lab_bio0) +
-  theme_box_pft5() +
-#  ylim(-5, NA) +
+  labs(x = lab_rcp) +
+  theme_box_pft5()
+
+suffix <- filter_rcp_run(df = NULL)
+
+jpeg(paste0("figures/biomass/pub_qual/bio-box_pft5_", suffix, ".jpeg"),
+     res = 600, height = hfig_box2, width = wfig_box2, units = "in")
+g0 +
+  labs(y = lab_bio0) +
   geom_text(data = n_zero2, aes(y = y, label = string),
             size = 2,vjust = 'inward',
-            lineheight = 0.7)
-
-
-# boxplot
-jpeg("figures/biomass/pub_qual/bio-boxplot_pft5_rcp8.5_c4on.jpeg",
-     res = 600, height = hfig_box2, width = wfig_box2, units = "in")
-g +  geom_boxplot(outlier.size = outlier.size) +
-  # for some reason geom_vline needs to come after boxplot, or error thrown
-  geom_vline(xintercept = 1.5, linetype = 2)
-
-
-dev.off()
-
-jpeg("figures/biomass/pub_qual/bio-violin_pft5_rcp8.5_c4on.jpeg",
-     res = 600, height = hfig_box2, width = wfig_box2, units = "in")
-
-g + geom_violin() +
+            lineheight = 0.7) +  
+  geom_boxplot(aes(y = biomass), outlier.size = outlier.size) +
   geom_vline(xintercept = 1.5, linetype = 2)
 
 dev.off()
 
+jpeg(paste0("figures/biomass/pub_qual/util-box_pft5_", suffix, ".jpeg"),
+     res = 600, height = hfig_box2, width = wfig_box2, units = "in")
+
+g0 +
+  labs(y = lab_util0) +
+  geom_boxplot(aes(y = utilization), outlier.size = outlier.size) +
+  geom_vline(xintercept = 1.5, linetype = 2)
+
+dev.off()
 
 # * scatterplot (vs climate) ----------------------------------------------
 
 # each combination PFt and C4 on or off is plotted on seperate pages
 # facets are RCP/year combinations, colors are grazing
-pdf("figures/biomass/bio_vs_climate_v1.pdf",
+pdf("figures/biomass/bio_vs_climate_v2.pdf",
     width = 6, height = 5)
 
 # here pmap is working by taking the column names (i.e. iterating over rows)
-pmap(levs_pft_c4, function(pft, levs_c4) {
+pmap(levs_pft_run, function(pft, run) {
+  pft <- as.character(pft)
 
-  g <- pft5_bio2 %>% 
-    filter(PFT == pft, c4 == levs_c4) %>% 
-    ggplot(aes(y = biomass, color = graze)) +
+  df <- pft5_bio2[pft5_bio2$PFT == pft & pft5_bio2$run == run, ] 
+  
+  base <- function(ylab){
+    list(
+      facet_rep_wrap(~RCP + years),
+                 scale_color_graze(),
+      labs(y = ylab,
+           subtitle = pft,
+           caption = paste(run, '\n x-axis shows current climate in all panels')),
+        theme(legend.position = c(0.85, 0.15),
+              axis.text = element_text(size = 7)) 
+      )
+    }
+  
+  g1 <- ggplot(df, aes(y = biomass, color = graze)) +
+    base(ylab = lab_bio0)
 
-    facet_rep_wrap(~RCP + years) +
-    scale_color_graze() +
-    labs(y = lab_bio0,
-         subtitle = paste(pft, "biomass"),
-         caption = c4on_off_lab(levs_c4)) +
-    theme(legend.position = c(0.85, 0.15),
-          axis.text = element_text(size = 7)) 
-
-  climate_scatter(g)
+  g2 <- ggplot(df, aes(y = utilization, color = graze)) +
+    base(ylab = lab_util0)
+  
+  list(bio = climate_scatter(g1), util = climate_scatter(g2))
   
 })
 
 # facets are grazing level, colors are RCP
-pmap(levs_pft_c4, function(pft, levs_c4) {
-  g <- pft5_bio2 %>% 
-    filter(PFT == pft, c4 == levs_c4,
-           years != "2030-2060") %>% 
-    ggplot(aes(y = biomass, color = RCP)) +
-    facet_rep_wrap(~graze) +
-    scale_color_manual(values = cols_rcp) +
-    labs(y = lab_bio0,
-         subtitle = paste(pft, "biomass"),
-         caption = paste(c4on_off_lab(levs_c4),
-           "\nOnly showing 2070-2100 for RCP 4.5 & 8.5")) +
-    theme(legend.position = "top",
-          axis.text = element_text(size = 7))
+pmap(levs_pft_run, function(pft, run) {
+  pft <- as.character(pft)
+  df <- pft5_bio2[pft5_bio2$PFT == pft & pft5_bio2$run == run &
+                       pft5_bio2$years != "2030-2060", ] 
   
-  climate_scatter(g)
+  base <- function(ylab){
+    list(
+      facet_rep_wrap(~graze),
+      scale_color_manual(values = cols_rcp),
+      labs(y = ylab,
+           subtitle = pft,
+           caption = paste(run,
+                           "\nOnly showing 2070-2100 for RCP4.5 & 8.5")),
+      theme(legend.position = "top",
+              axis.text = element_text(size = 7)) 
+    )
+  }
   
+  g1 <- ggplot(df, aes(y = biomass, color = RCP)) +
+    base(ylab = lab_bio0)
+  
+  g2 <- ggplot(df, aes(y = utilization, color = RCP)) +
+    base(ylab = lab_util0)
+  
+  list(bio = climate_scatter(g1), util = climate_scatter(g2))
+
 })
 
 dev.off()
-
 
 # * cheat light vs heavy graze --------------------------------------------
 # comparing cheatgrass light vs heavy grazing, to help determine why some
@@ -241,98 +231,96 @@ dev.off()
 # group of sites with low cheat biomass)
 
 cheat_df <- pft5_bio2 %>% 
-  filter(PFT == "Cheatgrass", RCP %in% c("Current", "RCP8.5")) %>% 
-  select(c4, years, RCP, graze, site, biomass)
+  filter(PFT == "Cheatgrass", RCP %in% c("Current", "RCP45")) %>% 
+  select(run, years, RCP, graze, site, biomass, utilization)
 
 pdf("figures/biomass/light_vs_heavy_graze_scatterplot.pdf",
     width = 6, height = 6)
-cheat_df %>% 
+
+for(r in runs_graze) {
+df <- cheat_df %>% 
   filter(graze == "Light") %>% 
   left_join(filter(cheat_df, graze == "Heavy"),
-            by = c("c4", "RCP", "years", "site"),
+            by = c("run", "RCP", "years", "site"),
             suffix = c("_light", "_heavy")) %>% 
-  ggplot(aes(biomass_light, biomass_heavy)) +
-  geom_point() +
+  filter(run == r)
+
+g <- ggplot(df) +
   facet_rep_wrap(~RCP + years, ncol = 2) +
   geom_abline(slope = 1) +
+  labs(caption = r)
+
+print(g +
   labs(x = "Biomass (light grazing)",
-       y = "Biomass (heavy grazing)",
-       subtitle = "Cheatgrass biomass under light vs heavy grazing")
+       y = "Biomass (heavy grazing)") +
+  geom_point(aes(biomass_light, biomass_heavy)))
+
+print(g +
+  labs(x = "Utilization (light grazing)",
+       y = "Utilization (heavy grazing)") +
+  geom_point(aes(utilization_light, utilization_heavy))
+  )
+}
 dev.off()
-# c4 on vs off biomass ----------------------------------------------------
-
-pdf("figures/biomass/bio_c4on_vs_off_v1.pdf",
-    width = 9, height = 7)
-
+# compare runs  -----------------------------------------------------------
 
 # * absolute biomass ------------------------------------------------------
 
-map(levs_pft[levs_pft != "C4Pgrass"], function(x) {
-  pft5_c4on_v_off %>% 
-    filter(PFT == x) %>% 
-    ggplot(aes(c4on, c4off, color = graze)) +
+# select which two runs to compare with each other
+rn1 <- runs_graze[1]
+rn2 <- runs_graze[2]
+
+pft5_wide <- pft5_bio2 %>% 
+  filter(run %in% runs_graze) %>% 
+  pivot_wider(
+    id_cols = c('years', 'RCP', 'graze', 'id', 'PFT', 'site'),
+    names_from = 'run',
+    values_from = c('biomass', 'utilization')
+  )
+
+compare_runs_scatter <- function(pft, var) {
+  pft5_wide %>% 
+    filter(.data$PFT == pft) %>% 
+    ggplot(aes(.data[[paste0(var, '_', rn1)]], 
+               .data[[paste0(var, '_', rn2)]], 
+               color = graze)) +
     geom_point(alpha = 0.6, size = 1) +
     facet_rep_wrap(RCP ~ years) +
     geom_abline(slope = 1, color = "black") +
     geom_smooth(method = "lm") +
     labs(
-      x = lab_c4on0,
-      y = lab_c4off0,
+      x = rn1,
+      y = rn2,
       caption = paste(
         "Regression lines seperate for each grazing treatment,",
-        "1:1 line in black.", 
-      "Only showing the 98 sites for which no C4Pgrass is simulated\n",
-      "under future conditions when the C4Pgrass climate suitability function", 
-      "is turned off"),
-      subtitle = paste(x, "biomass at the site level, for simulations with",
-                       "C4Pgrass on vs off")
+        "1:1 line in black."),
+      subtitle = paste(pft, var, "at the site level, comparing runs")
     ) +
     scale_color_graze() +
     theme(legend.position = c(0.85, 0.15))
+}
+
+pdf("figures/biomass/bio-util_compare-runs.pdf",
+    width = 9, height = 7)
+
+map(levs_pft, function(x) {
+  list(compare_runs_scatter(x, var = 'biomass'), 
+       compare_runs_scatter(x, var = 'utilization'))
 })
-
-
-# * on vs off %change ----------------------------------------------------
-# boxplot of % change of going from c4 on to c4 off
-c4on_v_off_diff %>% 
-  #filter(PFT != "C4Pgrass") %>% 
-  group_by(years, RCP, graze, PFT, id) %>% 
-  compute_boxplot_stats(var = "bio_es") %>% 
-  ggplot(aes(x = id, fill = RCP)) +
-  geom_text(data = ~box_anno(boxplot_stats_long(.), 
-                             var = "y", group_by = c("PFT", "graze"),
-                             mult = 0.05),
-            aes(x, y, label = graze, fill = NULL), 
-            size = 2.5) +
-  geom_boxplot_identity() +
-  scale_fill_manual(values = cols_rcp, name = "Scenario") +
-  scale_x_discrete(labels = id2year) +
-  geom_vline(xintercept = line_loc, linetype = 2) +
-  theme(legend.position = legend_pos_box1,
-        axis.text = element_text(size = 7)) +
-  facet_rep_wrap(~ PFT, scales = "free", ncol = ncol_box,
-                 repeat.tick.labels = TRUE) +
-  add_sec_axis() +
-  labs(x = lab_yrs,
-       y = lab_es_on_off,
-       caption = "Outliers not shown. 
-       Not showing points where biomass was 0 for on or off",
-       subtitle = "Change in biomass when C4 expansion is turned off 
-       in a given climate scenario and grazing level") 
-
 
 dev.off()
 
 # C3Pgrass/Pgrass ---------------------------------------------------------
-
-g <- ggplot(C3_Pgrass_ratio, aes(id, C3_Pgrass_ratio, fill = RCP)) +
+g <- C3_Pgrass_ratio %>% 
+  filter(run %in% runs_graze) %>% 
+  ggplot(aes(id, C3_Pgrass_ratio, fill = RCP)) +
   box1(add_facet_wrap = FALSE, var = "C3_Pgrass_ratio",
-       group_by = c("c4", "graze"),
+       group_by = c("run", "graze"),
        y = lab_C3_Pgrass_ratio) +
-  facet_rep_wrap(~c4) +
+  facet_rep_wrap(~run) +
   labs(subtitle = "Ratio of C3Pgrass biomass to total Pgrass biomass",
        caption = "Separately showing data from simulations with C4 expansion on and off") 
-
+g
 ggsave("figures/biomass/C3_Pgrass_ratio.jpeg", g, 
        width = 6, height = 4)
 
@@ -351,14 +339,14 @@ pdf("figures/biomass/pft5_bio_diff_boxplots_v1.pdf",
     height = 8, width = wfig_box1)
 
 # % change
-map(levs_c4, function(lev_c4) {
+map(runs_graze, function(rn) {
 
   pft5_bio_d2 %>% 
-    filter(c4 == lev_c4) %>% 
+    filter(run == rn) %>% 
     ggplot(aes(id2, bio_diff, fill = graze)) +
     box2(axis_data = pft5_bio_d2) +
     labs(y = lab_bio2,
-         caption = c4on_off_lab(lev_c4))
+         caption = rn)
 
 })
 

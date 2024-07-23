@@ -12,8 +12,8 @@
 
 # colors for RCP scenarios
 cols_rcp <- c("Current" = "cornflower blue",
-              "RCP4.5" = "darkgreen",
-              "RCP8.5" = "green3")
+              "RCP45" = "darkgreen",
+              "RCP85" = "green3")
 
 # colors for grazing levels (from 5-class OrRd on colorbrewer2)
 cols_graze <- c("Light" = "#fdd49e", 
@@ -67,6 +67,9 @@ lab_bio2 <- expression(~Delta*" Biomass (scaled %)")
 lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
 lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
 lab_perc_bio0 <- "% of total biomass"
+
+# utilization
+lab_util0 <- expression("Utilization ("*gm^-2*")")
 
 # cover
 lab_cov0 <-  "Cover (%)"

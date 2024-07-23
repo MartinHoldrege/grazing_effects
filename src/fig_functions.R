@@ -18,6 +18,16 @@ legend_pos_box1 <- "top"
 line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
 outlier.size <-  0.5 # outlier size used in boxplot functions below
 
+# ggplot themes -----------------------------------------------------------
+
+theme_custom1 <- function() {
+  theme_bw() %+replace%
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"),
+          strip.background = element_blank())
+}
+
 # funs that misc create dfs ------------------------------------------------------
 
 

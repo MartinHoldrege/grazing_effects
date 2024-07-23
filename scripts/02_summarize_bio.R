@@ -143,6 +143,7 @@ pft5_bio2 <- pft5_bio1 %>%
   # median across GCMs
   summarise(biomass = median(biomass),
             indivs = median(indivs),
+            utilization = median(utilization),
             .groups = "drop")%>% 
   left_join(clim1, by = "site") # adding current climate
 
@@ -161,7 +162,7 @@ mean(x[x>0]) # mean biomass at sites where present
 # commenting out because not currently using this
 C3_Pgrass_ratio <- pft5_bio1 %>% 
   filter(PFT %in% c("C3Pgrass", "Pgrass")) %>% 
-  select(-indivs) %>% # pivot doesn't work with other data column present
+  select(-indivs, -utilization) %>% # pivot doesn't work with other data column present
   pivot_wider(names_from = "PFT",
               values_from = "biomass") %>%  
   mutate(C3_Pgrass_ratio = C3Pgrass/Pgrass) %>% 
@@ -217,17 +218,28 @@ pft5_bio_es1 <- pft5_bio1 %>%
 levs_graze <- levels(pft5_bio1$graze)
 names(levs_graze) <- levs_graze
 
+# select runs that have for which complete set of grazing levels exist
+runs_graze <- pft5_bio1 %>% 
+  ungroup() %>% 
+  select(run, graze) %>% 
+  distinct() %>% 
+  group_by(run) %>% 
+  summarize(n = n()) %>% 
+  filter(n == 4) %>% 
+  pull(run)
+
 # scaled % changes
 # naming here: d== difference, grefs = different grazing references used
 
 # commenting out because currently we only have 'light' grazing anyway
-# pft5_d_grefs <- map(levs_graze, function(x) {
-#   out <-  pft5_bio2 %>% # using data already summarized across GCMs
-#     scaled_change_2var(by = c("run", "PFT"), ref_graze = x) %>% 
-#     # adding id variable that doesn't include graze
-#     create_id2()
-#   out
-# })
+pft5_d_grefs <- map(levs_graze, function(x) {
+  out <-  pft5_bio2 %>% # using data already summarized across GCMs
+    filter(run %in% runs_graze) %>% 
+    scaled_change_2var(by = c("run", "PFT"), ref_graze = x) %>%
+    # adding id variable that doesn't include graze
+    create_id2()
+  out
+})
 
 # effect sizes
 # throwing warnings--needs debugging
