@@ -237,6 +237,11 @@ climate_scatter <- function(g) {
     geom_point(aes(x = Temp)) +
     geom_smooth(aes(x = Temp), method = "loess", se = FALSE) +
     labs(x = lab_mat)
+  
+  out[["CorrTP2"]] <- g +
+    geom_point(aes(x = CorrTP2)) +
+    geom_smooth(aes(x = CorrTP2), method = "loess", se = FALSE) +
+    labs(x = lab_corrtp)
   out
 }
 

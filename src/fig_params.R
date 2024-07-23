@@ -105,6 +105,7 @@ lab_firep1 <- expression(Delta~"# fires/century")
 # climate
 lab_map <- "MAP (mm)"
 lab_mat <- expression("MAT ("*degree*C*")")
+lab_corrtp <- 'Seasonality (T-P correlation)'
 lab_map0 <- lab_map
 lab_mat0 <- lab_mat
 lab_map1 <- expression(Delta~"MAP (mm)")

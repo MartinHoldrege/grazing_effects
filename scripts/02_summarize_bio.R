@@ -37,6 +37,10 @@ bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v4.csv",
 seas1 <- read_csv('data_processed/site_means/clim_seasonality.csv',
                   show_col_types = FALSE)
 
+# file created by 00_query_weather_db.R
+clim_db <- read_csv("data_processed/site_means/dbWeather_200sites.csv",
+                    show_col_types = FALSE)
+
 # parse -------------------------------------------------------------------
 # Convert columns to useful factors
 
@@ -81,18 +85,20 @@ bio4 <- bio4a
 
 # climate -----------------------------------------------------------------
 
-
+seas2 <- seas1 %>% 
+  select(-PTcor) 
 clim_all1 <- bio4 %>% 
   # arbitrarily filtering for one graze and PFT, so rows aren't duplicated
   filter(graze == "Light", PFT == "sagebrush",
          run == "fire0_eind1_c4grass1_co20") %>% 
   select(site, PPT, Temp, years, RCP, GCM) %>% 
-  left_join(seas1, by = join_by(site, years, RCP, GCM))
+  left_join(seas2, by = join_by(site, years, RCP, GCM))
 
 # current climate only
 clim1 <- clim_all1 %>% 
   filter(years == "Current") %>% 
-  select(site, PPT, Temp)
+  left_join(clim_db, by = c("site" = "Site_id")) %>% 
+  select(site, PPT, Temp, CorrTP2, psp) 
 
 clim_all2 <- clim_all1 %>% 
   select(-MAP, -MAT) %>%  # these just based on monthly averages so, averaging
