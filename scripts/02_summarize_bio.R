@@ -145,6 +145,23 @@ pft5_bio1 <- bind_rows(pft5_bio0) %>%
   # order PFTs into a factor
   mutate(PFT = pft_all_factor(PFT))
 
+# select runs that have for which complete set of grazing levels exist
+# (used for filter in this and other scripts)
+runs_graze0 <- pft5_bio1 %>% 
+  ungroup() %>% 
+  select(run, graze) %>% 
+  distinct() %>% 
+  group_by(run) %>% 
+  summarize(n = n()) %>% 
+  filter(n == 4) %>% 
+  pull(run)
+
+runs_graze <- c('NoC4Exp' = "fire1_eind1_c4grass0_co20_2311", 
+                'default' = "fire1_eind1_c4grass1_co20_2311")
+
+# make sure selecting runs for which all grazing levs exist
+stopifnot(runs_graze %in% runs_graze0) 
+
 pft5_bio2 <- pft5_bio1 %>% 
   # median across GCMs
   summarise(biomass = median(biomass),
@@ -188,12 +205,13 @@ C3_Pgrass_ratio <- pft5_bio1 %>%
 # this throws a warning (which is ok) because utilization is 0 for some groups
 pft5_bio_d2 <-  pft5_bio1 %>% 
   # calculating % scaled change for biomass and individuals
-  scaled_change_2var(by = c("run", "PFT", "graze", "utilization"),
-                     vars = c("biomass", "indivs")) %>% 
+  scaled_change_2var(by = c("run", "PFT", "graze"),
+                     vars = c("biomass", "indivs", "utilization")) %>% 
   # median across GCMs
   group_by(run, site, years, RCP, PFT, graze, id) %>% 
   summarise_bio_indivs(suffix = "_diff") %>% 
-  create_id2() # adding another id variable
+  create_id2() %>%  # adding another id variable
+  filter(run %in% runs_graze)
 
 
 # effect size; es = ln(biomass scenario of interest/biomass references group)
@@ -201,6 +219,7 @@ pft5_bio_d2 <-  pft5_bio1 %>%
 
 # shouldn't throw warnings
 pft5_bio_es1 <- pft5_bio1 %>% 
+  filter(run %in% runs_graze) %>% 
   # warning here is ok
   scaled_change_2var(by = c("run", "PFT", "graze"), percent = FALSE,
                      vars = c("biomass", "indivs", "utilization"),
@@ -211,7 +230,7 @@ pft5_bio_es1 <- pft5_bio1 %>%
   summarise_bio_indivs(suffix = "_es") %>% 
   create_id2() %>% 
   mutate(bio_es = ifelse(is.finite(bio_es), bio_es, NA_real_),
-         indivs_es = ifelse(is.finite(indivs_es), indivs_es, NA_real_))
+         indivs_es = ifelse(is.finite(indivs_es), indivs_es, NA_real_)) 
 
 
 # ** change relative to reference graze ------------------------------------
@@ -224,15 +243,7 @@ pft5_bio_es1 <- pft5_bio1 %>%
 levs_graze <- levels(pft5_bio1$graze)
 names(levs_graze) <- levs_graze
 
-# select runs that have for which complete set of grazing levels exist
-runs_graze <- pft5_bio1 %>% 
-  ungroup() %>% 
-  select(run, graze) %>% 
-  distinct() %>% 
-  group_by(run) %>% 
-  summarize(n = n()) %>% 
-  filter(n == 4) %>% 
-  pull(run)
+
 
 # scaled % changes
 # naming here: d== difference, grefs = different grazing references used
@@ -248,14 +259,15 @@ pft5_d_grefs <- map(levs_graze, function(x) {
 })
 
 # effect sizes
-# throwing warnings--needs debugging
-# pft5_es_grefs <- map(levs_graze, function(x) {
-#   out <-  pft5_bio2 %>% # using data already summarized across GCMs
-#     scaled_change_2var(by = c("run", "PFT"), ref_graze = x, percent = FALSE,
-#                   effect_size = TRUE) %>% 
-#     create_id2()
-#   out
-# })
+pft5_es_grefs <- map(levs_graze, function(x) {
+  out <-  pft5_bio2 %>% # using data already summarized across GCMs
+    filter(run %in% runs_graze) %>% 
+    scaled_change_2var(by = c("run", "PFT"), ref_graze = x, percent = FALSE,
+                       vars = c("biomass", "indivs", "utilization"),
+                       effect_size = TRUE) %>%
+    create_id2()
+  out
+})
 
 
 # ** change relative to light grazing of same gcm -------------------------
@@ -299,14 +311,16 @@ pft5_es_wgcm <- pft5_bio1 %>%
 #   summarise_bio_indivs(suffix = "_diff") %>% 
 #   create_id2()
 
-# pft5_es_wgcm_heavy <- pft5_bio1 %>% 
-#   scaled_change_2var(by = c("run", "PFT", "RCP", "GCM", "years"), 
-#                      ref_graze = "Heavy", percent = FALSE, effect_size = TRUE,
-#                      within_GCM = TRUE) %>% 
-#   # median across GCMs
-#   group_by(run, site, years, RCP, PFT, graze, id) %>% 
-#   summarise_bio_indivs(suffix = "_es") %>% 
-#   create_id2()
+pft5_es_wgcm_heavy <- pft5_bio1 %>%
+  filter(run %in% runs_graze) %>% 
+  scaled_change_2var(by = c("run", "PFT", "RCP", "GCM", "years"),
+                     ref_graze = "Heavy", percent = FALSE, effect_size = TRUE,
+                     vars = c("biomass", "indivs", "utilization"),
+                     within_GCM = TRUE) %>%
+  # median across GCMs
+  group_by(run, site, years, RCP, PFT, graze, id) %>%
+  summarise_bio_indivs(suffix = "_es") %>%
+  create_id2()
 
 # threshold ---------------------------------------------------------------
 
@@ -322,24 +336,25 @@ pcent <- 0.05 # 5th percentile is the reference level
 # threshold
 # 5th percentile under current light grazing for each PFT, at sites
 # with >0 biomass
-# ref_threshold <- pft5_bio1 %>% 
-#   filter(RCP == "Current", graze == "Light",
-#          biomass > 0) %>% 
-#   group_by(c4, PFT) %>% 
-#   # lower limit of biomass, under today's conditions
-#   summarise(threshold = quantile(biomass, probs = pcent),
-#             .groups = "drop")
+ref_threshold <- pft5_bio1 %>%
+  filter(RCP == "Current", graze == "Light",
+         biomass > 0, run %in% runs_graze) %>%
+  group_by(run, PFT) %>%
+  # lower limit of biomass, under today's conditions
+  summarise(threshold = quantile(biomass, probs = pcent),
+            .groups = "drop")
 
-# threshold1 <- pft5_bio1 %>% 
-#   left_join(ref_threshold,  by = c("run", "PFT")) %>% 
-#   group_by(across(all_of(group_cols[group_cols != "site"]))) %>% 
-#   mutate(above= biomass > threshold) %>% 
-#   # % sites above threshold
-#   summarise(pcent_above = mean(above)*100,
-#             .groups = "drop_last") %>% 
-#   # median across GCMs
-#   summarise(pcent_above = median(pcent_above),
-#             .groups = "drop")
+threshold1 <- pft5_bio1 %>%
+  filter(run %in% runs_graze) %>% 
+  left_join(ref_threshold,  by = c("run", "PFT")) %>%
+  group_by(across(all_of(group_cols[group_cols != "site"]))) %>%
+  mutate(above= biomass > threshold) %>%
+  # % sites above threshold
+  summarise(pcent_above = mean(above)*100,
+            .groups = "drop_last") %>%
+  # median across GCMs
+  summarise(pcent_above = median(pcent_above),
+            .groups = "drop")
 
 # * crossing threshold ----------------------------------------------------
 # What is mildest grazing treatment that causes biomass to go below threshold. 
@@ -363,54 +378,53 @@ pcent <- 0.05 # 5th percentile is the reference level
 # plant functional types
 # not updated yet
 
-# comp1 <- pft5_bio1_tot %>% 
-#   filter(c4 == 'c4on') %>% 
-# #  filter_rcp_c4() %>% 
-#   # median across GCMs
-#   summarise(biomass = median(biomass),
-#             .groups = 'drop') %>% 
-#   group_by(c4, years, RCP, graze,  id, PFT) %>% 
-#   # mean biomass across sites
-#   summarise(biomass = mean(biomass),
-#             .groups = 'drop_last') %>% 
-#   # percent of total biomass
-#   mutate(bio_perc = biomass/biomass[PFT == "Total"] * 100) %>% 
-#   filter(PFT %in% c(pft5_factor(NULL, return_levels = TRUE), "Total")) 
+comp1 <- pft5_bio1_tot %>%
+  filter(run == runs_graze['default']) %>%
+  # median across GCMs
+  summarise(biomass = median(biomass),
+            .groups = 'drop') %>%
+  group_by(run, years, RCP, graze,  id, PFT) %>%
+  # mean biomass across sites
+  summarise(biomass = mean(biomass),
+            .groups = 'drop_last') %>%
+  # percent of total biomass
+  mutate(bio_perc = biomass/biomass[PFT == "Total"] * 100) %>%
+  filter(PFT %in% c(pft5_factor(NULL, return_levels = TRUE), "Total"))
 
 # calculating biomass and % of total biomass in the 'other' category,
 # that is not biomass from the main 5 PFTs
 # all climate scenarios
-# comp2_all <- comp1 %>% 
-#   mutate(other_biomass = biomass[PFT == "Total"] - sum(biomass[PFT != "Total"]),
-#          other_perc = 100 - sum(bio_perc[PFT != 'Total']),
-#          biomass = other_biomass,
-#          bio_perc = other_perc,
-#          PFT = "Other") %>%
-#   select(-other_biomass, -other_perc) %>% 
-#   distinct() %>% 
-#   bind_rows(comp1) %>% 
-#   filter(PFT != "Total") %>% 
-#   mutate(PFT = factor(PFT,  
-#                       levels = c("Other", "Cheatgrass", "Pforb",  
-#                                  "C4Pgrass", 
-#                                  "C3Pgrass", "Sagebrush")))%>% 
-#   arrange(RCP, graze) 
-# 
-# # just current and RCP8.5 mid-century
-# comp2 <- comp2_all %>%  
-#   filter_rcp_c4()%>% 
-#   mutate(id = factor(id, levels = unique(id)))
-# 
-# 
-# # composition of just key herbaceous PFTs
-# comp_herb1 <- comp2 %>% 
-#   filter(PFT %in% c('C3Pgrass', 'C4Pgrass', 'Pforb', "Cheatgrass")) %>% 
-#   # this df is already grouped
-#   mutate(bio_perc = biomass/(sum(biomass))*100)
-# 
-# # test that the percents do sum to 100
-# test <- summarise(comp_herb1, test = sum(bio_perc))$test
-# stopifnot(all.equal(test, rep(100, length(test))))
+comp2_all <- comp1 %>%
+  mutate(other_biomass = biomass[PFT == "Total"] - sum(biomass[PFT != "Total"]),
+         other_perc = 100 - sum(bio_perc[PFT != 'Total']),
+         biomass = other_biomass,
+         bio_perc = other_perc,
+         PFT = "Other") %>%
+  select(-other_biomass, -other_perc) %>%
+  distinct() %>%
+  bind_rows(comp1) %>%
+  filter(PFT != "Total") %>%
+  mutate(PFT = factor(PFT,
+                      levels = c("Other", "Cheatgrass", "Pforb",
+                                 "C4Pgrass",
+                                 "C3Pgrass", "Sagebrush")))%>%
+  arrange(RCP, graze)
+
+# just current and RCP8.5 mid-century
+comp2 <- comp2_all %>%
+  filter_rcp_run()%>%
+  mutate(id = factor(id, levels = unique(id)))
+
+
+# composition of just key herbaceous PFTs
+comp_herb1 <- comp2 %>%
+  filter(PFT %in% c('C3Pgrass', 'C4Pgrass', 'Pforb', "Cheatgrass")) %>%
+  # this df is already grouped
+  mutate(bio_perc = biomass/(sum(biomass))*100)
+
+# test that the percents do sum to 100
+test <- summarise(comp_herb1, test = sum(bio_perc))$test
+stopifnot(all.equal(test, rep(100, length(test))))
 
 # wildfire ----------------------------------------------------------------
 
@@ -420,7 +434,10 @@ pcent <- 0.05 # 5th percentile is the reference level
 fire0 <- bio4 %>% 
   # fire return interval. WildFire is the mean number of fires in a given year
   # across 200 iterations
-  filter(PFT == 'sagebrush') %>% 
+  filter(PFT == 'sagebrush', 
+         run %in% runs_graze,
+         str_detect(run, 'fire1') # only want simulations where fire was actually simulated
+         ) %>% 
   select(-PFT) %>% 
   # number of fires over all iterations and years
   rename(n_fires = WildFire) %>% 

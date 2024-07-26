@@ -516,13 +516,9 @@ scaled_change <- function(df,
   }
   
   # shortening name for reverse compatibility
-  if("biomass_diff" %in% names(out)) {
-    out <- out %>% 
-      rename(bio_diff = biomass_diff)
-  } else if ("biomass_es" %in% names(out)) {
-    out <- out %>% 
-      rename(bio_es = biomass_es)
-  }
+  names(out) <- names(out) %>% 
+    str_replace("^utilization_", "util_") %>% 
+    str_replace("^biomass_", "bio_")
   
   out
 
@@ -637,11 +633,12 @@ pivot_wider_c4 <- function(df) {
 #' @param suffix string, the suffix (e.g. _diff, _es), of columns of interest
 #'
 #' @return dataframe, with median values for the biomass and indivs columns
-summarise_bio_indivs <- function(df, suffix = "_diff"){
+summarise_bio_indivs <- function(df, suffix = "_diff",
+                                 col_names = c('biomass', "indivs", "utilization"),
+                                 abbreviations = c("bio", "indivs", "util")){
   
   # columns to summarise
-  columns <- c("biomass", "indivs", paste0("bio", suffix), 
-            paste0("indivs", suffix))
+  columns <- c(col_names, paste0(abbreviations, suffix))
   
   # using dtplyr because summarise is super slow with across() which is a
   # known issue: https://github.com/tidyverse/dplyr/issues/4953

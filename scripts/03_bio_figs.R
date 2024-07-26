@@ -335,34 +335,35 @@ ggsave("figures/biomass/C3_Pgrass_ratio.jpeg", g,
 # conditions for that same grazing level (i.e. this is the climate effect)
 
 
-pdf("figures/biomass/pft5_bio_diff_boxplots_v1.pdf",
+pdf("figures/biomass/pft5_bio-util_diff_boxplots_v1.pdf",
     height = 8, width = wfig_box1)
 
-# % change
-map(runs_graze, function(rn) {
-
-  pft5_bio_d2 %>% 
-    filter(run == rn) %>% 
-    ggplot(aes(id2, bio_diff, fill = graze)) +
-    box2(axis_data = pft5_bio_d2) +
-    labs(y = lab_bio2,
-         caption = rn)
-
-})
+# scaled % change (see pre-2024 code)
 
 # effect size
-map(levs_c4, function(lev_c4) {
-
-  pft5_bio_es1 %>% 
-    filter(c4 == lev_c4) %>% 
-    ggplot(aes(id2, bio_es, fill = graze)) +
+l <- map(runs_graze, function(rn) {
+  
+  df <- pft5_bio_es1 %>% 
+    filter(run == rn)
+  
+  g1 <- ggplot(df, aes(id2, bio_es, fill = graze)) +
     box2(axis_data = pft5_bio_es1, 
          var = "bio_es", repeat.tick.labels = "y") +
     add_sec_axis() +
     labs(y = lab_es0,
-         caption = c4on_off_lab(lev_c4))
+         caption = rn)
   
+  g2 <- ggplot(df, aes(id2, util_es, fill = graze)) +
+    box2(axis_data = pft5_bio_es1, 
+         var = "bio_es", repeat.tick.labels = "y") +
+    add_sec_axis() +
+    labs(y = lab_es0_util,
+         caption = rn)
+  
+  list(bio = g1, util = g2)
 })
+
+l
 
 dev.off()
 
@@ -374,44 +375,36 @@ dev.off()
 # boxplots showing change in biomass (and effect size) relative to current time 
 # period and a given grazing intensity ('reference class')
 
-pdf("figures/biomass/pft5_bio_diff_gref_boxplots_v1.pdf", 
+pdf("figures/biomass/pft5_bio-util_diff_gref_boxplots_v1.pdf", 
     height = 6.5, width = wfig_box1)
 
 # % change
-# 'loop' over reference class (reference grazing level) and c4 on or off
-pmap(levs_grefs_c4, function(ref_graze, levs_c4){
-  
-  df0 <- pft5_d_grefs[[ref_graze]]
-  
-  df <- df0 %>% 
-    filter(c4 == levs_c4) 
-
-  # at this point it is not possible to show the unused grazing level in ggplot
-  # for the current rcp (https://github.com/tidyverse/ggplot2/issues/3345)
-  ggplot(df, aes(id2, bio_diff, fill = graze)) +
-    # keeping axes the same between the c4 on and off figures
-    box3(axis_data = df0) +
-    labs(y = lab_bio2,
-         subtitle = paste("Change in biomass relative to", tolower(ref_graze), 
-                          "grazing \n under current conditions"),
-         caption = c4on_off_lab(levs_c4))
-})
+# see pre 2024 commits for % change
 
 # effect size
-pmap(levs_grefs_c4, function(ref_graze, levs_c4){
-  
+pmap(levs_grefs_run, function(ref_graze, run){
+  rn <- run
   df0 <- pft5_es_grefs[[ref_graze]]
   
   df <- df0 %>% 
-    filter(c4 == levs_c4) 
+    filter(run == rn) 
   
-  ggplot(df, aes(id2, bio_es, fill = graze)) +
+  g1 <- ggplot(df, aes(id2, bio_es, fill = graze)) +
     box3(axis_data = df0, var = "bio_es") +
     add_sec_axis() +
     labs(y = lab_es0,
          subtitle = paste("Change in biomass relative to", tolower(ref_graze), 
                           "grazing \n under current conditions"),
-         caption = c4on_off_lab(levs_c4))
+         caption = rn)
+  
+  g2 <- ggplot(df, aes(id2, util_es, fill = graze)) +
+    box3(axis_data = df0, var = "util_es") +
+    add_sec_axis() +
+    labs(y = lab_es0_util,
+         subtitle = paste("Change in utilization relative to", tolower(ref_graze), 
+                          "grazing \n under current conditions"),
+         caption = rn)
+  list(g1, g2)
 })
 
 
@@ -420,48 +413,47 @@ dev.off()
 
 # ** scatterplot (vs climate) ----------------------------------------------
 
-
-pdf("figures/biomass/bio-diff_vs_climate_v1.pdf",
-    width = 6, height = 5)
-
-# bio-diff and effect size vs MAP and MAT, for for ref class of light grazing, for
+# effect size vs MAP and MAT, for for ref class of light grazing, for
 # each RCP/time period and PFT
-
-# %change
-l1 <- pmap(levs_pft_c4, function(pft, levs_c4) {
-  # using Light grazing as reference class
-  df <- pft5_d_grefs[["Light"]] %>% 
-    filter(PFT == pft)
-  
-  g <- df %>% 
-    filter(c4 == levs_c4) %>% 
-    ggplot(aes(y = bio_diff, color = graze)) +
-    scatter_light(pft, levs_c4, axis_data = df) +
-    labs(y = lab_bio2)
-  
-  climate_scatter(g)
-  
-})
-
+pdf("figures/biomass/bio-util-diff_vs_climate_v1.pdf",
+    width = 6, height = 5)
+# scaled %change[see pre 2024 code]
 
 # effect size
-l2 <- pmap(levs_pft_c4, function(pft, levs_c4) {
+# just showing results for default
+l2 <- pmap(levs_pft_run[levs_pft_run$run == runs_graze['default'], ], 
+           function(pft, run) {
   # using Light grazing as reference class
   df <- pft5_es_grefs[["Light"]] %>% 
-    filter(PFT == pft)
+    filter(PFT == as.character(pft))
   
-  g <- df %>% 
-    filter(c4 == levs_c4) %>% 
+  g1 <- df %>% 
+    filter(.data$run == !!run) %>% 
     ggplot(aes(y = bio_es, color = graze)) +
-    scatter_light(pft, levs_c4, axis_data = df) +
-    labs(y = lab_es0)
+    scatter_light(pft, run, axis_data = df,
+                  subtitle_response = 'biomass') +
+    labs(y = lab_es0) +
+    add_sec_axis()
   
-  climate_scatter(g)
+  g2 <- df %>%
+    filter(.data$run == !!run) %>%
+    ggplot(aes(y = util_es, color = graze)) +
+    scatter_light(pft, run, axis_data = df,
+                  subtitle_response = 'utilization') +
+    labs(y = lab_es0_util) +
+    add_sec_axis()
   
+  if(pft == 'Sagebrush') {
+    # utilization is 0 for sagebrush for light grazing, so figure doesn't work
+    out <- list(climate_scatter(g1))
+  } else {
+    out <- list(climate_scatter(g1),
+                climate_scatter(g2))
+  }
+  out
 })
 
-map_depth(c(l1, l2), .depth = 1, .f = `[`, "MAT") # all MAT figs
-map_depth(c(l1, l2), .depth = 1, .f = `[`, "MAP") # all MAP figs
+l2
 
 dev.off()
 
@@ -474,67 +466,39 @@ dev.off()
 
 
 # ** boxplots -------------------------------------------------------------
-
-pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v1.pdf", 
+pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v2.pdf", 
     height = 8, width = wfig_box1)
 
-# % change
-map(levs_c4, function(x){
-  pft5_d_wgcm %>% 
-    filter(c4 == x) %>% 
-    ggplot(aes(id2, bio_diff, fill = graze)) +
-    box2(axis_data = pft5_d_wgcm, xintercept = line_loc2,
-         subtitle = "Reference group is light grazing for the given climate scenario") +
-    labs(y = lab_bio2,
-         caption = c4on_off_lab(x))
-  
-})
-
 # effect size
-map(levs_c4, function(x){
+map(runs_graze, function(x){
  
   out <- list()
   # w/outliers
-   out[[1]] <- pft5_es_wgcm %>% 
-    filter(c4 == x) %>% 
-    ggplot(aes(id2, bio_es, fill = graze)) +
-    box2(axis_data = pft5_es_wgcm, 
+  df <- pft5_es_wgcm %>% 
+    filter(run == x) 
+  out[[1]] <- ggplot(df, aes(id2, bio_es, fill = graze)) +
+    box2(axis_data = pft5_es_wgcm,
          var = "bio_es", xintercept = line_loc2,
          subtitle = "Reference group is light grazing for the given climate scenario",
          repeat.tick.labels = TRUE) +
     add_sec_axis() +
     labs(y = lab_es0,
-         caption = paste0("All data shown\n", c4on_off_lab(x))) +
+         caption = paste0("All data shown\n", x)) +
     theme(axis.text.y.right = element_text(size = 5)) 
-  
-  # boxplot outliers removed
-   df <-  pft5_es_wgcm %>% 
-     group_by(id2, PFT, RCP, graze, years, c4) %>% 
-     compute_boxplot_stats(var = "bio_es")
-  
-   g <- df %>% 
-     filter(c4 == x) %>% 
-     ggplot(aes(x = id2, fill = graze)) +
-     add_sec_axis() +
-     labs(y = lab_es0,
-          caption = paste0("Outliers removed\n", c4on_off_lab(x)))
+
    
-  out[[2]] <- g +
-    box2(axis_data = boxplot_stats_long(df), var = "y", xintercept = line_loc2,
-         box_identity = TRUE, 
-         subtitle = "Reference group is light grazing for the given climate scenario",
-         repeat.tick.labels = TRUE
-         )  
+   # throws warnings b/ 0 utilization for sagebrush light grazing
+   out[[2]] <- ggplot(df, aes(id2, util_es, fill = graze)) +
+     box2(axis_data = pft5_es_wgcm, 
+          var = "util_es", xintercept = line_loc2,
+          subtitle = "Reference group is light grazing for the given climate scenario",
+          repeat.tick.labels = TRUE) +
+     add_sec_axis() +
+     labs(y = lab_es0_util,
+          caption = paste0("All data shown\n", x)) +
+     theme(axis.text.y.right = element_text(size = 5)) 
   
-  # same figure but with fixed scales
-  out[[3]] <- g +
-    box2(axis_data = boxplot_stats_long(df), var = "y", xintercept = line_loc2,
-         box_identity = TRUE, 
-         subtitle = "Reference group is light grazing for the given climate scenario",
-         repeat.tick.labels = TRUE,
-         scales = "fixed",
-         anno_same_across_panels = TRUE)
-     
+  # see pre-'24 commits for version of  boxplot w/ outliers removed
   out
 })
 
@@ -546,89 +510,57 @@ dev.off()
 # effect size boxplot/violin plot for main PFTs, and only RCP8.5 mid-century,
 # (i.e. closer to publication quality)
 
-
-
 df <- pft5_es_wgcm_heavy %>% 
-  filter_rcp_c4(PFT = TRUE)
-
-# setting y limits to include all data points (except cheatgrass outliers)
-range <- df %>% 
-  filter(PFT != 'Cheatgrass') %>% 
-  pull(bio_es) %>% 
-  range(na.rm = TRUE)
-
-ylim <- c(range[1] - 0.01, range[2] + 0.01)
-
-outliers0 <- df%>% 
-  filter(bio_es < ylim[1] | bio_es > ylim[2])
-
-if(!all(outliers0$PFT == "Cheatgrass")) {
-  stop("Other PFTs also have outliers")
-} else {
-  outliers <- outliers0 %>% 
-    group_by(graze, RCP, PFT) %>% 
-    summarize(n = n(),
-              .groups = 'drop') %>% 
-    mutate(n = paste(n, "")) # add symbol here (e.g. *) if desired
-}
+  filter_rcp_run(PFT = TRUE)
 
 
 # base of the plot
-g <- ggplot(df, aes(x = RCP, y = bio_es, fill = graze)) +
+g <- ggplot(df, aes(x = RCP, fill = graze)) +
   geom_blank() + # added so that geom_vline doesn't throw an error
   geom_vline(xintercept = 1.5, linetype = 2) +
   geom_hline(yintercept = 0, linetype = 1, alpha = 0.3) +
   facet_rep_wrap(~ PFT, ncol = 3,
                  repeat.tick.labels = FALSE) +
   scale_fill_graze(exclude = 'Heavy') +
-  labs(x = lab_rcp,
-       y = lab_es1_heavy) +
+  labs(x = lab_rcp) +
   theme_box_pft5()+
   add_sec_axis(name = "% Change relative to heavy grazing") +
-  # this restricts 
-  #expand_limits(y = ylim) +
-  # printing how many outliers not shown. 
   scale_color_manual(values = cols_graze) +
-  guides(color = 'none')+
-  coord_cartesian(ylim = ylim)
+  guides(color = 'none')
 
 
-# boxplot
-jpeg("figures/biomass/pub_qual/bio-diff_boxplot_pft5_rcp8.5_c4on_v2_heavy.jpeg",
+suffix <- filter_rcp_run(df = NULL)
+jpeg(paste0("figures/biomass/pub_qual/bio-diff_boxplot_pft5_", suffix, ".jpeg"),
      res = 600, height = hfig_box2, width = wfig_box2, units = "in")
 g+
-  geom_boxplot(outlier.size = outlier.size) +
-  # add label of the number of outliers
-  geom_label(data = outliers, aes(x = as.numeric(RCP) + as.numeric(graze)/3.7 -0.5,
-                                  y = Inf, label = n, color = graze),
-             fill = 'white', label.padding = unit(0.1, 'lines') ,
-             size = 2.5, vjust = 'inward', label.size = 0) +
-  theme(panel.spacing.x = unit(-2, "lines"))
+  geom_boxplot(aes(y = bio_es),outlier.size = outlier.size) +
+  theme(panel.spacing.x = unit(-2, "lines"))+
+  labs(y = lab_es1_heavy)
 
 dev.off()
 
-# violin plot
-jpeg("figures/biomass/pub_qual/bio-diff_violin_pft5_rcp8.5_c4on.jpeg",
+jpeg(paste0("figures/biomass/pub_qual/util-diff_boxplot_pft5_", suffix, ".jpeg"),
      res = 600, height = hfig_box2, width = wfig_box2, units = "in")
-
-# applying filter otherwise violin goes off the edge of the page
-g +
-  geom_violin(data = df %>% filter(bio_es > ylim[1])) 
-
+g+
+  geom_boxplot(aes(y = util_es),outlier.size = outlier.size) +
+  theme(panel.spacing.x = unit(-2, "lines"))+
+  labs(y = lab_es1_util_heavy)+
+  
 dev.off()
+
 
 # % below threshold ------------------------------------------------------
 
 ref_threshold2 <- ref_threshold %>% 
   mutate(string = paste(round(threshold, 0), "g/m^2"))
 
-pdf("figures/threshold/threshold_dotplots_v1.pdf", 
+pdf("figures/threshold/threshold_dotplots_v2.pdf", 
     height = 6.5, width = wfig_box1)
 
-map(levs_c4, function(lev_c4) {
+map(runs_graze, function(x) {
   
 threshold1 %>% 
-  filter(c4 == lev_c4) %>% 
+  filter(run == x) %>% 
   ggplot(aes(x = id, y = pcent_above)) +
   geom_text(data = ~box_anno(., var = "pcent_above",
                              group_by = c("PFT", "graze"),
@@ -636,7 +568,7 @@ threshold1 %>%
             aes(x, y, label = graze, fill = NULL),
             size = 2.5) +
   # printing the value of the threshold on each panel
-  geom_text(data = filter(ref_threshold2, c4 == lev_c4),
+  geom_text(data = filter(ref_threshold2, run == x),
             aes(x = 3, y = 10, label = string),
                 size = 2.5) +
   # line at the threshold
@@ -651,7 +583,7 @@ threshold1 %>%
   labs(x = lab_yrs,
        y = lab_below0,
        subtitle = "% of sites with biomass above current light grazing 5th percentile",
-       caption = paste0(c4on_off_lab(lev_c4),
+       caption = paste0(x,
                        "\nValue of threshold provided in each panel"))
   
 })
@@ -666,15 +598,14 @@ geom_text(data = filter(ref_threshold2, c4 == lev_c4),
           aes(x = 3, y = 10, label = string),
           size = 2.5)
 df <- threshold1 %>% 
-  filter_rcp_c4(PFT = TRUE) %>% 
+  filter_rcp_run(PFT = TRUE) %>% 
   # it's not relevant whether cheatgrass drops below a 'sustainable' level.
   filter(PFT != "Cheatgrass" ) 
 
 ref_threshold3 <- ref_threshold2 %>% 
-  filter(c4 == 'c4on',
-         PFT %in% df$PFT)
+  filter(run %in% df$run, PFT %in% df$PFT)
 
-jpeg("figures/threshold/threshold_5th-pcent_RCP8.5-mid_v1.jpeg",
+jpeg(paste0("figures/threshold/threshold_5th-pcent_", suffix, ".jpeg"),
      res = 600, units = 'in',
      height = 4, width = 4)
 ggplot(df, aes(x = RCP, y = pcent_above)) +
@@ -742,7 +673,7 @@ g_comp <- function(df, color, text_y = 600, ylab2 = lab_perc_bio0,
   rbind(ggplotGrob(g1), ggplotGrob(g2))
 }
 
-jpeg("figures/biomass/comp_stacked-bar_RCP8.5-M_c4on.jpeg",
+jpeg(paste0("figures/biomass/comp_stacked-bar_", suffix, ".jpeg"),
      width = 8, height = 6, units = 'in', res = 600)
 
 grid::grid.draw(
@@ -771,7 +702,8 @@ g <- g_comp(comp2_all2, color =  cols_pft5_other, label = "RCP_years",
        group_by = "RCP_years", xintercept = 0.5 + 4*1:4, text_y = 630,
        text_y2 = 113, shift_ylim = 0.05)
 
-jpeg("figures/biomass/comp_stacked-bar_pft5_all-scenarios_c4on.jpeg",
+jpeg(paste0("figures/biomass/comp_stacked-bar_pft5_all-scenarios_", 
+            runs_graze['default'], ".jpeg"),
      width = 8, height = 6, units = 'in', res = 600)
 
 grid::grid.draw(g)
@@ -790,7 +722,8 @@ g2 <- g_comp(comp_herb_all, color =  cols_pft5_other, label = "RCP_years",
              group_by = "RCP_years", xintercept = 0.5 + 4*1:4, text_y = 190,
              text_y2 = 113, shift_ylim = 0.05)
 
-jpeg("figures/biomass/comp_stacked-bar_herb_all-scenarios_c4on.jpeg",
+jpeg(paste0("figures/biomass/comp_stacked-bar_herb_all-scenarios_", 
+            runs_graze['default'], ".jpeg"),
      width = 8, height = 6, units = 'in', res = 600)
 
 grid::grid.draw(g2)
@@ -801,9 +734,9 @@ dev.off()
 
 # boxplot of fire return interval by RCP, and grazing intensity
 
-map(levs_c4, function(lev_c4) {
+map(runs_graze, function(x) {
   g1 <- fire1 %>% 
-    filter(c4 == lev_c4) %>% 
+    filter(run == x) %>% 
     group_by(id) %>% 
     # note--this method of filtering before drawing boxplot 
     # creates biased boxplots
@@ -826,7 +759,7 @@ map(levs_c4, function(lev_c4) {
   
   # fire difference boxplot
   g2 <- fire_d1 %>% 
-    filter(c4 == lev_c4) %>% 
+    filter(run == x) %>% 
     group_by(id) %>% 
     # removing outliers (extreme outliers make the body of the boxplot
     # hard to see)
@@ -850,7 +783,7 @@ map(levs_c4, function(lev_c4) {
          y = lab_fire1,
          caption = "Outliers not shown in either panel")
   
-  jpeg(paste0("figures/fire/fire_return_boxplots_", lev_c4, ".jpeg"),
+  jpeg(paste0("figures/fire/fire_return_boxplots_", x, ".jpeg"),
        height = 8, width = 5, res = 600, units = "in")
   gridExtra::grid.arrange(
     g1, g2

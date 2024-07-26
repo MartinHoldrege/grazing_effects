@@ -124,6 +124,7 @@ box2 <- function(axis_data, # axis data can be a different data frame than
   
   
   out <- list(
+    geom_hline(yintercept = 0, alpha = 0.3, linetype = 1),
     facet_rep_wrap(~PFT, scales = scales, ncol = ncol_box,
                    repeat.tick.labels = repeat.tick.labels),
     scale_fill_graze(),
@@ -162,7 +163,8 @@ box3 <- function(axis_data, var = "bio_diff") {
     geom_hline(yintercept = 0, alpha = 0.3, linetype = 1),
     geom_boxplot(position = position_dodge(preserve = "single"),
                  outlier.size = outlier.size),
-    facet_rep_wrap(~PFT, scales = "free", ncol = ncol_box),
+    facet_rep_wrap(~PFT, scales = "free", ncol = ncol_box,
+                   repeat.tick.labels = "y"),
     scale_fill_graze(),
     # so just display the RCP
     scale_x_discrete(labels = id2year),
@@ -238,6 +240,7 @@ climate_scatter <- function(g) {
     geom_smooth(aes(x = Temp), method = "loess", se = FALSE) +
     labs(x = lab_mat)
   
+  # average correlation between monthly precip and temp (seasonality metric)
   out[["CorrTP2"]] <- g +
     geom_point(aes(x = CorrTP2)) +
     geom_smooth(aes(x = CorrTP2), method = "loess", se = FALSE) +
@@ -248,14 +251,14 @@ climate_scatter <- function(g) {
 # base of scatter plots for change in light grazing relative to light grazing
 # vs climate
 scatter_light <- function(pft, # for subtitle
-                          levs_c4, # c4on/off for subtitle
+                          run, # c4on/off for subtitle
                           axis_data, # for setting axis limits
                           subtitle_response = "biomass") {
   list(
     geom_hline(yintercept = 0, linetype = 2),
     facet_rep_wrap(~RCP + years),
     scale_color_graze(),
-    labs(caption = paste(c4on_off_lab(levs_c4),
+    labs(caption = paste(run,
                          "\nReference class is light grazing under current",
                          "conditions"),
          subtitle = paste("Change in", pft, subtitle_response)),
@@ -310,20 +313,6 @@ add_sec_axis <- function(name = "% Change", breaks = waiver(),...) {
 }
 
 # label functions ---------------------------------------------------------
-
-# function to create description based on which model simulation is being used
-c4on_off_lab <- function(x) {
-  stopifnot(length(x) == 1)
-  
-  out <- if (x == "c4on") {
-    "Data from (normal) simulation where C4Pgrass expansion on."
-  } else if (x == "c4off") {
-    "Data from simulation where C4Pgrass expansion off"
-  } else {
-    stop("Input incorrect")
-  }
-  out
-}
 
 # convert effect size to percent change
 # assumes effect size, was calculated as ln(trmt/ctrl). For use to create

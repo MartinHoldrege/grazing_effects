@@ -70,6 +70,7 @@ lab_perc_bio0 <- "% of total biomass"
 
 # utilization
 lab_util0 <- expression("Utilization ("*gm^-2*")")
+lab_util2 <- expression(~Delta*" Utilization (scaled %)")
 
 # cover
 lab_cov0 <-  "Cover (%)"
@@ -116,6 +117,8 @@ lab_es0 <- expression("ln("*frac(biomass, reference~group~biomass)*")")
 lab_es1 <- expression("ln("*frac(biomass, light~grazing~biomass)*")")
 lab_es1_heavy <- expression("ln("*frac(biomass, heavy~grazing~biomass)*")")
 lab_es0_indivs <- expression("ln("*frac(individuals, reference~group~individuals)*")")
+lab_es0_util <- expression("ln("*frac(utilization, reference~group~utilization)*")")
+lab_es1_util_heavy <- expression("ln("*frac(utilization, heavy~grazing~utilization)*")")
 lab_es_on_off <- expression("ln("*frac(biomass~C4off, biomass~C4on)*")")
 lab_es_on_off_indivs <- expression("ln("*frac(individuals~C4off, individuals~C4on)*")")
 
