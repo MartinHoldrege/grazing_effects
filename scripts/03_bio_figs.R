@@ -12,6 +12,7 @@
 
 library(tidyverse)
 library(lemon) # for facet_rep_wrap function
+library(patchwork)
 source("scripts/02_summarize_bio.R")
 source("src/fig_params.R")
 source("src/fig_functions.R") # box_ann function defined here
@@ -544,7 +545,7 @@ jpeg(paste0("figures/biomass/pub_qual/util-diff_boxplot_pft5_", suffix, ".jpeg")
 g+
   geom_boxplot(aes(y = util_es),outlier.size = outlier.size) +
   theme(panel.spacing.x = unit(-2, "lines"))+
-  labs(y = lab_es1_util_heavy)+
+  labs(y = lab_es1_util_heavy)
   
 dev.off()
 
@@ -594,9 +595,6 @@ dev.off()
 # threshold dotplot just showing current and RCP 8.5 mid-century.
 # grouped by climate scenario.
 
-geom_text(data = filter(ref_threshold2, c4 == lev_c4),
-          aes(x = 3, y = 10, label = string),
-          size = 2.5)
 df <- threshold1 %>% 
   filter_rcp_run(PFT = TRUE) %>% 
   # it's not relevant whether cheatgrass drops below a 'sustainable' level.
@@ -735,39 +733,37 @@ dev.off()
 # boxplot of fire return interval by RCP, and grazing intensity
 
 map(runs_graze, function(x) {
-  g1 <- fire1 %>% 
-    filter(run == x) %>% 
-    group_by(id) %>% 
-    # note--this method of filtering before drawing boxplot 
-    # creates biased boxplots
-    mutate(ylim = boxplot.stats(fire_return)$stats[5]) %>% 
-    filter(fire_return <= ylim) %>% 
-    ggplot(aes(x = id, y = fire_return, fill = RCP)) +
-    # first plotting text, so it doesn't overplot data
-    geom_text(data = ~box_anno(., var = "fire_return",
+  df <- fire_med1 %>% 
+    filter(run == x) 
+  g1 <- ggplot(df, aes(x = id, y = fire_prob, fill = RCP)) +
+    geom_text(data = ~box_anno(., var = "fire_prob",
                                group_by = c("graze")),
               aes(x, y, label = graze, fill = NULL),
               size = 2.5) +
-    geom_boxplot(outlier.color = NA) + # not showing outliers as points
+    geom_boxplot() + 
     scale_fill_manual(values = cols_rcp, name = "Scenario") +
     scale_x_discrete(labels = id2year) +
     geom_vline(xintercept = line_loc, linetype = 2) +
     theme(legend.position = "top",
           axis.text = element_text(size = 7))  +
     labs(x = lab_yrs,
-         y = lab_fire0)
+         y = lab_firep0) 
+  
+  g2 <- ggplot(df, aes(x = rcp_label(RCP, years, include_parenth = FALSE), 
+                 y = fire_prob, fill = graze))+
+    geom_boxplot() +
+    scale_fill_graze() +
+    theme(axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1)) +
+    labs(y = lab_firep0,
+         x = NULL)
   
   # fire difference boxplot
-  g2 <- fire_d1 %>% 
+  g3 <- fire_d_wgraze %>% 
     filter(run == x) %>% 
     group_by(id) %>% 
-    # removing outliers (extreme outliers make the body of the boxplot
-    # hard to see)
-    # NOTE--should update code to use 
-    # compute_boxplot_stats() and stat = "identity" instead of remove_outliers()
-    remove_outliers(var = "fire_return_diff") %>% 
-    ggplot(aes(id2, fire_return_diff, fill = graze)) +
-    geom_text(data = ~box_anno(., var = "fire_return_diff", 
+    #remove_outliers(var = "fire_prob_diff") %>% 
+    ggplot(aes(id2, fire_prob_diff, fill = graze)) +
+    geom_text(data = ~box_anno(., var = "fire_prob_diff", 
                                group_by = c("RCP"), id = "id2"),
               aes(x, y, label = RCP, fill = NULL),
               size = 2.5) +
@@ -777,17 +773,14 @@ map(runs_graze, function(x) {
     scale_fill_graze() +
     # so just display the RCP
     scale_x_discrete(labels = id2year) +
-    theme(legend.position = "top") +
+    theme(legend.position = "none") +
     geom_vline(xintercept = 2.5, linetype = 2) +
     labs(x = lab_yrs,
-         y = lab_fire1,
-         caption = "Outliers not shown in either panel")
+         y = lab_firep1)
   
   jpeg(paste0("figures/fire/fire_return_boxplots_", x, ".jpeg"),
-       height = 8, width = 5, res = 600, units = "in")
-  gridExtra::grid.arrange(
-    g1, g2
-  )
+       height = 7, width = 7, res = 600, units = "in")
+  print(g1 + g2 + g3 + guide_area() + patchwork::plot_layout(guides = 'collect'))
   dev.off()
 })
 

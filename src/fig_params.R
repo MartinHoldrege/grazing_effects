@@ -100,7 +100,7 @@ lab_fire0 <- "Fire return interval (years)"
 lab_fire1 <- "Change in fire return interval (years)"
 
 # fire probability
-lab_firep0 <- "Annual fire probability (%)"
+lab_firep0 <- "# fires/century"
 lab_firep1 <- expression(Delta~"# fires/century")
 
 # climate

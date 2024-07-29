@@ -466,13 +466,12 @@ fire_med1 <- fire0 %>%
 
 # Calculated change as absolute difference (not scaled % change),
 # due to extreme max values
-
-# Note--some diff's are NA track down the reason
-# fire_d1 <- fire1 %>% 
-#   # warning here is ok, calculating the actual (absolute) change, not % change
-#   scaled_change(var = "fire_return", by = c("run", "graze"),
-#                 percent = FALSE) %>% 
-#   # adding id variable that doesn't include graze
-#   create_id2()
+# change due to to climate within a grazing level
+fire_d_wgraze <- fire_med1 %>%
+  # warning here is ok, calculating the actual (absolute) change, not % change
+  scaled_change_2var(vars = c("fire_return", "fire_prob"), by = c("run", "graze"),
+                percent = FALSE) %>%
+  # adding id variable that doesn't include graze
+  create_id2()
 
 

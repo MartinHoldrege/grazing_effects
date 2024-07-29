@@ -278,7 +278,7 @@ id2year <- function(x) {
   # x--id (character vector), that includes the time period in it
   # returns--character vector of letter designations of the time period
   out <- case_when(
-    str_detect(x, "Current") ~ "C",
+    str_detect(x, "Current") ~ "H",
     str_detect(x, "_2030-2060") ~ "M",
     str_detect(x, "_2070-2100") ~ "E"
   )
@@ -350,7 +350,7 @@ rcp_label <- function(rcp, years, add_letters = FALSE,
   if (include_parenth) {
     x1 <- ifelse(rcp == "Current", "(Historical)", paste0("(",rcp,", ",years, ")"))
   } else {
-    x1 <- ifelse(rcp == "Current", "Historica)", paste(rcp,years))
+    x1 <- ifelse(rcp == "Current", "Historical", paste(rcp,years))
   }
   
   
