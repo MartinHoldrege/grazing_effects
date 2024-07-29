@@ -168,7 +168,8 @@ pdf("figures/biomass/bio_vs_climate_v2.pdf",
     width = 6, height = 5)
 
 # here pmap is working by taking the column names (i.e. iterating over rows)
-pmap(levs_pft_run, function(pft, run) {
+pmap(filter(levs_pft_run, run %in% runs_graze['default']), 
+     function(pft, run) {
   pft <- as.character(pft)
 
   df <- pft5_bio2[pft5_bio2$PFT == pft & pft5_bio2$run == run, ] 
@@ -191,12 +192,16 @@ pmap(levs_pft_run, function(pft, run) {
   g2 <- ggplot(df, aes(y = utilization, color = graze)) +
     base(ylab = lab_util0)
   
-  list(bio = climate_scatter(g1), util = climate_scatter(g2))
+  list(bio = climate_scatter(g1, include_psp = TRUE), 
+       util = climate_scatter(g2, include_psp = TRUE))
   
 })
 
 # facets are grazing level, colors are RCP
-pmap(levs_pft_run, function(pft, run) {
+
+  
+pmap(filter(levs_pft_run, run %in% runs_graze['default']), 
+     function(pft, run) {
   pft <- as.character(pft)
   df <- pft5_bio2[pft5_bio2$PFT == pft & pft5_bio2$run == run &
                        pft5_bio2$years != "2030-2060", ] 
@@ -220,7 +225,8 @@ pmap(levs_pft_run, function(pft, run) {
   g2 <- ggplot(df, aes(y = utilization, color = RCP)) +
     base(ylab = lab_util0)
   
-  list(bio = climate_scatter(g1), util = climate_scatter(g2))
+  list(bio = climate_scatter(g1, include_psp = TRUE), 
+       util = climate_scatter(g2, include_psp = TRUE))
 
 })
 

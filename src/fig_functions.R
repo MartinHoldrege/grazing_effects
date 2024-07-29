@@ -226,7 +226,7 @@ geom_boxplot_identity <- function(...) {
 # funs for scatterplots ---------------------------------------------------
 
 # given a ggplot (g) create scatter plots y ~ MAP and y ~ MAT
-climate_scatter <- function(g) {
+climate_scatter <- function(g, include_psp = FALSE) {
   out <- list()
   # vs MAP
   out[["MAP"]] <- g +
@@ -245,6 +245,14 @@ climate_scatter <- function(g) {
     geom_point(aes(x = CorrTP2)) +
     geom_smooth(aes(x = CorrTP2), method = "loess", se = FALSE) +
     labs(x = lab_corrtp)
+  
+  if(include_psp) {
+    out[["psp"]] <- g +
+      geom_point(aes(x = psp)) +
+      geom_smooth(aes(x = psp), method = "loess", se = FALSE) +
+      labs(x = lab_psp)
+  }
+
   out
 }
 
