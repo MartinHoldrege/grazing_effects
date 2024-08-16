@@ -1015,3 +1015,37 @@ matchqual <- function(match, tc, bioclim_vars, crit) {
   
   diff_norm[, c('cellnumber', 'matching_quality')]
 }
+
+#' convert layer to depth
+#'
+#' @param x numeric vector (soil layer in SOILWAT2)
+#'
+#' @return numeric vector of depth (cm) (midpoint of layer)
+#' @export
+#'
+#' @examples
+#' lyr2depth(c(1, 1, 2:8))
+lyr2depth <- function(x) {
+  stopifnot(x %in% 1:8)
+  # bottom of layers
+  #depth_lookup <- c(10, 20, 30, 40, 60, 80, 100, 150)
+  # midpoint of layer:
+  depth_lookup <- c(5,  15,  25,  35,  50,  70,  90, 125)
+  out <- depth_lookup[x]
+  out
+}
+
+
+
+#' convert tranpsiration to a rate per cm soil (for
+#' to compare unequal width soil bins)
+#'
+#' @param x transpiration
+#' @param lyr soil layer
+transp_per_cm <- function(x, lyr) {
+  layer_width_lookup <- c(10, 10, 10, 10, 20, 20, 20, 50)
+  stopifnot(is.numeric(lyr),
+            lyr %in% 1:8)
+  width <- layer_width_lookup[lyr]
+  x/width # transpiration per cm of soil depth
+}
