@@ -8,10 +8,17 @@
 
 library(tidyverse)
 library(DBI)
+library(patchwork)
 source('src/paths.R') 
 source('src/general_functions.R')
 source("src/fig_functions.R") # box_ann function defined here
+source('src/fig_params.R')
 theme_set(theme_custom1())
+
+
+# params ------------------------------------------------------------------
+
+suffix <- 'fire1eind1c4grass0C020grazeMCurrent' # for file names
 
 # read in data ------------------------------------------------------------
 
@@ -40,29 +47,36 @@ dat2 <- dat1 %>%
                names_pattern = "TRANSP_transp_(.+)_Lyr_(\\d)_(.+)") %>% 
   pivot_wider(names_from = 'summary') %>% 
   rename(transp = Mean,
-         transp_sd = SD)
+         transp_sd = SD,
+         month = Month)
 
 # discarding columns that have just 1 unique value
 dat3 <- keep(dat2, \(x) !(is.character(x) & length(unique(x)) == 1))
 
 # mean across years
 dat4 <- dat3 %>% 
-  group_by(site, Month, PFT, layer) %>% 
+  group_by(site, month, PFT, layer) %>% 
   summarize(transp = mean(transp)*10, # convert to mm
             .groups = 'drop') %>% 
   mutate(layer = as.numeric(layer),
-         depth = lyr2depth(layer))
+         depth = lyr2depth(layer),
+         depth_group = cut_depth(depth),
+         month = factor(month, levels = 1:12,
+                        labels = month.abb))
+
+datg4 <- dat4 %>% # same as dat4 but with depth groups (object name has 'g')
+  group_by(site, month, PFT, depth_group) %>% 
+  summarize(transp = sum(transp));
 
 clim_db1 <- clim_db0 %>% 
   rename(site = Site_id,
          MAT = MAT_C,
          MAP = MAP_mm) %>% 
   select(-CorrTP, -Latitude, -Longitude, -Label)
-
+clim_vars <- c("corrTP2", 'MAP', 'MAT')
 # summarize ---------------------------------------------------------------
 
 # calculate proportion of 
-
 tot_t <- dat4 %>% 
   group_by(site) %>% 
   summarise(transp = sum(transp)
@@ -74,43 +88,179 @@ tot_t <- dat4 %>%
 # sum across depths by PFT
 t_by_pft0 <- dat4 %>% 
   group_by(site, PFT) %>% 
-  summarize(transp = sum(transp)) %>% 
-  left_join(tot_t, by = 'site',
-            suffix = c('', "_tot")) %>% 
-  mutate(transp_perc = transp/transp_tot*100 # percent of total transpiration (by PFT)
-         )
+  summarize(transp = sum(transp)) 
 
 t_by_depth0 <- dat4 %>% 
   group_by(site, depth, layer) %>% 
   summarize(transp = sum(transp))
 
-dat5 <- dat4 %>% 
-  left_join(t_by_depth0, by = c('site', 'depth', 'layer'),
-            suffix = c('', '_tot_depth')) %>% 
-  left_join(t_by_pft0, by = c('site', 'PFT'),
-            suffix = c('', '_tot_pft')) %>% 
-  mutate(transp_perc_depth = transp/transp_tot_depth*100,
-         transp_perc_pft = transp/transp_tot_pft*100,
-        transp2 = transp_per_cm(transp, layer))
+t_by_depthg0 <- dat4  %>% 
+  group_by(site, depth_group) %>% 
+  summarize(transp = sum(transp), .groups = 'drop') 
 
-t_by_depth <- left_join(t_by_depth0, clim_db1, by = 'site') %>% 
+# total by month
+months2keep <- month.abb[3:8] # focus on a subset of months
+t_by_m_depthg <- dat4  %>% 
+  group_by(site, depth_group, month) %>% 
+  filter(month %in% months2keep) %>% 
+  summarize(transp = sum(transp), .groups = 'drop') %>% 
+  mutate(transp2 = transp_per_cm(transp, depth_group)) %>% 
+  left_join(clim_db1)
+
+
+datg5 <- datg4 %>% 
+  group_by(site, month, depth_group) %>% 
+  # percent of that depth's transpiration by that PFT
+  mutate(transp_perc_depth = transp/sum(transp)*100) %>% 
+  ungroup() %>% 
+  group_by(site, month, PFT) %>% 
+  # percent of total t for that pft that comes from the given
+  # depth (during the given month)
+  mutate(transp_perc_pft = transp/sum(transp)*100,
+         transp2 = transp_per_cm(transp, depth_group)) %>% 
+  ungroup() %>% 
+  left_join(clim_db1)
+
+datg6 <- datg5 %>% 
+  filter(month %in% months2keep)
+
+t_by_depthg <- left_join(t_by_depthg0, clim_db1, by = 'site') %>% 
   # defining 'transp2' as transpiration as mm water per cm soil
-  mutate(transp2 = transp_per_cm(transp, layer))
+  mutate(transp2 = transp_per_cm(transp, depth_group))
 
-t_by_pft <- left_join(t_by_pft0, clim_db1, by = 'site')
+t_by_pft <- t_by_pft0 %>% 
+  left_join(tot_t, by = 'site',
+            suffix = c('', "_tot")) %>% 
+  mutate(transp_perc = transp/transp_tot*100 # percent of total transpiration (by PFT)
+  )
+
+t_by_pft_depthg <- datg5 %>% 
+  group_by(site, PFT, depth_group) %>% 
+  summarize(transp = sum(transp)) %>% 
+  left_join(t_by_depthg, by = c('site', 'depth_group'),
+            suffix = c('', '_tot_depth')) %>% 
+  # percent of transpiration at a given depth that comes from a particular
+  # PFT
+  mutate(transp_perc_depth = transp/transp_tot_depth*100)
 
 # figures -----------------------------------------------------------------
 
+
+# * totals (across PFT and depth) -------------------------------------------
+
+pdf(paste0('figures/water/transpiration_total_', suffix, '.pdf'),
+    width = 8, height = 8)
+# climate variables
+
+GGally::ggpairs(clim_db1[, c("MAT", "MAP", "CorrTP2")])
+
 # total transpiration
 
-ggplot(t_by_depth, aes(CorrTP2, transp2)) +
-  geom_point() +
-  facet_wrap(~depth, scales = 'free_y') +
-  geom_smooth(method = 'loess', se = FALSE) +
-  expand_limits(y = range(t_by_depth$transp2[t_by_depth$depth != 5]))
+# base (b) of the next figures
+b0 <- function() {
+  list(geom_point(),
+       geom_smooth(method = 'loess', se = FALSE))
+}
 
-ggplot(dat5, aes(CorrTP2, transp2)) +
-  geom_point() +
-  facet_grid(depth~PFT, scales = 'free_y') +
-  geom_smooth(method = 'loess', se = FALSE)
-  expand_limits(y = range(t_by_depth$transp2[t_by_depth$depth != 5]))
+b1 <- function() {
+  list(b0(),
+       labs(y = lab_transp0))
+}
+g1 <- ggplot(tot_t, aes(CorrTP2, transp)) +
+  b1() +
+  labs(x = lab_corrtp)
+
+g2 <- ggplot(tot_t, aes(MAT, transp)) +
+  b1()
+
+g3 <- ggplot(tot_t, aes(MAP, transp)) +
+  b1()
+
+(g1 + g2)/(g3 + patchwork::plot_spacer())
+
+# ecosystem water use efficiency
+g1 <- ggplot(tot_t, aes(CorrTP2, eWUE)) +
+  b0() +
+  labs(x = lab_corrtp)
+
+g2 <- ggplot(tot_t, aes(MAT, eWUE)) +
+  b0()
+
+g3 <- ggplot(tot_t, aes(MAP, eWUE)) +
+  b0()
+
+(g1 + g2)/(g3 + patchwork::plot_spacer())
+
+
+
+# * totals by depth -------------------------------------------------------
+
+# total transpiration by depth
+ggplot(t_by_depthg, aes(CorrTP2, transp)) +
+  b0() +
+  facet_wrap(~depth_group, ncol = 2) +
+  labs(x = lab_corrtp,
+       y = lab_transp0)
+
+# total by depth and month
+b2 <- \() list(b0(), 
+               facet_grid(month~depth_group), 
+               labs(y = lab_transp0))
+
+ggplot(t_by_m_depthg, aes(CorrTP2, transp)) +
+  b2() +
+  labs(x = lab_corrtp)
+
+ggplot(t_by_m_depthg, aes(MAP, transp)) +
+  b2()
+
+ggplot(t_by_m_depthg, aes(MAT, transp)) +
+  b2()
+
+dev.off()
+# * PFT level (across depth and month) ------------------------------------------
+
+pdf(paste0('figures/water/transpiration_by-pft_', suffix, '.pdf'),
+    width = 8, height = 8)
+
+ggplot(t_by_pft, aes(CorrTP2, transp_perc)) +
+  b0() +
+  facet_wrap(~PFT, ncol = 2) +
+  labs(x = lab_corrtp,
+       y = "% of total transpiration")
+
+ggplot(t_by_pft_depthg, aes(CorrTP2, transp_perc_depth)) +
+  b0() +
+  facet_grid(depth_group~PFT)+
+  labs(x = lab_corrtp,
+       y = "% of total transpiration of that depth",
+       subtitle = 'rows sum to 100%')
+
+for (m in months2keep) {
+  g <- datg6 %>% 
+    filter(month == m) %>% 
+    ggplot(aes(CorrTP2, transp_perc_depth)) +
+    b0() +
+    facet_grid(depth_group~PFT)+
+    labs(x = lab_corrtp,
+       y = "% of total transpiration of that depth & month",
+       title = m,
+       subtitle = 'rows sum to 100%') +
+    expand_limits(y = c(0, 100))
+  print(g)
+}
+
+for (m in months2keep) {
+  g <- datg6 %>% 
+    filter(month == m) %>% 
+    ggplot(aes(CorrTP2, transp_perc_pft)) +
+    b0() +
+    facet_grid(depth_group~PFT)+
+    labs(x = lab_corrtp,
+         y = "% of PFT total transpiration for the month",
+         title = m,
+         subtitle = 'columns sum to 100%') +
+    expand_limits(y = c(0, 100))
+  print(g)
+}
+dev.off()

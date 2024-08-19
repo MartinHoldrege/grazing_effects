@@ -113,6 +113,10 @@ lab_mat0 <- lab_mat
 lab_map1 <- expression(Delta~"MAP (mm)")
 lab_mat1 <- expression(Delta~"MAT ("*degree*C*")")
 
+# transpiration
+lab_transp0 <- 'Transpiration (mm)'
+lab_transp02 <- 'Transpiration (mm/cm soil)'
+
 # effect size
 lab_es0 <- expression("ln("*frac(biomass, reference~group~biomass)*")")
 lab_es1 <- expression("ln("*frac(biomass, light~grazing~biomass)*")")

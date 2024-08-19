@@ -110,6 +110,24 @@ update_yr <- function(x) {
     str_replace('2070', '2071')
 }
 
+# cut depth into 3 categories
+cut_depth <- function(x, two_depths = FALSE) {
+  # x--numeric vector, depth of the layer
+  # two_depths --logical of whether to create two depth categories
+  # (default is 3--for back compatibility)
+  stopifnot(x %in% lyr2depth(1:8))
+  out <- if (two_depths) {
+    cut(x,
+        breaks = c(0, 10, 200),
+        labels = c("0-10 cm", "10-150 cm"))
+  } else {
+    cut(x,
+        breaks = c(0, 10, 40, 200),
+        labels = c("0-10 cm", "10-40 cm", "40-150 cm"))
+  }
+  out
+}
+
 # * PFTs ------------------------------------------------------------------
 
 # Rename plant functional types into the 5 main categories used in M.E.'s 
@@ -1041,11 +1059,16 @@ lyr2depth <- function(x) {
 #' to compare unequal width soil bins)
 #'
 #' @param x transpiration
-#' @param lyr soil layer
+#' @param lyr soil layer, or soil layer category
 transp_per_cm <- function(x, lyr) {
-  layer_width_lookup <- c(10, 10, 10, 10, 20, 20, 20, 50)
-  stopifnot(is.numeric(lyr),
-            lyr %in% 1:8)
-  width <- layer_width_lookup[lyr]
+  if(is.numeric(lyr) & all(lyr %in% 1:8)) {
+    lookup <- c(10, 10, 10, 10, 20, 20, 20, 50)
+    width <- lookup[lyr]
+  } else if(all(as.character(lyr) %in% c("0-10 cm", "10-40 cm", "40-150 cm"))){
+    lookup <- c("0-10 cm" = 10 , "10-40 cm" = 30 , "40-150 cm" = 110)
+    width <- lookup[as.character(lyr)]
+  } else {
+    stop('values in lyr not recognized')
+  }
   x/width # transpiration per cm of soil depth
 }
