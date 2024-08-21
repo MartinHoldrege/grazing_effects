@@ -34,8 +34,12 @@ q <- "SELECT * FROM sw2_monthly_slyrs"
 dat1 <- dbGetQuery(connect,
                    statement = q)
 
+# weater data compiled from stepwat weather database 00_query_weather_db.R
 clim_db0 <- read_csv("data_processed/site_means/dbWeather_200sites.csv",
                     show_col_types = FALSE)
+# mean monthly ppt and temp
+clim_m_db0 <- read_csv("data_processed/site_means/dbWeather_200sites_monthly.csv",
+                           show_col_types = FALSE)
 
 # make tidy ---------------------------------------------------------------
 
@@ -74,6 +78,13 @@ clim_db1 <- clim_db0 %>%
          MAP = MAP_mm) %>% 
   select(-CorrTP, -Latitude, -Longitude, -Label)
 clim_vars <- c("corrTP2", 'MAP', 'MAT')
+
+clim_m_db1 <- clim_m_db0 %>% 
+  mutate(month = month.abb[month]) %>% 
+  left_join(clim_db1, by = 'site') %>% 
+  # percent of mean annual precip received during that month
+  mutate(PPT_m_perc = PPT/MAP*100)
+
 # summarize ---------------------------------------------------------------
 
 # calculate proportion of 
@@ -105,8 +116,7 @@ t_by_m_depthg <- dat4  %>%
   filter(month %in% months2keep) %>% 
   summarize(transp = sum(transp), .groups = 'drop') %>% 
   mutate(transp2 = transp_per_cm(transp, depth_group)) %>% 
-  left_join(clim_db1)
-
+  left_join(clim_m_db1, by = c('site', 'month'))
 
 datg5 <- datg4 %>% 
   group_by(site, month, depth_group) %>% 
@@ -116,10 +126,14 @@ datg5 <- datg4 %>%
   group_by(site, month, PFT) %>% 
   # percent of total t for that pft that comes from the given
   # depth (during the given month)
-  mutate(transp_perc_pft = transp/sum(transp)*100,
+  mutate(transp_perc_pft_m = transp/sum(transp)*100,
          transp2 = transp_per_cm(transp, depth_group)) %>% 
   ungroup() %>% 
-  left_join(clim_db1)
+  group_by(site, PFT) %>% 
+  # proportion of a PFTs total annual transpiration, occuring in a given
+  # month and depth
+  mutate(transp_perc_pft = transp/sum(transp)*100) %>% 
+  left_join(clim_m_db1, by = c('site', 'month'))
 
 datg6 <- datg5 %>% 
   filter(month %in% months2keep)
@@ -221,7 +235,7 @@ dev.off()
 # * PFT level (across depth and month) ------------------------------------------
 
 pdf(paste0('figures/water/transpiration_by-pft_', suffix, '.pdf'),
-    width = 8, height = 8)
+    width = 9, height = 8)
 
 ggplot(t_by_pft, aes(CorrTP2, transp_perc)) +
   b0() +
@@ -239,21 +253,33 @@ ggplot(t_by_pft_depthg, aes(CorrTP2, transp_perc_depth)) +
 for (m in months2keep) {
   g <- datg6 %>% 
     filter(month == m) %>% 
-    ggplot(aes(CorrTP2, transp_perc_depth)) +
-    b0() +
-    facet_grid(depth_group~PFT)+
+    ggplot(aes(CorrTP2, transp_perc_depth) # percent of total Transp for that pft
+           # coming from that month and depth
+           ) +
+    geom_point(aes(color = PPT_m_perc, size = transp_perc_pft))+
+    geom_smooth(method = 'loess', se = FALSE)+
+    scale_color_gradient2(low = "#a50026", midpoint = 1/12*100, 
+                        mid = "lightgrey", high = "#313695",
+                        name = '% MAP this month',
+                        limits = range(datg6$PPT_m_perc, na.rm = TRUE))+
+    scale_size(range = c(0.2, 3),
+               name = '% of PFTs total T',
+               limits = range(datg6$transp_perc_pft, na.rm = TRUE)) +
+    facet_grid(depth_group~PFT) +
     labs(x = lab_corrtp,
        y = "% of total transpiration of that depth & month",
        title = m,
        subtitle = 'rows sum to 100%') +
-    expand_limits(y = c(0, 100))
+    expand_limits(y = c(0, 100)) +
+    theme(legend.title = element_text(size = rel(0.5)))
   print(g)
 }
+
 
 for (m in months2keep) {
   g <- datg6 %>% 
     filter(month == m) %>% 
-    ggplot(aes(CorrTP2, transp_perc_pft)) +
+    ggplot(aes(CorrTP2, transp_perc_pft_m)) +
     b0() +
     facet_grid(depth_group~PFT)+
     labs(x = lab_corrtp,
@@ -263,4 +289,24 @@ for (m in months2keep) {
     expand_limits(y = c(0, 100))
   print(g)
 }
+
+for (m in months2keep) {
+  g <- datg6 %>% 
+    filter(month == m) %>% 
+    ggplot(aes(PPT, transp)) +
+    geom_point(aes(color = PPT_m_perc)) +
+    geom_smooth(method = 'loess', se = FALSE) +
+    scale_color_gradient2(low = "#a50026", midpoint = 1/12*100, 
+                        mid = "lightgrey", high = "#313695",
+                        name = '% MAP this month',
+                        limits = range(datg6$PPT_m_perc, na.rm = TRUE)) +
+    facet_grid(depth_group~PFT) +
+    labs(x= paste(m, 'precipitation (mm)'),
+         y = lab_transp0,
+         title = m) +
+    expand_limits(y = c(0, 30))
+  print(g)
+}
+
 dev.off()
+
