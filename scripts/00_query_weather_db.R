@@ -17,7 +17,10 @@ rSOILWAT2::dbW_setConnection(
 xsites <- rSOILWAT2::dbW_getSiteTable() |> as.data.frame()
 Nsites <- nrow(xsites)
 
-
+monthly <- tidyr::expand_grid(site = xsites$Site_id,
+                              month = 1:12) 
+monthly$PPT <- NA
+monthly$Tmean <- NA
 #--- Loop over sites ------
 xsites[, c("MAT_C", "MAP_mm", "CorrTP", "CorrTP2")] <- NA
 
@@ -34,6 +37,8 @@ for (k in seq_len(Nsites)) {
   clim <- rSOILWAT2::calc_SiteClimate(wdl)
   xsites[k, "MAT_C"] <- clim[["MAT_C"]]
   xsites[k, "MAP_mm"] <- 10 * clim[["MAP_cm"]]
+  monthly$PPT[monthly$site == k] <- 10* clim[["meanMonthlyPPTcm"]]
+  monthly$Tmean[monthly$site == k] <- clim[["meanMonthlyTempC"]]
 
   #--- * Calculate monthly correlation between precipitation and temperature ---
   wdt <- rSOILWAT2::dbW_weatherData_to_monthly(
@@ -52,14 +57,16 @@ for (k in seq_len(Nsites)) {
     as.vector() |>
     mean()
 
+wdt
   # correlation of monthly means
-  xsites[k, 'CorrTP'] <- wdt |>
-    dplyr::group_by(Month) |>
-    dplyr::summarize(Tmean_C = mean(Tmean_C),
-              PPT_cm = mean(PPT_cm)) |>
-    dplyr::summarize(CorrTP = stats::cor(Tmean_C, PPT_cm)) |> 
-    dplyr::pull(CorrTP)
-  utils::setTxtProgressBar(pb, value = k)
+  # 'type 1' corrTP (not what we want to use)
+  # xsites[k, 'CorrTP'] <- wdt |>
+  #   dplyr::group_by(Month) |>
+  #   dplyr::summarize(Tmean_C = mean(Tmean_C),
+  #             PPT_cm = mean(PPT_cm)) |>
+  #   dplyr::summarize(CorrTP = stats::cor(Tmean_C, PPT_cm)) |> 
+  #   dplyr::pull(CorrTP)
+  # utils::setTxtProgressBar(pb, value = k)
 }
 
 close(pb)
@@ -70,6 +77,12 @@ close(pb)
 utils::write.csv(
   xsites,
   file = file.path(dir_results, "dbWeather_200sites.csv"),
+  row.names = FALSE
+)
+
+utils::write.csv(
+  monthly,
+  file = file.path(dir_results, "dbWeather_200sites_monthly.csv"),
   row.names = FALSE
 )
 
