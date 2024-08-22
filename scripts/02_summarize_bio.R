@@ -426,6 +426,97 @@ comp_herb1 <- comp2 %>%
 test <- summarise(comp_herb1, test = sum(bio_perc))$test
 stopifnot(all.equal(test, rep(100, length(test))))
 
+# total utilization ------------------------------------------------------
+
+# total utilization across PFTs
+util1 <- pft5_bio1 %>% 
+  group_by(run, years, RCP, graze, id, site, GCM) %>% 
+  summarize(utilization = sum(utilization),
+            .groups = 'drop_last')
+
+util_med1 <- util1 %>% 
+  # median across GCMs
+  summarise(utilization = median(utilization),
+            .groups = "drop")%>% 
+  left_join(clim1, by = "site") # adding current climate
+
+# ** change relative to same grazing trmt -----------------------------------
+
+# effect size; es = ln(utilization scenario of interest/util references group)
+# effect size compared to current scenario of the given grazing scenario
+
+# shouldn't throw warnings
+util_es1 <- util1 %>% 
+  filter(run %in% runs_graze) %>% 
+  # warning here is ok
+  scaled_change(by = c("run","graze"), percent = FALSE,
+                     var = "utilization",
+                     effect_size = TRUE) %>% 
+  # median across GCMs
+  group_by(run, site, years, RCP, 
+           graze, id) %>% 
+  summarise_bio_indivs(suffix = "_es",
+                       col_names = 'utilization',
+                       abbreviations = 'util') %>% 
+  create_id2() 
+
+
+# ** change relative to reference graze ------------------------------------
+# comparing all grazing treatments and RCPs/time periods to a given reference 
+# grazing scenario (e.g. current light grazing). 
+# here starting with median across GCMs, because in all cases
+# comparing to current conditions so calculating % change or effect size
+# for each GCM then taking the median would yield the same answer
+
+# scaled % changes
+# naming here: d== difference, grefs = different grazing references used
+
+# effect sizes
+util_es_grefs <- map(levs_graze, function(x) {
+  out <-  util_med1 %>% # using data already summarized across GCMs
+    filter(run %in% runs_graze) %>% 
+    scaled_change(by = c("run"), ref_graze = x, percent = FALSE,
+                       var = 'utilization',
+                       effect_size = TRUE) %>%
+    create_id2()
+  out
+})
+
+
+# ** change relative to light grazing of same gcm -------------------------
+
+# e.g. this shows the effects size of going from light grazing, to heavy
+# grazing for RCP 8.5 end of century
+
+
+# naming es = effects size wgcm = within gcm comparison
+util_es_wgcm <- util1 %>% 
+  scaled_change(by = c("run", "RCP", "GCM", "years"), 
+                     var = "utilization",
+                     ref_graze = "Light", percent = FALSE, effect_size = TRUE,
+                     within_GCM = TRUE) %>% 
+  # median across GCMs
+  group_by(run, site, years, RCP, graze, id) %>% 
+  summarise_bio_indivs(suffix = "_es",
+                       col_names = 'utilization',
+                       abbreviations = 'util') %>% 
+  create_id2()
+
+# ** change relative to heavy grazing of same gcm -------------------------
+
+util_es_wgcm_heavy <- util1 %>%
+  filter(run %in% runs_graze) %>% 
+  scaled_change(by = c("run", "RCP", "GCM", "years"),
+                     ref_graze = "Heavy", percent = FALSE, effect_size = TRUE,
+                     var = "utilization",
+                     within_GCM = TRUE) %>%
+  # median across GCMs
+  group_by(run, site, years, RCP, graze, id) %>%
+  summarise_bio_indivs(suffix = "_es",
+                       col_names = 'utilization',
+                       abbreviations = 'util') %>%
+  create_id2()
+
 # wildfire ----------------------------------------------------------------
 
 # * probability/return interval ------------------------------------------

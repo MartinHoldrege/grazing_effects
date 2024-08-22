@@ -65,6 +65,10 @@ pft5_bio_b <- pft5_bio2 %>%
   # consider removing 0s so boxplot doesn't show sites with 0 biomass
  mutate(biomass = ifelse(biomass == 0, NA, biomass))
 
+fire_med2 <- fire_med1 %>% 
+  left_join(clim1, by = 'site')
+
+
 # absolute biomass ------------------------------------------------------
 # This figure meant to be analogous to M.E.'s thesis figure 9.
 # biomass by pft, rcp, time period, and grazing intensity
@@ -734,12 +738,37 @@ grid::grid.draw(g2)
 
 dev.off()
 
+
+# total utilization -------------------------------------------------------
+
+# * boxplot ---------------------------------------------------------------
+
+# continue here
+# next steps create analagous figures to thos about biomass at the pft
+# level
+
+# total utilization
+pdf("figures/biomass/tot-util_boxplot.pdf",
+    height = 4, width = 4)
+
+figs_l <- map(runs_graze, function(x) {
+  df <-  filter(util_med1, run == x)
+  g <- ggplot(df, aes(x = id, y = utilization, fill = RCP)) +
+    box1(var = "utilization",
+         y = 'util', add_facet_wrap = FALSE,
+         group_by = 'graze') +
+    labs(caption = x)
+  g
+})
+
+dev.off()
+
 # fire --------------------------------------------------------------------
 
 # boxplot of fire return interval by RCP, and grazing intensity
 
 map(runs_graze, function(x) {
-  df <- fire_med1 %>% 
+  df <- fire_med2 %>% 
     filter(run == x) 
   g1 <- ggplot(df, aes(x = id, y = fire_prob, fill = RCP)) +
     geom_text(data = ~box_anno(., var = "fire_prob",
@@ -790,3 +819,22 @@ map(runs_graze, function(x) {
   dev.off()
 })
 
+
+# * fire vs climate -------------------------------------------------------
+
+pdf("figures/fire/fire_vs_clim_v1.pdf",
+    width = 8, height = 7)
+
+rn <- runs_graze['default']
+g1 <- fire_med2 %>% 
+  filter(run == rn) %>% 
+  ggplot(aes(y = fire_prob, color = graze)) +
+  facet_rep_wrap(~RCP + years) + 
+  scale_color_graze() +
+  labs(y = lab_firep0, 
+     caption = paste(rn, '\n x-axis shows current climate in all panels')) +
+  theme(legend.position = c(0.85, 0.15),
+      axis.text = element_text(size = 7))
+
+climate_scatter(g1, include_psp = TRUE)
+dev.off() 
