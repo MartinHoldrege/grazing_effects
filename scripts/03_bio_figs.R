@@ -234,6 +234,40 @@ pmap(filter(levs_pft_run, run %in% runs_graze['default']),
 
 })
 
+# simplified figures
+# just light grazing, and current conditions
+tmp <- pft5_bio2 %>% 
+  filter(RCP == 'Current',
+         run == runs_graze['default'],
+         graze == 'Light') %>% 
+  select(-CorrTP2) %>% 
+  pivot_longer(cols = c('PPT', 'Temp', 'psp'),
+               names_to = 'clim_var',
+               values_to = 'clim_value') %>% 
+  mutate(clim_var = c('PPT' = 'MAP',
+                      'Temp' = 'MAT',
+                      'psp' = 'PSP')[clim_var] # lookup vector
+         )
+
+for (pft in levs_pft) {
+  g <- tmp %>% 
+    filter(PFT == pft) %>% 
+    ggplot(aes(clim_value, biomass)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    facet_wrap(~clim_var,
+               scales = 'free_x') +
+    labs(y = lab_bio0,
+         x = NULL,
+         title = pft,
+         caption = paste0(
+           runs_graze['default'], 
+           '\nlight grazing, historical time period'
+         ))
+  print(g)
+}
+
+
 dev.off()
 
 # * cheat light vs heavy graze --------------------------------------------
