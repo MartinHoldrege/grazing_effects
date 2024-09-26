@@ -157,6 +157,20 @@ t_by_pft_depthg <- datg5 %>%
   # PFT
   mutate(transp_perc_depth = transp/transp_tot_depth*100)
 
+
+# save key dataframes -----------------------------------------------------
+# for use in the stepwat_params/scripts/02_evaluate-test-sites.R script
+
+tmp <- list(
+  tot_t = tot_t,
+  t_by_depthg = t_by_depthg,
+  t_by_pft = t_by_pft,
+  t_by_pft_depthg,
+  datg6 = datg6
+)
+
+saveRDS(tmp, paste0('data_processed/site_means/transpiration_dfs_', suffix))
+
 # figures -----------------------------------------------------------------
 
 
