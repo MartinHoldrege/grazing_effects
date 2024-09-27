@@ -18,7 +18,7 @@ theme_set(theme_custom1())
 
 # params ------------------------------------------------------------------
 
-suffix <- 'fire1eind1c4grass0C020grazeMCurrent' # for file names
+suffix <- 'fire1eind1c4grass0co20grazeMCurrent' # for file names
 
 # read in data ------------------------------------------------------------
 
@@ -176,14 +176,6 @@ saveRDS(tmp, paste0('data_processed/site_means/transpiration_dfs_', suffix))
 
 # * totals (across PFT and depth) -------------------------------------------
 
-pdf(paste0('figures/water/transpiration_total_', suffix, '.pdf'),
-    width = 8, height = 8)
-# climate variables
-
-GGally::ggpairs(clim_db1[, c("MAT", "MAP", "CorrTP2")])
-
-# total transpiration
-
 # base (b) of the next figures
 b0 <- function() {
   list(geom_point(),
@@ -194,6 +186,16 @@ b1 <- function() {
   list(b0(),
        labs(y = lab_transp0))
 }
+
+pdf(paste0('figures/water/transpiration_total_', suffix, '.pdf'),
+    width = 8, height = 8)
+# climate variables
+
+GGally::ggpairs(clim_db1[, c("MAT", "MAP", "CorrTP2")])
+
+# total transpiration
+
+
 g1 <- ggplot(tot_t, aes(CorrTP2, transp)) +
   b1() +
   labs(x = lab_corrtp)
@@ -257,12 +259,24 @@ ggplot(t_by_pft, aes(CorrTP2, transp_perc)) +
   labs(x = lab_corrtp,
        y = "% of total transpiration")
 
+ggplot(t_by_pft, aes(CorrTP2, transp)) +
+  b0() +
+  facet_wrap(~PFT, ncol = 2, scales = "free_y") +
+  labs(x = lab_corrtp,
+       y = lab_transp0)
+
 ggplot(t_by_pft_depthg, aes(CorrTP2, transp_perc_depth)) +
   b0() +
   facet_grid(depth_group~PFT)+
   labs(x = lab_corrtp,
        y = "% of total transpiration of that depth",
        subtitle = 'rows sum to 100%')
+
+ggplot(t_by_pft_depthg, aes(CorrTP2, transp)) +
+  b0() +
+  facet_grid(depth_group~PFT, scales = 'free_y')+
+  labs(x = lab_corrtp,
+       y = lab_transp0)
 
 for (m in months2keep) {
   g <- datg6 %>% 

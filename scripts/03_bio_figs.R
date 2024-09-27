@@ -168,7 +168,7 @@ dev.off()
 
 # each combination PFt and C4 on or off is plotted on seperate pages
 # facets are RCP/year combinations, colors are grazing
-pdf("figures/biomass/bio_vs_climate_v2.pdf",
+pdf("figures/biomass/bio_vs_climate_v3.pdf",
     width = 6, height = 5)
 
 # here pmap is working by taking the column names (i.e. iterating over rows)
@@ -240,14 +240,14 @@ tmp <- pft5_bio2 %>%
   filter(RCP == 'Current',
          run == runs_graze['default'],
          graze == 'Light') %>% 
-  select(-CorrTP2) %>% 
-  pivot_longer(cols = c('PPT', 'Temp', 'psp'),
+  select(-psp) %>% 
+  pivot_longer(cols = c('PPT', 'Temp', 'CorrTP2'),
                names_to = 'clim_var',
                values_to = 'clim_value') %>% 
   mutate(clim_var = c('PPT' = 'MAP',
                       'Temp' = 'MAT',
-                      'psp' = 'PSP')[clim_var] # lookup vector
-         )
+                      'CorrTP2' = 'T-P Correlation')[clim_var] # lookup vector
+  )
 
 for (pft in levs_pft) {
   g <- tmp %>% 
