@@ -22,13 +22,13 @@ version <- 'v3'
 # v3--criteria used in palmquist et al 2021 and renne et al 2024
 run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
-
+run_fire <- FALSE
 # for filtering output, put NULL if don't want to filter that variable
 PFT2run = c('Pherb', 'Aherb') #c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 'Pherb', 'Aforb', 'Pgrass')
 run2run = 'fire1_eind1_c4grass1_co20_2311' # or NULL
 years2run = 'Current'
 
-
+v2paste <- if(version == 'v1') "" else version # for pasting to interpolated tiffs
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -48,7 +48,7 @@ template <- raster(path_template)
 
 # Read in raw bioclim data for sagebrush extent and set cellnumbers as rownames
 # (tc stands for 'targetcells')
-tc1 <- read_csv("data_processed/interpolation_data/clim_for_interpolation.csv",
+tc1 <- read_csv("data_processed/interpolation_data/clim_for_interp_daymet-v4_1991-2020.csv",
                 col_types = cols(site_id = 'd'),
                 show_col_types = FALSE)
 
@@ -139,7 +139,9 @@ pft5_bio_w1 <- bio$pft5_bio1 %>%
   calc_aherb() %>% # add a total annual herbacious category
   filter_scenarios(PFT = PFT2run, run = run2run, years = years2run) %>% 
   ungroup() %>% 
-  mutate(id = paste(run, PFT, "biomass", id, GCM, sep = "_")) %>% 
+  mutate(
+    run2 = paste0(run, v2paste),
+    id = paste(run2, PFT, "biomass", id, GCM, sep = "_")) %>% 
   dplyr::select(site, id, biomass) %>% 
   pivot_wider(id_cols = "site",
               names_from = "id",
@@ -328,7 +330,7 @@ print('biomass done')
 print(Sys.time())
 }
 # * fire ------------------------------------------------------------------
-
+if(run_fire) {
 # which columns haven't already been upscaled
 todo3 <- which_todo(df = fire_w1,
                     path = "data_processed/interpolated_rasters/fire",
@@ -369,10 +371,9 @@ foreach (x = vecs_l2) %dopar% {
 print('fire end')
 print(Sys.time())
 
-# When you're done, clean up the cluster
-stopImplicitCluster()
-}
 
+}
+}
 
 # * climate ---------------------------------------------------------------
 
@@ -416,4 +417,5 @@ rMultivariateMatching::interpolatePoints(
   overwrite = TRUE
 )
 }
-
+# When you're done, clean up the cluster
+stopImplicitCluster()
