@@ -170,8 +170,6 @@ pft5_bio2 <- pft5_bio1 %>%
             .groups = "drop")%>% 
   left_join(clim1, by = "site") # adding current climate
 
-saveRDS(pft5_bio2, 'data_processed/site_means/pft5_bio2.RDS') # for use in other scripts
-
 # for now we're exluding succulents--is that warranted?--it appears so,
 # they have very limited biomass
 x <- bio4 %>% filter(PFT == "succulents") %>% pull(biomass)
@@ -568,3 +566,13 @@ fire_d_wgraze <- fire_med1 %>%
   create_id2()
 
 
+# save outputs ------------------------------------------------------------
+
+out <- list(
+  pft5_bio1 = pft5_bio1,
+  pft5_bio2 = pft5_bio2,
+  fire0 = fire0,
+  clim_all2 = clim_all2
+)
+
+saveRDS(out, 'data_processed/site_means/summarize_bio.RDS')

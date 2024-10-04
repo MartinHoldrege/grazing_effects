@@ -673,6 +673,37 @@ summarise_bio_indivs <- function(df, suffix = "_diff",
   out
 }
 
+#' add a total herbacious category
+#'
+#' @param df dataframe
+#' @param col_names names of columns to sum across annual PFTs
+#' @param group_cols names of columns to group by
+#'
+#' @return same dataframe as input but with rows added that provide values
+#' for all annual herbacious PFTs
+calc_aherb <- function(df, col_names = c('biomass', "indivs", "utilization"),
+                       group_cols = c('run', 'years', 'RCP', 'graze', 'id', 
+                       'site', 'GCM')) {
+  
+  annuals <- c('Cheatgrass', 'Aforb')
+  stopifnot(annuals %in% df$PFT)
+  aherb <- df %>% 
+    filter(.data$PFT %in% !!annuals) %>% 
+    group_by(across(all_of(group_cols))) %>% 
+    summarise(across(.cols = all_of(col_names),
+                     .fns = sum),
+              .groups = 'drop') %>% 
+    mutate(PFT = 'Aherb')
+  
+  # not all PFT levels warning not helpul here
+  aherb$PFT <- suppressWarnings(pft5_factor(aherb$PFT))
+  
+  if(!all(names(aherb) %in% names(df))) {
+    stop('some col_names or group_cols likely missing')
+  }
+  out <- bind_rows(aherb, df)
+  out
+}
 
 # classification ----------------------------------------------------------
 
@@ -739,6 +770,33 @@ filter_rcp_run <- function(df, PFT = FALSE, current = TRUE,
     out$PFT <- pft5_factor(as.character(out$PFT)) # relevel factor
   }
   out
+}
+
+#' filter dataframe by climate scenario etc. 
+#'
+#' @param df dataframe
+#' @param PFT character vector
+#' @param run character vector
+#' @param years character vector
+#'
+#' @return
+#' dataframe (same as input if character vector inputs left NULL)
+filter_scenarios <- function(df, PFT = NULL,
+                             run = NULL,
+                             years = NULL) {
+  stopifnot(
+    c("run", "years") %in% names(df)
+  )
+  
+  out <- df %>% 
+    lazy_dt() %>% # 4x faster using dtplyr
+    filter(is.null(!!run) | .data$run %in% !!run,
+           is.null(!!years) | .data$years %in% !!years) 
+  if(!is.null(PFT)){
+    out <- filter(out, .data$PFT %in% !!PFT)
+  }
+  
+  as_tibble(out)
 }
 
 # misc functions ---------------------------------------------------------------
