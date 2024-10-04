@@ -14,6 +14,9 @@ sage_cutoffs <- c(1, 2, 5) # rcmap sage cover of 30 pixel (%), for it
 # to be 'counted' [this only applies to pixels that are within the SCD study area]
 
 test_run <- FALSE # runs some code at low resolution for testing
+rerun <- FALSE # recreate intermediate objects (used so some slow code doesn't need to rerun)
+include_palm <- TRUE # should the study area include the full extent of previous
+# studies (e.g. Palmquist et al 2021), makes the study area larger
 
 # read in data ------------------------------------------------------------
 
@@ -43,77 +46,123 @@ paths_rcmap <- list.files(
 rcmap1 <- vrt(paths_rcmap)
 
 if(test_run) {
-  rcmap1 <- aggregate(rcmap1, fact = 10, fun = "mean")
+  path <- 'data_processed/temp_rds/rcmap1_testrun.rds'
+  
+  if(file.exists(path) & !rerun) {
+    rcmap <- readRDS(path)
+  } else {
+    rcmap1 <- aggregate(rcmap1, fact = 20, fun = "mean")
+    saveRDS(rcmap1, path)
+  }
+  
 }
+
+# template raster Renne and palmquist used
+palm1 <- rast("data_raw/interpolation_data_RR/CoreARTR_combined_DayMet_cropped_trimmed.tif")
 
 # project/resample data ------------------------------------------------------------
 
-# reclassify such that 1 means sagebrush habitat, 0 means masked out
-scd_mask <- rcmap1
-scd_mask <- classify(rcmap1, rcl = cbind(NA, 0))
-scd_mask[!is.na(rcmap1)] <- 1
-names(scd_mask) <- 'scd_all'
-# plot(scd_mask)
+path1 <- 'data_processed/temp_rds/prop_cells_testrun.rds'
+path2 <- 'data_processed/temp_rds/prop_cells.rds'
 
-rcmap_masks <- purrr::map(sage_cutoffs, function(x) {
-  out <- scd_mask
-  out[rcmap1 <= x] <- 0
-  out
-})
-rcmap_masks <- rast(rcmap_masks)
-names(rcmap_masks) <- paste0('sage_gt_', sage_cutoffs)
+if(!rerun & test_run & file.exists(path1)) {
+  prop_cells <- readRDS(path1)
+} else if (!rerun & !test_run & file.exists(path2)) {
+  prop_cells <- readRDS(path2)
+} else {
+  # reclassify such that 1 means sagebrush habitat, 0 means masked out
+  scd_mask <- rcmap1
+  scd_mask <- classify(rcmap1, rcl = cbind(NA, 0))
+  scd_mask[!is.na(rcmap1)] <- 1
+  
+  names(scd_mask) <- 'scd_all'
+  # plot(scd_mask)
 
-# resample to 1k resolution to match met data
-masks_all <- c(scd_mask, rcmap_masks)
+  rcmap_masks <- purrr::map(sage_cutoffs, function(x) {
+    out <- scd_mask
+    out[rcmap1 <= x] <- 0
+    out
+  })
+  rcmap_masks <- rast(rcmap_masks)
+  names(rcmap_masks) <- paste0('sage_gt_', sage_cutoffs)
+  
+  # resample to 1k resolution to match met data
+  masks_all <- c(scd_mask, rcmap_masks)
+  
+  # this provides the proportion of cells in the 1km2 that belong to the
+  # given mask
+  met1 <- crop(met1, scd_mask)
+  prop_cells <- resample(masks_all, met1, method = 'average')
+  names(prop_cells) <- paste0("prop_", names(prop_cells))
+  
+  if(test_run) {
+    saveRDS(prop_cells, path1)
+  } else {
+    saveRDS(prop_cells, path2)
+  }
+}
 
-# this provides the proportion of cells in the 1km2 that belong to the
-# given mask
-met1 <- crop(met1, scd_mask)
-prop_cells <- resample(masks_all, met1, method = 'average')
-names(prop_cells) <- paste0("prop_", names(prop_cells))
 
 # id raster ---------------------------------------------------------------
 # Non NA grid cells contain the cell number
 
-id1 <- prop_cells[['prop_scd_all']]
-id1[] <- cells(id1)
-id1 <- mask(id1, prop_cells[['prop_scd_all']], maskvalues = c(0, NA))
-plot(id1)
+# palmquist et al. mask
+palm2 <- project(palm1, crs_scd)
+palm3 <- trim(resample(palm2, met1, method = 'max'))
+
+if(include_palm) {
+  prop_cells <- extend(prop_cells, palm3)
+  tmp <- c(prop_cells[['prop_scd_all']], 
+           extend(palm3,prop_cells[['prop_scd_all']]))
+  # summing layers together, so nonzero values are can be considered
+  # the study area (i.e. extending the study area to be union of two layers)
+  m <- app(tmp, fun = function(x) sum(x, na.rm = TRUE))
+} else {
+  m <- prop_cells[['prop_scd_all']]
+}
+
+id1 <- m
+id1[] <- cells(m)
+id1 <- mask(id1, m, maskvalues = c(0, NA))
 names(id1) <- 'cellnumber'
+
 # compute climate normals -------------------------------------------------
 # bioclimatic variables based on avg monthly ppt and temp. (i.e. these
 # are the worldclim variables)
-met2 <- mask(met1, id1)
 
-prcp <- raster::brick(met2['prcp_.*'])
-tmin <- raster::brick(met2['tmin_.*'])
-tmax <- raster::brick(met2['tmax_.*'])
 
-bioclim <- dismo::biovars(prec = prcp,
-                          tmin = tmin,
-                          tmax = tmax
-                          )
-bioclim2 <- rast(bioclim) # convert back to spatraster
+path <- "data_processed/temp_rds/bioclim2.rds"
 
-# * calculate PTcor --------------------------------------------------------
-# correlation between monthly precip and temperature (not a bio clim variable)
+pass <- FALSE
+if(file.exists(path) & !rerun) {
+  bioclim2 <- readRDS(path)
+  pass <- compareGeom(bioclim2, id1, ext = TRUE,
+                      stopOnError = FALSE)
+} 
 
-tmean <- (tmin + tmax)/2
-
-# P-T correlation (type 1)
-ptcor <- app(c(terra::rast(tmean), terra::rast(prcp)), fun = function(x) {
-  # first 12 layers are temp, remains ones are prcp
-  cor(x[1:12], x[13:24])
-})
-
-names(ptcor) <- 'ptcor'
+# run this section if rds doesn't exist, or even if it does 
+# and it's read in and the extend is wrong (e.g. if changed code above
+# to change study area)
+if(!pass) {
+  met2 <- mask(crop(met1, id1), id1)
+  
+  prcp <- raster::brick(met2['prcp_.*'])
+  tmin <- raster::brick(met2['tmin_.*'])
+  tmax <- raster::brick(met2['tmax_.*'])
+  bioclim <- dismo::biovars(prec = prcp,
+                            tmin = tmin,
+                            tmax = tmax
+  )
+  bioclim2 <- rast(bioclim) # convert back to spatraster
+  saveRDS(bioclim2, path)
+}
 
 # combine layers ----------------------------------------------------------
 
 # scd_prop_cells <- crop(scd_prop_cells, bioclim2)
-bioclim2 <- c(bioclim2, ptcor, prop_cells)
+bioclim2 <- c(bioclim2, prop_cells)
 
-stopifnot(all(cells(bioclim2) == cells(id1)))
+stopifnot(all(cells(bioclim2[[1]]) == cells(id1)))
 
 df_bioclim1 <- as.data.frame(bioclim2, cells = TRUE) %>% 
   rename(cellnumber = cell)
@@ -125,6 +174,8 @@ sf_site1 <- st_as_sf(site_nums[, c('site_id', "X_WGS84", "Y_WGS84")],
                      crs = "EPSG:4326") %>% 
   st_transform(crs = crs_scd)
 
+test <- sum(is.na(terra::extract(bioclim2[[1]], sf_site1)[[2]]))
+if(test > 0) warning('output raster doesnt cover all stepwat sites')
 # determining which cell each site is located in
 site2 <- as.data.frame(terra::extract(id1, vect(sf_site1), bind = TRUE))
 

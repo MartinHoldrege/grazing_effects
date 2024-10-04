@@ -259,6 +259,7 @@ pft_all_factor <- function(x) {
   stopifnot(x %in% levels)
   
   out <- factor(x, levels = levels)
+  out
 }
 
 # convert individual PFTs into a total category, useful for calculating
@@ -695,12 +696,12 @@ calc_aherb <- function(df, col_names = c('biomass', "indivs", "utilization"),
               .groups = 'drop') %>% 
     mutate(PFT = 'Aherb')
   
-  # not all PFT levels warning not helpul here
-  aherb$PFT <- suppressWarnings(pft5_factor(aherb$PFT))
+  aherb$PFT <- pft_all_factor(aherb$PFT)
   
   if(!all(names(aherb) %in% names(df))) {
     stop('some col_names or group_cols likely missing')
   }
+  stopifnot(levels(aherb$PFT) == levels(df$PFT))
   out <- bind_rows(aherb, df)
   out
 }
