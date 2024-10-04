@@ -16,29 +16,35 @@
 rerun <- FALSE # re-create rasters that have already been interpolated?
 test_run <- FALSE # TRUE # 
 date <- "20240605" # for appending to select file names
-version <- 'v1'
+version <- 'v3'
 # v1--1st version of criteria (i.e. based on calculating mathcing criteria across the region)
 # v2--second version of criteria (i.e. basing matching criteria just on 200 sites)
 # v3--criteria used in palmquist et al 2021 and renne et al 2024
 run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
-# stepwat climat outpute but using the exact values used for the matching
 
-# rerun unless climate variables are changed/updated)
+# for filtering output, put NULL if don't want to filter that variable
+PFT2run = c('Pherb', 'Aherb') #c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 'Pherb', 'Aforb', 'Pgrass')
+run2run = 'fire1_eind1_c4grass1_co20_2311' # or NULL
+years2run = 'Current'
+
 
 # dependencies ------------------------------------------------------------
 
-source("scripts/02_summarize_bio.R") # creates dataframes of stepwat2 output
+library(tidyverse)
 library(raster)
 library(rMultivariateMatching)
 library(doParallel)
+library(dtplyr)
+source("src/general_functions.R")
 
 # read in data ------------------------------------------------------------
+# list dataframes of stepwat2 output created in "scripts/02_summarize_bio.R" 
+bio <- readRDS('data_processed/site_means/summarize_bio.RDS') 
 
 # template raster
 path_template <- "data_processed/interpolation_data/cellnumbers.tif"
 template <- raster(path_template)
-
 
 # Read in raw bioclim data for sagebrush extent and set cellnumbers as rownames
 # (tc stands for 'targetcells')
@@ -73,25 +79,33 @@ bioclim_vars <- c("bio1", "bio4", "bio9", "bio12",
 
 tc2 <- tc1[, c("cellnumber", 'site_id', 'x', 'y', bioclim_vars)]
 
-
-
 # criteria for matchingvars function (here using 10% of range of data)
 # this is for scaling the variables
-# for v2, switching to base matching variables on the grid-cells with sites
-criteria <- map_dbl(tc2[, bioclim_vars], function(x) {
-  (max(x) - min(x))*0.1
-})
-criteria_v2 <- map_dbl(tc2[!is.na(tc2$site_id), bioclim_vars], function(x) {
-  (max(x) - min(x))*0.1
-})
-
-if(version != 'v1') {
+if (version == 'v1') {
+  criteria <- map_dbl(tc2[, bioclim_vars], function(x) {
+    (max(x) - min(x))*0.1
+  })
+} else if(version == 'v2') {
+  criteria_v2 <- map_dbl(tc2[!is.na(tc2$site_id), bioclim_vars], function(x) {
+    (max(x) - min(x))*0.1
+  })
   criteria <- criteria_v2
+  # for v2, switching to base matching variables on the grid-cells with sites
+} else if (version == 'v3') {
+  # criteria used in Renne et al 2024 
+  criteria_v3 <- c(bio1 = 1.55, 
+                   bio4 = 61.1, 
+                   bio9 = 3.53, 
+                   bio12 = 84.9, 
+                   bio15 = 9.21, 
+                   bio18 = 33.8
+  )
+  criteria <- criteria_v3
 }
 criteria
 
 write_csv(data.frame(variable = names(criteria), criteria = criteria), 
-          paste0("data_processed/interpolation_data/criteria-for-interp_", date, "_", version, '.csv'))
+          paste0("data_processed/interpolation_data/criteria-for-interp_", version, '.csv'))
 
 # * subset cell data ------------------------------------------------------
 # location and climate data for the 200 sites where simulations were actually
@@ -107,24 +121,6 @@ if(nrow(sc1) != 200 | any(duplicated(sc1$site_id))) {
 }
 
 
-# determine w/ sites have c4 grasses --------------------------------------
-# creating a dataframe of where c4 grasses are present under current conditions
-# --this is to be used in a later script
-
-# not in use at the moment:
-
-# sites_c4_present <- pft5_bio2 %>% 
-#   filter(RCP == "Current", graze == "Light", PFT == "C4Pgrass",
-#          c4 == "c4on") %>% 
-#   mutate(C4Pgrass = ifelse(biomass > 0, "present", "absent")) %>% 
-#   dplyr::select(site, C4Pgrass) %>% 
-#   inner_join(site_nums2, by = c("site" = "site_id"))
-# 
-# stopifnot(nrow(sites_c4_present) == 200)
-# 
-# write_csv(sites_c4_present, 
-#           "data_processed/site-num_C4Pgrass-presence_c4off.csv")
-
 # stepwat2 outputs --------------------------------------------------------
 
 # files created in 02_summarize_bio.R script
@@ -138,11 +134,11 @@ if(nrow(sc1) != 200 | any(duplicated(sc1$site_id))) {
 # this is every PFT, for all GCMs--i.e. all derived biomass change 
 # variables could be calculated from these values after up-scaling,
 # therefore %change of biomass no longer up-scaled
-pft5_bio_w1 <- pft5_bio1 %>% 
+
+pft5_bio_w1 <- bio$pft5_bio1 %>% 
+  calc_aherb() %>% # add a total annual herbacious category
+  filter_scenarios(PFT = PFT2run, run = run2run, years = years2run) %>% 
   ungroup() %>% 
-  # c4off and on are the same for RCP current, so don't want redundant 
-  # up-scaling
-  #filter(!(c4 == "c4off" & RCP == "Current")) %>% 
   mutate(id = paste(run, PFT, "biomass", id, GCM, sep = "_")) %>% 
   dplyr::select(site, id, biomass) %>% 
   pivot_wider(id_cols = "site",
@@ -152,10 +148,10 @@ pft5_bio_w1 <- pft5_bio1 %>%
 # joining in cell numbers
 pft5_bio_w2 <- join_subsetcells(step_dat = pft5_bio_w1, sc_dat = sc1)
 
-
 # * wildfire --------------------------------------------------------------
 
-fire_w1 <- fire0 %>% 
+fire_w1 <- bio$fire0 %>% 
+  filter_scenarios(run = run2run, years = years2run) %>% 
   ungroup() %>% 
   # don't want to bother upscale fire prob on runs where fire not simulated
   filter(!str_detect(run, 'fire0')) %>% 
@@ -171,10 +167,9 @@ fire_w1 <- fire0 %>%
 # climate data doesn't have a 'run' name attached b/ runs have same climate
 # but date attached in case in future runs are based on a different climate
 # dataset
-clim_all_w1 <- clim_all2 %>% 
-  pivot_longer(cols = c(
-    #"MAP", "MAT", # comment out variables that have already interpolated
-    'PTcor', 'psp')) %>% 
+clim_all_w1 <- bio$clim_all2 %>% 
+  filter(.data$years %in% years2run | is.null(.data$years)) %>% 
+  pivot_longer(cols = c("MAP", "MAT", 'psp')) %>% 
   ungroup() %>% 
   mutate(id = paste(name, "climate", RCP, years, GCM, '20230919', sep = "_")) %>% 
   dplyr::select(site, id, value) %>% 
@@ -216,39 +211,6 @@ match1 <- multivarmatch(
   subset_in_target = TRUE
 )
 
-# *calculating matching quality for different criteria --------------------
-
-if(FALSE){
-# this is for the SCD climate analysis
-# testing of calculating matching quality
- 
-# criteria used in Renne et al 2024 
-criteria_v3 <- c(bio1 = 1.55, 
-                 bio4 = 61.1, 
-                 bio9 = 3.53, 
-                 bio12 = 84.9, 
-                 bio15 = 9.21, 
-                 bio18 = 33.8
-)
-qual <- matchqual(match = match1, tc = tc2, bioclim_vars = bioclim_vars,
-                        crit = criteria)
-
-stopifnot(all.equal(qual$matching_quality, match1$matching_quality))
-
-# now testing matching quality for different criteria
-# qual_v2 <- matchqual(match = match1, tc = tc2, bioclim_vars = bioclim_vars,
-#                      crit = criteria_v2)
-qual_v3 <- matchqual(match = match1, tc = tc2, bioclim_vars = bioclim_vars,
-                     crit = criteria_v3)
-
-
-# interpolation done using v1 (criteria from across the study area, and 
-# matching quality calculated based on criteria from the 200 sites; for
-# SCD appendix)
-qual_v3 %>% 
-  dplyr::select(cellnumber, matching_quality) %>% 
-  write_csv('data_processed/interpolation_data/match-qual_v1-interp_v3-criteria.csv')
-}
 # *plotting interpolation quality -----------------------------------------
 
 interp <- template
@@ -263,7 +225,8 @@ tmp_site_id <- match1 %>%
 # for each pixels this raster shows which stepwat site the data was drawn
 # from for interpolation
 interp_ordered[as.numeric(match1$target_cell)] <- tmp_site_id
-writeRaster(interp_ordered, "data_processed/interpolation_data/interp_locations_200sites.tif",
+writeRaster(interp_ordered, 
+            paste0("data_processed/interpolation_data/interp_locations_200sites_", version, ".tif"),
             overwrite = TRUE)
 
 set.seed(1234)
@@ -273,7 +236,7 @@ interp[as.numeric(match1$target_cell)] <- tmp_site_id %>%
   forcats::fct_shuffle()
 
 pal <- colorRampPalette(rev(RColorBrewer::brewer.pal(10, 'RdBu')))(200)
-jpeg(paste0("figures/interpolation_quality/interpolation_areas_", date, ".jpeg"),
+jpeg(paste0("figures/interpolation_quality/interpolation_areas_", version, ".jpeg"),
      res = 600, units = 'in', width = 8, height = 8)
   plot(interp, main = 'interpolation areas (site numbers jumbled)',
        col = pal)
@@ -286,7 +249,7 @@ mean(match1$matching_quality < 1.5) # ~93%
 match_quality <- template
 match_quality[as.numeric(match1$target_cell)] <- match1$matching_quality
 
-jpeg(paste0("figures/interpolation_quality/matching_quality_", date, ".jpeg"),
+jpeg(paste0("figures/interpolation_quality/matching_quality_", version, ".jpeg"),
      res = 600, units = 'in', width = 8, height = 8)
 plot(match_quality, main = 'matching quality', breaks = c(0, 0.5, 1, 1.5, 2, 3, 4, 5, 10),
      col = rev(RColorBrewer::brewer.pal(10, 'RdBu'))[3:10])
