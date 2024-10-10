@@ -257,7 +257,9 @@ plot(match_quality, main = 'matching quality', breaks = c(0, 0.5, 1, 1.5, 2, 3, 
      col = rev(RColorBrewer::brewer.pal(10, 'RdBu'))[3:10])
 dev.off()
 
-
+writeRaster(match_quality, 
+            paste0("data_processed/interpolation_quality/matching_quality", 
+                   version, '.tif'))
 # interpolation ---------------------------------------------------------
 # use matches from multivarmatch to interpolate the STEPWAT2 output
 # across all the grid cells

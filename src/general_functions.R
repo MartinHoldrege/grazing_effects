@@ -923,6 +923,7 @@ calc_pcent_by_thresh <- function(lyr, r) {
 #' @param run regular expression the defines the run, the 
 #' "(_\\d{4}){0,1}" part of the default regex is meant to optionally match
 #' the two digit year and month code that started to be appendix to newer run ids
+#' which is sometimes also folled by a version (e.g. v3)
 #' @param into columns the components of the layer names will be seperated
 #' into
 #' @param id_noGCM logical, create a column that provides the layer id but
@@ -932,7 +933,7 @@ calc_pcent_by_thresh <- function(lyr, r) {
 #' path <- "grazing_effects/data_processed/interpolated_rasters/biomass/fire1_eind1_c4grass1_co20_Aforb_biomass_RCP45_2030-2060_Light_inmcm4.tif"
 #' create_rast_info(path)
 create_rast_info <- function(x,
-                             run_regex = "fire\\d_eind\\d_c4grass\\d_co2\\d(_\\d{4}){0,1}",
+                             run_regex = "fire\\d_eind\\d_c4grass\\d_co2\\d(_\\d{4}v{0,1}\\d{0,1}){0,1}",
                              into = c("PFT", "type", "RCP", "years", 
                                       "graze", "GCM"),
                              id_noGCM = FALSE) {
