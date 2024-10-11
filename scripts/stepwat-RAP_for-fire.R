@@ -170,6 +170,15 @@ df_sw2 <- df_sw1 %>%
                values_to = 'biomass') %>% 
   left_join(info1, by = 'id')
 
+tmp1 <- df_sw2 %>% 
+  select(biomass, PFT, graze) %>% 
+  mutate(dataset = 'interpolated') 
+
+sw_comb <- sw_site_bio1 %>% 
+  select(biomass, PFT, graze) %>% 
+  mutate(dataset = 'site level') %>% 
+  bind_rows(tmp1)
+
 # density figures ---------------------------------------------------------
 
 pdf(paste0('figures/RAP/RAP-vs-sw_hists_', run, '.pdf'),
@@ -223,6 +232,22 @@ ggplot() +
          '\nRAP data from Holdrege et al. only from grid-cells in those site locations',
         "Black line is the mean fire model prediction")) +
   theme(legend.position = 'top')
+
+# histograms of just stepwat data 
+# showing these seperately because density curves may be hiding details
+
+for (pft in pft_lookup) {
+  g <- sw_comb %>% 
+    filter(PFT == pft) %>% 
+    ggplot(aes(x = biomass, y = after_stat(density))) +
+    geom_histogram() +
+    facet_grid(dataset~graze) +
+    labs(title = pft,
+         subtitle = 'Comparing site level and interpolated stepwat biomass')
+  print(g)
+}
+
+
 
 dev.off()
 
