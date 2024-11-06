@@ -25,7 +25,7 @@ run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
 run_fire <- FALSE
 # for filtering output, put NULL if don't want to filter that variable
 PFT2run = c('Pherb', 'Aherb') #c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 'Pherb', 'Aforb', 'Pgrass')
-run2run = 'fire1_eind1_c4grass1_co20_2311' # or NULL
+run2run = 'fire0_eind1_c4grass1_co20' # or NULL
 years2run = 'Current'
 
 v2paste <- if(version == 'v1') "" else version # for pasting to interpolated tiffs
@@ -152,6 +152,7 @@ pft5_bio_w2 <- join_subsetcells(step_dat = pft5_bio_w1, sc_dat = sc1)
 
 # * wildfire --------------------------------------------------------------
 
+if(run_fire) {
 fire_w1 <- bio$fire0 %>% 
   filter_scenarios(run = run2run, years = years2run) %>% 
   ungroup() %>% 
@@ -163,7 +164,7 @@ fire_w1 <- bio$fire0 %>%
               names_from = "id",
               values_from = "fire_prob") %>% 
   join_subsetcells(sc_dat = sc1)
-
+}
 
 # * climate ---------------------------------------------------------------
 # climate data doesn't have a 'run' name attached b/ runs have same climate
@@ -259,7 +260,8 @@ dev.off()
 
 writeRaster(match_quality, 
             paste0("data_processed/interpolation_quality/matching_quality", 
-                   version, '.tif'))
+                   version, '.tif'),
+            overwrite = TRUE)
 # interpolation ---------------------------------------------------------
 # use matches from multivarmatch to interpolate the STEPWAT2 output
 # across all the grid cells
