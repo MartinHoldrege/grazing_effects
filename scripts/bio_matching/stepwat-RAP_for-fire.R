@@ -12,6 +12,7 @@
 
 version_interp <- 'v3' # interpolation version (see 03_interpolate.R)
 run <- "fire1_eind1_c4grass1_co20_2311"
+runs <- c("fire1_eind1_c4grass1_co20_2311", "fire0_eind1_c4grass1_co20")
 
 # matching quality cutoff, this decides
 # the cells from which both stepwat and rap data will be pulled from
@@ -47,15 +48,17 @@ df_pdp2 <- readRDS("../cheatgrass_fire/data_processed/df_pdp2.rds");
 # * interpolated stepwat --------------------------------------------------
 PFTs <- c('Aherb', 'Pherb')
 
-paths <- list.files("data_processed/interpolated_rasters/biomass/",
-                    pattern = paste0(run, version_interp, ".*", RCP, ",*.tif"),
-                    full.names = TRUE)
+suffix <- paste0(version_interp, ".*", RCP, ",*.tif")
+pattern <- paste0("(", paste0(runs, collapse = '|'), ")", suffix)
 
+paths <- list.files("data_processed/interpolated_rasters/biomass/",
+                    pattern = pattern,
+                    full.names = TRUE)
+basename(paths)
 r_sw1 <- rast(paths)
 
 r_qual <- rast(paste0("data_processed/interpolation_quality/matching_quality",
                  version_interp, ".tif"))
-
 
 # vectors etc -------------------------------------------------------------
 
@@ -94,10 +97,11 @@ site_ids <- cell_nums_sites$site[!is.na(cell_nums_sites$cell_num)]
 sw_site_bio1 <- pft5_bio2 %>% 
   calc_aherb(group_cols = c('run', 'years', 'RCP', 'graze', 'id', 
                             'site')) %>% 
-  filter(.data$run == !!run,
+  filter(.data$run %in% !!runs,
          RCP == "Current",
          site %in% site_ids,
-         PFT %in% unname(pft_lookup))
+         PFT %in% unname(pft_lookup)) %>% 
+  mutate(fire = str_extract(run, 'fire\\d'))
 
 # * evaluate clim of stepwat sites ------------------------------------------
 # see if the subset of stepwat sites, that overlap with the rap data from the
@@ -168,18 +172,24 @@ df_sw2 <- df_sw1 %>%
   pivot_longer(cols = everything(),
                names_to = 'id',
                values_to = 'biomass') %>% 
-  left_join(info1, by = 'id')
+  left_join(info1, by = 'id') %>% 
+  mutate(fire = str_extract(run, 'fire\\d'))
 
 tmp1 <- df_sw2 %>% 
-  select(biomass, PFT, graze) %>% 
+  select(run, fire, biomass, PFT, graze) %>% 
   mutate(dataset = 'interpolated') 
 
 sw_comb <- sw_site_bio1 %>% 
-  select(biomass, PFT, graze) %>% 
+  select(run, fire, biomass, PFT, graze) %>% 
   mutate(dataset = 'site level') %>% 
   bind_rows(tmp1)
 
 # density figures ---------------------------------------------------------
+
+linetype <- function() {
+  scale_linetype_manual(name = NULL, 
+                 values = c("fire1" = 1, "fire0" = 2))
+}
 
 pdf(paste0('figures/RAP/RAP-vs-sw_hists_', run, '.pdf'),
     width = 8)
@@ -190,7 +200,7 @@ ggplot() +
                  aes(biomass, y = after_stat(density)),
                  bins = 100) + 
   geom_density(data = df_sw2, 
-               aes(biomass, color = graze)) +
+               aes(biomass, color = graze, linetype = fire)) +
   geom_line(data = df_pdp3, 
             aes(x = x_value, y = yhat*2)) +
   scale_color_manual(values = cols_graze,
@@ -207,7 +217,8 @@ ggplot() +
          '\nMatching critera from Palmquist used.',
          '\nFor given pixels RAP data includes 3-year averages for all years in Holdrege et al.'
        )) +
-  theme(legend.position = 'top')
+  theme(legend.position = 'top') +
+  linetype()
 
 # stepwat site level comparison
 
@@ -216,7 +227,7 @@ ggplot() +
                  aes(biomass, y = after_stat(density)),
                  bins = 100) + 
   geom_density(data = sw_site_bio1, 
-               aes(biomass, color = graze)) +
+               aes(biomass, color = graze, linetype = fire)) +
   geom_line(data = df_pdp3,
             aes(x = x_value, y = yhat*2)) +
   scale_color_manual(values = cols_graze,
@@ -231,7 +242,8 @@ ggplot() +
          "\n(other sites didn't overlap with Holdrege et al. study area).",
          '\nRAP data from Holdrege et al. only from grid-cells in those site locations',
         "Black line is the mean fire model prediction")) +
-  theme(legend.position = 'top')
+  theme(legend.position = 'top') +
+  linetype()
 
 # histograms of just stepwat data 
 # showing these seperately because density curves may be hiding details
@@ -239,15 +251,13 @@ ggplot() +
 for (pft in pft_lookup) {
   g <- sw_comb %>% 
     filter(PFT == pft) %>% 
-    ggplot(aes(x = biomass, y = after_stat(density))) +
+    ggplot(aes(x = biomass, y = after_stat(density), fill = fire)) +
     geom_histogram() +
     facet_grid(dataset~graze) +
     labs(title = pft,
          subtitle = 'Comparing site level and interpolated stepwat biomass')
   print(g)
 }
-
-
 
 dev.off()
 

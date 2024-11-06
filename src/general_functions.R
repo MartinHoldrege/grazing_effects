@@ -933,7 +933,7 @@ calc_pcent_by_thresh <- function(lyr, r) {
 #' path <- "grazing_effects/data_processed/interpolated_rasters/biomass/fire1_eind1_c4grass1_co20_Aforb_biomass_RCP45_2030-2060_Light_inmcm4.tif"
 #' create_rast_info(path)
 create_rast_info <- function(x,
-                             run_regex = "fire\\d_eind\\d_c4grass\\d_co2\\d(_\\d{4}v{0,1}\\d{0,1}){0,1}",
+                             run_regex = "fire\\d_eind\\d_c4grass\\d_co2\\dv{0,1}\\d{0,1}(_\\d{4}v{0,1}\\d{0,1}){0,1}",
                              into = c("PFT", "type", "RCP", "years", 
                                       "graze", "GCM"),
                              id_noGCM = FALSE) {
