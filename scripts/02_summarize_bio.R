@@ -572,6 +572,7 @@ out <- list(
   pft5_bio1 = pft5_bio1,
   pft5_bio2 = pft5_bio2,
   fire0 = fire0,
+  fire_med1 = fire_med1,
   clim_all2 = clim_all2
 )
 
