@@ -63,7 +63,7 @@ linetype <- function() {
 
 # density figures ---------------------------------------------------------
 
-pdf(paste0('figures/matching/RAP-vs-sw_hists_', run, '.pdf'),
+pdf(paste0('figures/bio_matching/RAP-vs-sw_hists_', run, '.pdf'),
     width = 8)
 
 # interpolated data comparison
