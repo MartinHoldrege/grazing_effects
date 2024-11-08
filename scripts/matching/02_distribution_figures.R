@@ -5,10 +5,43 @@
 
 # dependencies ------------------------------------------------------------
 
+library(tidyverse)
+library(patchwork)
+source('src/fig_params.R')
+source('src/fig_functions.R')
+theme_set(theme_custom1())
+
+# read in data -----------------------------------------------------------
+# list created in 01_combine_data.R
+m <- readRDS('data_processed/temp_rds/rap_sw_matching.rds') 
+
+# partial dependence plot values from fire equation
+# file created in cheatgrass_fire/scripts/06_figures_pdp_vip_quant.R
+df_pdp2 <- readRDS("../cheatgrass_fire/data_processed/df_pdp2.rds");
+
+# params ------------------------------------------------------------------
+run <- m$runs[1]
+RCP <- 'Current'
+
+# dataframes etc --------------------------------------------------------------
+
+clim <- m$clim
+sw_comb <- m$sw_comb
+rap_comb <- m$rap_comb
+qual_cutoff <- m$qual_cutoff
+
+# *prepare pdp predictions -------------------------------------------------
+pft_lookup <- c('pfgAGB' = 'Pherb','afgAGB' = 'Aherb')
+
+df_pdp3 <- df_pdp2 %>% 
+  filter(inter_var == 'Mean prediction',
+         variable %in% c("pfgAGB", 'afgAGB')) %>% 
+  mutate(PFT = pft_lookup[variable]) %>% 
+  select(-variable)
 
 # climate figures -------------------------------------------------------------
 
-g <- ggplot(clim2, aes(color = dataset_overlap)) +
+g <- ggplot(clim, aes(color = dataset_overlap)) +
   theme_bw() +
   scale_color_manual(name = 'STEPWAT site falls on \nHoldrege et al 2024 1km cell',
                      values = c('darkgrey', 'blue' ))
@@ -30,15 +63,15 @@ linetype <- function() {
 
 # density figures ---------------------------------------------------------
 
-pdf(paste0('figures/RAP/RAP-vs-sw_hists_', run, '.pdf'),
+pdf(paste0('figures/matching/RAP-vs-sw_hists_', run, '.pdf'),
     width = 8)
 
 # interpolated data comparison
 ggplot() +
-  geom_histogram(data = rap_df_m, 
+  geom_histogram(data = rap_comb[rap_comb$dataset == 'interpolated',], 
                  aes(biomass, y = after_stat(density)),
                  bins = 100) + 
-  geom_density(data = df_sw2, 
+  geom_density(data = sw_comb[sw_comb$dataset == 'interpolated', ], 
                aes(biomass, color = graze, linetype = fire)) +
   geom_line(data = df_pdp3, 
             aes(x = x_value, y = yhat*2)) +
@@ -62,10 +95,10 @@ ggplot() +
 # stepwat site level comparison
 
 ggplot() +
-  geom_histogram(data = rap_sub2, 
+  geom_histogram(data = rap_comb[rap_comb$dataset != 'interpolated',], 
                  aes(biomass, y = after_stat(density)),
                  bins = 100) + 
-  geom_density(data = sw_site_bio1, 
+  geom_density(data = sw_comb[sw_comb$dataset != 'interpolated', ], 
                aes(biomass, color = graze, linetype = fire)) +
   geom_line(data = df_pdp3,
             aes(x = x_value, y = yhat*2)) +
@@ -77,7 +110,7 @@ ggplot() +
   labs(x = lab_bio0,
        subtitle = 'Stepwat site level data (not interpolated)',
        caption = paste0(
-         'Stepwat data from ', length(unique(site_ids)), ' sites',  
+         'Stepwat data from ', length(unique(rap_comb$site)), ' sites',  
          "\n(other sites didn't overlap with Holdrege et al. study area).",
          '\nRAP data from Holdrege et al. only from grid-cells in those site locations',
          "Black line is the mean fire model prediction")) +

@@ -11,7 +11,8 @@
 # params ------------------------------------------------------------------
 
 version_interp <- 'v3' # interpolation version (see 03_interpolate.R)
-run <- "fire1_eind1_c4grass1_co20_2311"
+# the first run in the vector is the 'main' one, ( and compared to the
+# no fire run in some figures)
 runs <- c("fire1_eind1_c4grass1_co20_2311", "fire0_eind1_c4grass1_co20")
 
 # matching quality cutoff, this decides
@@ -23,11 +24,7 @@ RCP <- 'Current'
 library(tidyverse)
 library(terra)
 library(sf)
-library(patchwork)
 source("src/general_functions.R")
-source('src/fig_params.R')
-source('src/fig_functions.R')
-theme_set(theme_custom1())
 
 # read in data ------------------------------------------------------------
 
@@ -41,10 +38,6 @@ pft5_bio2 <- readRDS('data_processed/site_means/summarize_bio.RDS')$pft5_bio2
 
 sites1 <- read_csv("data_raw/site_locations.csv")
 clim1 <- read_csv("data_processed/site_means/dbWeather_200sites.csv")
-
-# partial dependence plot values from fire equation
-# file created in cheatgrass_fire/scripts/06_figures_pdp_vip_quant.R
-df_pdp2 <- readRDS("../cheatgrass_fire/data_processed/df_pdp2.rds");
 
 # * interpolated stepwat --------------------------------------------------
 PFTs <- c('Aherb', 'Pherb')
@@ -61,17 +54,9 @@ r_sw1 <- rast(paths)
 r_qual <- rast(paste0("data_processed/interpolation_quality/matching_quality",
                  version_interp, ".tif"))
 
-# vectors etc -------------------------------------------------------------
+# vectors ----------------------------------------------------------------
 
 pft_lookup <- c('pfgAGB' = 'Pherb','afgAGB' = 'Aherb')
-
-# prepare pdp predictions -------------------------------------------------
-
-df_pdp3 <- df_pdp2 %>% 
-  filter(inter_var == 'Mean prediction',
-         variable %in% c("pfgAGB", 'afgAGB')) %>% 
-  mutate(PFT = pft_lookup[variable]) %>% 
-  select(-variable)
 
 # stepwat site level analysis ---------------------------------------------
 
@@ -124,7 +109,9 @@ rap_sub2 <- rap_sub1 %>%
   pivot_longer(cols = c('pfgAGB', 'afgAGB'),
                values_to = 'biomass',
                names_to = 'PFT') %>% 
-  mutate(PFT = pft_lookup[PFT])
+  mutate(PFT = pft_lookup[PFT],
+         dataset = 'site level') 
+
 
 # pulling together interpolation level data -------------------------------
 
@@ -145,8 +132,10 @@ rap_df_m <- rap_df2 %>%
   pivot_longer(cols = c("pfgAGB", 'afgAGB'),
                names_to = 'PFT',
                values_to = 'biomass') %>% 
-  mutate(PFT = pft_lookup[PFT]) %>% 
-  select(-cell_num, -year)
+  mutate(PFT = pft_lookup[PFT],
+         dataset = 'interpolated')
+
+rap_comb <- bind_rows(rap_df_m, rap_sub2) # all the rap data
 
 df_sw1 <- as_tibble(r_sw2) 
 
@@ -167,4 +156,17 @@ sw_comb <- sw_site_bio1 %>%
   select(run, fire, biomass, PFT, graze) %>% 
   mutate(dataset = 'site level') %>% 
   bind_rows(tmp1)
+
+
+# saving output -----------------------------------------------------------
+
+out <- list(
+  runs = runs,
+  sw_comb = sw_comb,
+  rap_comb = rap_comb,
+  clim = clim2,
+  qual_cutoff = qual_cutoff
+)
+
+saveRDS(out, 'data_processed/temp_rds/rap_sw_matching.rds')
 
