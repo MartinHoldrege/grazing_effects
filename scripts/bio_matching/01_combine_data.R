@@ -7,7 +7,6 @@
 
 # Oct 3, 2024
 
-
 # params ------------------------------------------------------------------
 
 version_interp <- 'v3' # interpolation version (see 03_interpolate.R)
@@ -155,7 +154,10 @@ tmp1 <- df_sw2 %>%
 sw_comb <- sw_site_bio1 %>% 
   select(run, fire, biomass, PFT, graze) %>% 
   mutate(dataset = 'site level') %>% 
-  bind_rows(tmp1)
+  bind_rows(tmp1) %>% 
+  # remove the (interpolation) version number
+  # so run names are the same between site level and interpolated
+  mutate(run = str_replace(run, 'v\\d$', ""))
 
 
 # saving output -----------------------------------------------------------
