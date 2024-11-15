@@ -19,9 +19,20 @@ m <- readRDS('data_processed/temp_rds/rap_sw_matching.rds')
 # file created in cheatgrass_fire/scripts/06_figures_pdp_vip_quant.R
 df_pdp2 <- readRDS("../cheatgrass_fire/data_processed/df_pdp2.rds");
 
+# functions for quantile matching
+path <- 'data_processed/temp_rds/qm_funs.rds'
+if(file.exists(path)) {
+  qm_l <- readRDS(path)
+} else {
+  source('scripts/bio_matching/02_quantile_matching.R')
+  qm_l <- readRDS(path)
+}
+
 # params ------------------------------------------------------------------
+
 run <- m$runs[1]
 RCP <- 'Current'
+stopifnot(run == qm_l$run) # there may be cases where this doesn't need to be true
 
 # dataframes etc --------------------------------------------------------------
 
@@ -32,12 +43,22 @@ qual_cutoff <- m$qual_cutoff
 
 # *prepare pdp predictions -------------------------------------------------
 pft_lookup <- c('pfgAGB' = 'Pherb','afgAGB' = 'Aherb')
-
+pfts <- pft_lookup
+names(pfts) <- pfts
 df_pdp3 <- df_pdp2 %>% 
   filter(inter_var == 'Mean prediction',
          variable %in% c("pfgAGB", 'afgAGB')) %>% 
   mutate(PFT = pft_lookup[variable]) %>% 
   select(-variable)
+
+# calculate quantile matched biomass ------------------------------------------
+
+sw_comb$biomass_qm <- NA
+
+for (pft in pfts) {
+  f <- qm_l[[pft]]
+  sw_comb$biomass_qm[sw_comb$PFT ==pft] <- f(sw_comb$biomass[sw_comb$PFT ==pft])
+}
 
 # climate figures -------------------------------------------------------------
 
@@ -63,59 +84,86 @@ linetype <- function() {
 
 # density figures ---------------------------------------------------------
 
+# captions
+cap_match <- paste0('\nMatching critera from Palmquist used.',
+                    '\nFor given pixels RAP data includes 3-year averages for all years in Holdrege et al.')
+cap_interp <- paste0('\nData from 1km gridcells where interpolation matching quality < ', 
+                     qual_cutoff)
+
+cap_qm <- qm_l$caption
+
+cap_sites <- paste0(
+  'Stepwat data from ', length(unique(rap_comb$site)), ' sites',  
+  "\n(other sites didn't overlap with Holdrege et al. study area).",
+  '\nRAP data from Holdrege et al. only from grid-cells in those site locations',
+  "Black line is the mean fire model prediction")
+
+pdp_line <- function() {
+  geom_line(data = df_pdp3, 
+            aes(x = x_value, y = yhat*2))
+}
+
 pdf(paste0('figures/bio_matching/RAP-vs-sw_hists_', run, '.pdf'),
     width = 8)
 
 # interpolated data comparison
-ggplot() +
+g1 <- ggplot() +
   geom_histogram(data = rap_comb[rap_comb$dataset == 'interpolated',], 
                  aes(biomass, y = after_stat(density)),
                  bins = 100) + 
-  geom_density(data = sw_comb[sw_comb$dataset == 'interpolated', ], 
-               aes(biomass, color = graze, linetype = fire)) +
-  geom_line(data = df_pdp3, 
-            aes(x = x_value, y = yhat*2)) +
+  pdp_line() +
   scale_color_manual(values = cols_graze,
                      name = 'STEPWAT2 grazing') +
   facet_wrap(~PFT, ncol = 1, scales = 'free') +
   scale_y_continuous(sec.axis = sec_axis(~./2, name = 'Mean predicted fire probability')) +
   expand_limits(x = 0) +
-  labs(x = lab_bio0,
-       subtitle = 'Interpolated stepwat data',
-       caption = paste0(
-         'Histogram shows RAP data, colored lines show stepwat (', RCP, ' climate), black is fire model',
-         '\nData from 1km gridcells where interpolation matching quality < ', 
-         qual_cutoff,
-         '\nMatching critera from Palmquist used.',
-         '\nFor given pixels RAP data includes 3-year averages for all years in Holdrege et al.'
-       )) +
   theme(legend.position = 'top') +
-  linetype()
+  linetype() +
+  labs(x = lab_bio0)
+
+g1 +
+  geom_density(data = sw_comb[sw_comb$dataset == 'interpolated', ], 
+               aes(biomass, color = graze, linetype = fire)) +
+  labs(subtitle = 'Interpolated  stepwat data',
+       caption = paste('Histogram shows RAP data, colored lines show stepwat (', 
+                       RCP, ' climate), black is fire model',
+                       cap_interp, cap_match)) 
+
+g1 +
+  geom_density(data = sw_comb[sw_comb$dataset == 'interpolated', ], 
+               aes(biomass_qm, color = graze, linetype = fire)) +
+  labs( subtitle = 'Interpolated stepwat (quantile mapped) data',
+       caption = paste('Histogram shows RAP data, colored lines show stepwat quantile mapped values\n',
+                       cap_qm,
+                       cap_interp, cap_match))
 
 # stepwat site level comparison
 
-ggplot() +
+g2 <- ggplot() +
   geom_histogram(data = rap_comb[rap_comb$dataset != 'interpolated',], 
                  aes(biomass, y = after_stat(density)),
                  bins = 100) + 
-  geom_density(data = sw_comb[sw_comb$dataset != 'interpolated', ], 
-               aes(biomass, color = graze, linetype = fire)) +
-  geom_line(data = df_pdp3,
-            aes(x = x_value, y = yhat*2)) +
+  pdp_line() +
   scale_color_manual(values = cols_graze,
                      name = 'STEPWAT2 grazing') +
   facet_wrap(~PFT, ncol = 1, scales = 'free') +
   scale_y_continuous(sec.axis = sec_axis(~. /2, name = 'Mean predicted fire probability')) +
   expand_limits(x = 0) +
-  labs(x = lab_bio0,
-       subtitle = 'Stepwat site level data (not interpolated)',
-       caption = paste0(
-         'Stepwat data from ', length(unique(rap_comb$site)), ' sites',  
-         "\n(other sites didn't overlap with Holdrege et al. study area).",
-         '\nRAP data from Holdrege et al. only from grid-cells in those site locations',
-         "Black line is the mean fire model prediction")) +
   theme(legend.position = 'top') +
-  linetype()
+  linetype() +
+  labs(x = lab_bio0)
+
+g2 +
+  geom_density(data = sw_comb[sw_comb$dataset != 'interpolated', ], 
+               aes(biomass, color = graze, linetype = fire)) +
+  labs(subtitle = 'Stepwat site level data (not interpolated)',
+     caption = cap_sites) 
+
+g2 +
+  geom_density(data = sw_comb[sw_comb$dataset != 'interpolated', ], 
+               aes(biomass_qm, color = graze, linetype = fire)) +
+  labs(subtitle = 'Stepwat (quantile mapped) site level data (not interpolated)',
+       caption = paste(cap_sites, '\n', cap_qm))
 
 # histograms of just stepwat data 
 # showing these seperately because density curves may be hiding details

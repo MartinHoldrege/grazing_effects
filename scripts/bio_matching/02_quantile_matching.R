@@ -188,12 +188,13 @@ dev.off()
 
 name <- paste0(method_abbrev, "_", dataset_abbrev)
 out <- list('Aherb' = qm_comb[[name]]$Aherb,
-            'Pherb' = qm_interp[[name]]$Pherb,
+            'Pherb' = qm_comb[[name]]$Pherb,
             # update this caption depending on what qm functions are put here
             caption = paste(lookup_method[method_abbrev], 
-                            'used for quantile matching,',
+                            'used for quantile mapping,',
                             '\n with',
                             lookup_dataset[dataset_abbrev],
                             'data from', run),
-            'dataset' = lookup_dataset[dataset_abbrev])
+            'dataset' = lookup_dataset[dataset_abbrev],
+            run = run)
 saveRDS(out, 'data_processed/temp_rds/qm_funs.rds')
