@@ -24,7 +24,7 @@ library(tidyverse)
 library(terra)
 library(sf)
 source("src/general_functions.R")
-
+source("src/mapping_functions.R")
 # read in data ------------------------------------------------------------
 
 # data from the Holdrege et al. 2024 publication
@@ -159,6 +159,46 @@ sw_comb <- sw_site_bio1 %>%
   # so run names are the same between site level and interpolated
   mutate(run = str_replace(run, 'v\\d$', ""))
 
+# figure of inerpolation area ---------------------------------------------
+
+study <- cell_nums2
+study[study > 0] <- 1
+mask_tmp <- mask
+mask_tmp[is.na(mask_tmp)] <- 0
+study2 <- study + mask_tmp
+
+# percent of fire ecology study area covered with strict interpolation
+pcent <- round(sum(values(mask), na.rm = TRUE)/sum(values(study), na.rm = TRUE)*100)
+
+cls <- data.frame(id=1:2, name=c("Study area used in Fire Ecology",
+                                  'Subset of area used for quantile mapping'))
+levels(study2) <- cls
+
+bb <- st_bbox(terra::trim(study2))
+m <- plot_map2(terra::trim(study2), expand_bbox = FALSE) +
+  scale_fill_manual(values = c('grey', 'blue'), na.value = 'transparent',
+                    name = NULL, na.translate = FALSE) +
+  geom_sf(data = sites2, size = 1) +
+  ggplot2::coord_sf(
+    xlim = bb[c("xmin", "xmax")],
+    ylim = bb[c("ymin", "ymax")],
+    crs = crs_scd) +
+  theme(legend.position = 'bottom',
+        legend.direction = 'vertical') + 
+  labs(
+    subtitle = paste('Area used for interpolation for quantile mapping\n',
+                     'with STEPWAT2 sites also shown'),
+    caption = paste0(
+      pcent, "% of the Holdrege et al (Fire Ecology) study area is covered by\n",
+      " stepwat interpolated data when a strict (", qual_cutoff, ") matching quality",
+      " cutoff is used."
+    )
+    )
+
+jpeg("figures/bio_matching/interpolation_area.jpg",
+     res = 800, width = 6, height = 6.5, units = 'in') 
+m
+dev.off()
 
 # saving output -----------------------------------------------------------
 

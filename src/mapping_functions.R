@@ -165,6 +165,24 @@ inset_element2 <- function(x) {
 
 # this function relies on 
 # source("src/Functions__DisplayItems.R") (Daniels functions)
+plot_map2 <- function(r, ...)  {
+  
+  
+  s <- stars::st_as_stars(r)
+  
+  map <- plot_map(s, 
+                  st_geom_state = states,
+                  add_coords = TRUE,
+                  ...) +
+    ggplot2_map_theme() +
+    theme(plot.tag = element_text(face = 'plain'))
+  
+  map
+  
+}
+
+# this function relies on 
+# source("src/Functions__DisplayItems.R") (Daniels functions)
 plot_map_inset <- function(r,
                            colors = colors,
                            tag_label = "",
