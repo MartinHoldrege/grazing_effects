@@ -137,22 +137,23 @@ rap_df_m <- rap_df2 %>%
 rap_comb <- bind_rows(rap_df_m, rap_sub2) # all the rap data
 
 df_sw1 <- as_tibble(r_sw2) 
+df_sw1$cell_num <- terra::cells(r_sw2)
 
 info1 <- create_rast_info(r_sw2)
 
 df_sw2 <- df_sw1 %>% 
-  pivot_longer(cols = everything(),
+  pivot_longer(cols = -cell_num,
                names_to = 'id',
                values_to = 'biomass') %>% 
   left_join(info1, by = 'id') %>% 
   mutate(fire = str_extract(run, 'fire\\d'))
 
 tmp1 <- df_sw2 %>% 
-  select(run, fire, biomass, PFT, graze) %>% 
+  select(run, fire, biomass, PFT, graze, cell_num) %>% 
   mutate(dataset = 'interpolated') 
 
 sw_comb <- sw_site_bio1 %>% 
-  select(run, fire, biomass, PFT, graze) %>% 
+  select(run, fire, biomass, PFT, graze, site) %>% 
   mutate(dataset = 'site level') %>% 
   bind_rows(tmp1) %>% 
   # remove the (interpolation) version number

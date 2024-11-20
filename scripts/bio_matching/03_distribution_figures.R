@@ -60,6 +60,16 @@ for (pft in pfts) {
   sw_comb$biomass_qm[sw_comb$PFT ==pft] <- f(sw_comb$biomass[sw_comb$PFT ==pft])
 }
 
+# Pherb:total herb
+ratio <- sw_comb %>% 
+  filter(dataset == 'site level') %>% 
+  pivot_wider(id_cols = c('run', 'fire', 'graze', 'dataset', 'site'),
+              values_from = c('biomass', 'biomass_qm'),
+              names_from = 'PFT') %>% 
+  mutate(P_ratio_qm = biomass_qm_Pherb/(biomass_qm_Aherb + biomass_qm_Pherb),
+         P_ratio_raw = biomass_Pherb/(biomass_Aherb + biomass_Pherb))
+
+
 # climate figures -------------------------------------------------------------
 
 g <- ggplot(clim, aes(color = dataset_overlap)) +
@@ -181,3 +191,23 @@ for (pft in pft_lookup) {
 
 dev.off()
 
+# Pherb/total herb ratio -------------------------------------------------------
+
+# how does the perenial fraction change with quantile matching?
+g <- ratio %>% 
+  filter(run == !!run) %>% 
+  ggplot(aes(P_ratio_raw, P_ratio_qm)) +
+  geom_point(aes(color = graze)) +
+  scale_color_manual(values = cols_graze) +
+  geom_abline(color = 'darkgray') +
+  coord_cartesian(xlim = c(0, 1),
+                  ylim = c(0, 1)) +
+  labs(x = 'Pherb/(Pherb + Aherb) [Raw stepwat biomass]',
+       y = 'Pherb/(Pherb + Aherb) [quantile mapped biomass]',
+       subtitle = 'Proportion perennials before and after quantile mapping',
+       caption = paste('Current climate conditions.\n',
+                       run))
+
+pdf('figures/bio_matching/Pherb_ratio_qm.pdf')
+g
+dev.off()
