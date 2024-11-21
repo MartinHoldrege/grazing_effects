@@ -20,7 +20,7 @@ version <- 'v3'
 # v1--1st version of criteria (i.e. based on calculating mathcing criteria across the region)
 # v2--second version of criteria (i.e. basing matching criteria just on 200 sites)
 # v3--criteria used in palmquist et al 2021 and renne et al 2024
-run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
+run_climate <- TRUE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
 run_fire <- FALSE
 # for filtering output, put NULL if don't want to filter that variable
@@ -174,7 +174,7 @@ clim_all_w1 <- bio$clim_all2 %>%
   filter(.data$years %in% years2run | is.null(.data$years)) %>% 
   pivot_longer(cols = c("MAP", "MAT", 'psp')) %>% 
   ungroup() %>% 
-  mutate(id = paste(name, "climate", RCP, years, GCM, '20230919', sep = "_")) %>% 
+  mutate(id = paste(name, "climate", RCP, years, GCM, date, version, sep = "_")) %>% 
   dplyr::select(site, id, value) %>% 
   pivot_wider(id_cols = "site",
               names_from = "id",
