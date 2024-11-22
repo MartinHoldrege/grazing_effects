@@ -37,6 +37,8 @@ cols_herb <- cols_pft5_other[c("Cheatgrass","Pforb", "C4Pgrass", "C3Pgrass")]
 # fire probability
 cols_firep <- RColorBrewer::brewer.pal(11, "RdYlBu")[9:2]
 
+
+
 # * for maps --------------------------------------------------------------
 
 # Create color ramp that represents the proportional changes in biomass...
@@ -50,6 +52,15 @@ cols_map_bio_dr <- colorRampPalette(cols_map_bio_d, interpolate = 'spline')
 # Standard color ramp for current biomass:
 cols_map_bio <- colorRampPalette(c("#f7fcb9","#d9f0a3","#addd8e","#78c679","#41ab5d",
                            "#238443","#005a32"), interpolate = "spline")
+
+# colors for predictor variables of fire equation
+cols_pred <- list(
+  mat = c(low = '#fee0d2', high = '#67000d'),
+  map = c(low = '#d0d1e6', high = '#023858'),
+  psp = c(low = '#d0d1e6', high = '#023858'),
+  pfg = c(low = '#f7fcb9', high = '#004529'),
+  afg = c(low = '#f7fcb9', high = '#004529')
+)
 
 # axis labels -------------------------------------------------------------
 # meaning of endings: 0= raw value, 1 = raw change, 2 = % change

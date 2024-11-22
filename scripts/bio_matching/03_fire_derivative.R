@@ -22,6 +22,7 @@ library(tidyverse)
 library(patchwork)
 source('src/fire_functions.R')
 source("src/mapping_functions.R")
+source("src/fig_params.R")
 
 # read in data ------------------------------------------------------------
 
@@ -61,6 +62,10 @@ pred_raw <- c(clim1, bio1) # fire equation predictor variables
 r_qual <- rast(paste0("data_processed/interpolation_quality/matching_quality",
                       version_interp, ".tif"))
 
+
+# functions ---------------------------------------------------------------
+
+mm <- function(r) as.numeric(minmax(r))
 
 # create mask -------------------------------------------------------------
 
@@ -149,15 +154,58 @@ base_deriv <- function(limits = NULL, oob = scales::censor) {
 }
 
 
+
 # maps predictor vars -----------------------------------------------------
+lims_pred <- map(pred_vars, function(var) {
+  range(c(mm(pred_raw[[var]]), 
+          mm(pred_qm[[var]]))
+  )
+})
 
+base_pred <- function(var) {
+  list(smaller_legend(),
+       scale_fill_gradient(low = cols_pred[[var]]['low'],
+                        high = cols_pred[[var]]['high'],
+                        na.value = 'transparent',
+                        name = pred_var_names[var],
+                        limits = lims_pred[[var]]),
+       theme(legend.position = 'right'))
+}
 
+maps_pred_raw <- map(pred_vars, function(var) {
+  plot_map2(pred_raw[[var]],
+            maintitle = pred_var_names[var]) +
+    base_pred(var)
+
+})
+
+maps_pred_qm <- map(pred_vars, function(var) {
+  plot_map2(pred_qm[[var]],
+            maintitle = pred_var_names[var]) +
+    base_pred(var)
+  
+})
+
+cap0 <- paste('data from', rcp, 
+      'conditions and', run2,
+      '\nStudy area = SCD cells with <', mask_cutoff, 'matching quality')
+
+pdf(paste0('figures/bio_matching/fire_pred_vars_qm', qual_cutoff, '.pdf'),
+    width = 10, height = 7)
+g1 <- wrap_plots(maps_pred_raw, nrow = 2)
+g1 + plot_annotation(title = 'Fire predictor variables',
+                     subtitle = '(Raw STEPWAT2 biomass)',
+                     caption = paste(cap0, '\n\n'))
+
+g2 <- wrap_plots(maps_pred_qm, nrow = 2)
+g2 + plot_annotation(title = 'Fire predictor variables',
+                     subtitle = '(Quantile mapped STEPWAT2 biomass)',
+                     caption = paste(cap0, '\n', qm_l$caption))
+dev.off()
 
 # maps--derivatives -------------------------------------------------------
 
 lims_deriv <- map(pred_vars, function(var) {
-  mm <- function(r) as.numeric(minmax(r))
-  
   range(c(mm(fire_deriv_raw[[var]]), 
              mm(fire_deriv_qm[[var]]))
         )
