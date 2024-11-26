@@ -102,12 +102,22 @@ names(pred_vars) <- pred_vars
 pred_var_names <- c(toupper(pred_vars[1:3]), pfts[pred_vars[4:5]])
 names(pred_var_names) <- pred_vars
 
+# 1% of range of pred vars (raw)
+changes <- map_dbl(pred_vars, function(var) {
+  x <- pred_raw[[var]]
+  range <- range(values(x), na.rm = TRUE)
+  change <- (range[2] - range[1])*0.01
+  change
+})
+
+
 # percentage point change in fire probability with 1 unit change in deriv_var
 # (except for psp, it's per 0.1 unit)
 fire_deriv_raw <- map(pred_vars, function(deriv_var) {
   p <- fire_rast_wrapper(f = calc_fire_deriv,
                     r = pred_raw,
                     deriv_var = deriv_var,
+                    change = changes[deriv_var],
                     run_checks = FALSE)
   p*100 
 }) %>% 
@@ -118,6 +128,7 @@ fire_deriv_qm <- map(pred_vars, function(deriv_var) {
   p <- fire_rast_wrapper(f = calc_fire_deriv,
                          r = pred_qm,
                          deriv_var = deriv_var,
+                         change = changes[deriv_var],
                          run_checks = FALSE)
   p*100 
 }) %>% 
@@ -211,6 +222,8 @@ lims_deriv <- map(pred_vars, function(var) {
         )
 })
 
+
+
 maps_deriv_raw <- map(pred_vars, function(var) {
   g1 <- plot_map2(fire_deriv_raw[[var]],
             maintitle = pred_var_names[var]) +
@@ -248,14 +261,14 @@ cap1 <- paste('predictions made using simulation data from', rcp,
 annotation_raw <- function(prefix = '') {
   plot_annotation(
   title = 'Derivative of fire equation (raw stepwat biomass used)',
-  subtitle = 'change in fire probability (delta # fires/100 years) per 1% change in predictor variable',
+  subtitle = 'change in fire probability (delta # fires/100 years) per 1% change in (raw) predictor variable',
   caption = paste(prefix, cap1, '\n\n'))
 }
 
 annotation_qm <- function(prefix = '') {
   plot_annotation(
   title = 'Derivative of fire equation (quantile mapped stepwat biomass used)',
-  subtitle = 'change in fire probability (delta # fires/100 years) per 1% change in predictor variable',
+  subtitle = 'change in fire probability (delta # fires/100 years) per 1% change in (raw) predictor variable',
   caption = paste(prefix, cap1, 
                   '\n', qm_l$caption)) 
 }

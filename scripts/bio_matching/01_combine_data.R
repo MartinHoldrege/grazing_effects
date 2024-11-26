@@ -16,7 +16,7 @@ runs <- c("fire1_eind1_c4grass1_co20_2311", "fire0_eind1_c4grass1_co20")
 
 # matching quality cutoff, this decides
 # the cells from which both stepwat and rap data will be pulled from
-qual_cutoff <- 0.5 
+qual_cutoff <- 0.5 # 1 # 
 RCP <- 'Current'
 # dependencies ------------------------------------------------------------
 
@@ -196,9 +196,9 @@ m <- plot_map2(terra::trim(study2), expand_bbox = FALSE) +
     )
     )
 
-jpeg("figures/bio_matching/interpolation_area.jpg",
+jpeg(paste0("figures/bio_matching/interpolation_area_qm",  qual_cutoff,".jpg"),
      res = 800, width = 6, height = 6.5, units = 'in') 
-m
+print(m)
 dev.off()
 
 # saving output -----------------------------------------------------------

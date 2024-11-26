@@ -39,25 +39,34 @@ if (FALSE) {
 # does depend on the value of the other variables
 # deriv_var is a string (name of variable), the other inputs are vectors of 
 # the predictor variables
-calc_fire_deriv <- function(deriv_var, mat, map, psp, afg, pfg, ...)  {
+# change is change in x part of the slope
+# by default it is 1% of the range (i.e. change in y per 1% change in x)
+calc_fire_deriv <- function(deriv_var, mat, map, psp, afg, pfg, change = NULL,...)  {
   l1 <- list(mat = mat, map = map, psp = psp, afg = afg, pfg = pfg)
   l2 <- l1
   stopifnot(deriv_var %in% names(l1))
   
-  # determine width of the change
-  tmp <- l1[[deriv_var]]
-  range <- if(is.numeric(tmp)) {
-    range(tmp)
-  } else if ("SpatRaster" %in% class(tmp)){
-    range(values(tmp), na.rm = TRUE)
-  } else {
-    stop('incorrect data type')
-  }
+
+
 
   # makes +/- change be 1% of the range of the variable
-  change <- (range[2] - range[1])*0.005 
-  l1[[deriv_var]] <- l1[[deriv_var]] - change
-  l2[[deriv_var]] <- l2[[deriv_var]] + change
+  if(is.null(change)) {
+    # determine width of the change
+    tmp <- l1[[deriv_var]]
+    
+    range <- if(is.numeric(tmp)) {
+      range(tmp)
+    } else if ("SpatRaster" %in% class(tmp)){
+      range(values(tmp), na.rm = TRUE)
+    } else {
+      stop('incorrect data type')
+    }
+    
+    change <- (range[2] - range[1])*0.01
+  }
+   
+  l1[[deriv_var]] <- l1[[deriv_var]] - change/2
+  l2[[deriv_var]] <- l2[[deriv_var]] + change/2
   first <- predict_fire(mat = l1$mat, map = l1$map, psp = l1$psp, afg = l1$afg,
                         pfg = l1$pfg,
                         ...)

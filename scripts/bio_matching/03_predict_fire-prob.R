@@ -35,6 +35,7 @@ if(file.exists(path)) {
 
 run <- "fire1_eind1_c4grass0_co20_2311"
 dataset <- qm_l$dataset
+qual_cutoff <- qm_l$qual_cutoff
 
 # functions ---------------------------------------------------------------
 
@@ -139,7 +140,7 @@ cap2 <- paste0('Fire equation used to predict fire probability using both raw',
 
 
 pdf('figures/bio_matching/fire-prob_predicted_vs_simulated.pdf')
-ggplot(comb2, aes(sim_fire_prob, pred_fire_prob_raw)) +
+g <- ggplot(comb2, aes(sim_fire_prob, pred_fire_prob_raw)) +
   geom_point(size = 0.5) +
   geom_abline(intercept = 0, slope = 1) +
   geom_smooth(method = 'lm', se = FALSE) +
@@ -148,6 +149,7 @@ ggplot(comb2, aes(sim_fire_prob, pred_fire_prob_raw)) +
        y = lab_pred_raw,
        caption = cap1) +
   facet_wrap(RCP~years)
+print(g)
 
 g1 <- ggplot(delta_fire_grazeL, aes(sim_fire_prob, pred_fire_prob_raw, 
                                     color = graze)) +
@@ -160,22 +162,22 @@ g1 <- ggplot(delta_fire_grazeL, aes(sim_fire_prob, pred_fire_prob_raw,
        caption = cap1) +
   scale_color_manual(values = cols_graze)
 
-g1 + facet_wrap(RCP~years)
+print(g1 + facet_wrap(RCP~years))
 
-g1 + 
+print(g1 + 
   facet_wrap(~graze, ncol = 2) +
   theme(legend.position = 'none') +
   geom_vline(xintercept = 0, alpha = 0.5) +
-  geom_hline(yintercept = 0, alpha = 0.5)
+  geom_hline(yintercept = 0, alpha = 0.5))
   
 dev.off()  
 
 # figures--qm vs raw predicted -----------------------------------------
 
 
-pdf('figures/bio_matching/fire-prob_qm_vs_raw.pdf')
+pdf(paste0('figures/bio_matching/fire-prob_qm', qual_cutoff, '_vs_raw.pdf'))
 
-ggplot(comb2, aes(pred_fire_prob_raw, pred_fire_prob_qm)) +
+g <- ggplot(comb2, aes(pred_fire_prob_raw, pred_fire_prob_qm)) +
   geom_point(alpha = 0.5, size = 0.5) +
   geom_abline(intercept = 0, slope = 1) +
   geom_smooth(method = 'lm', se = FALSE) +
@@ -184,6 +186,7 @@ ggplot(comb2, aes(pred_fire_prob_raw, pred_fire_prob_qm)) +
        y = lab_pred_qm,
        caption = cap2) +
   facet_wrap(RCP~years)
+print(g)
 
 g1 <- ggplot(delta_fire_grazeL, aes(pred_fire_prob_raw, pred_fire_prob_qm, 
                                     color = graze)) +
@@ -196,13 +199,13 @@ g1 <- ggplot(delta_fire_grazeL, aes(pred_fire_prob_raw, pred_fire_prob_qm,
        caption = cap2) +
   scale_color_manual(values = cols_graze)
 
-g1 + facet_wrap(RCP~years)
+print(g1 + facet_wrap(RCP~years))
 
-g1 + 
+print(g1 + 
   facet_wrap(~graze, ncol = 2) +
   theme(legend.position = 'none') +
   geom_vline(xintercept = 0, alpha = 0.5) +
-  geom_hline(yintercept = 0, alpha = 0.5)
+  geom_hline(yintercept = 0, alpha = 0.5))
 
 dev.off()  
 

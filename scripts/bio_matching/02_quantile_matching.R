@@ -83,13 +83,19 @@ qm_quant_factory <- function(from, to) {
   }
 }
 
-probs = c(seq(0, 0.9, by = 0.1),
-          0.95, 0.96, 0.97, 0.98, 0.99, 0.995, 1)# probabilities to calculate the quantiles of
+probs = c(0, 0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.98, 0.995, 1)# probabilities to calculate the quantiles of
 
 # quantiles
 quants_interp <- map(cdfs_interp, function(l) {
   map(l, \(x) as.numeric(quantile(x, probs = probs)))
 })
+
+# dataframe, for making a rug plot
+quants_interp_df <- bind_cols(quants_interp$sw) %>% 
+  mutate(probs = probs) %>% 
+  pivot_longer(cols = c("Pherb", "Aherb"),
+               values_to = 'biomass',
+               names_to = 'PFT')
 
 quants_site <-map(cdfs_site, function(l) {
   map(l, \(x) as.numeric(quantile(x, probs = probs)))
@@ -170,18 +176,21 @@ df_seq2 <- dat %>%
   mutate(dataset = lookup_dataset[dataset],
          method = lookup_method[method])
 
-
-pdf("figures/bio_matching/q-q_plots_v1.pdf")
-ggplot(df_seq2, aes(x = biomass, y = biomass_qm)) +
+n <- length(probs) # number of probability (quantile) levels used
+pdf(paste0("figures/bio_matching/q-q_plots_qm", m$qual_cutoff, "_", 
+           n, "p.pdf"))
+g <- ggplot(df_seq2, aes(x = biomass, y = biomass_qm)) +
   geom_abline(slope = 1, color = 'gray') +
   geom_line(aes(linetype = method, color = dataset)) +
+  geom_rug(data =  quants_interp_df, aes(x = biomass, y = NULL), stat = 'identity') +
   facet_wrap(~PFT, scales = 'free', ncol = 1) +
   labs(x = 'Biomass (stepwat scale)',
        y = 'Quantile matched to RAP scale',
        caption = paste0(
-         length(probs), ' fixed quantiles used.',
+         n, ' fixed quantiles used (', paste(probs, collapse = ', '), ')',
          "\n all grazing levels from ", run, " used"
        )) 
+print(g)
 dev.off()
 
 # save objects ------------------------------------------------------------

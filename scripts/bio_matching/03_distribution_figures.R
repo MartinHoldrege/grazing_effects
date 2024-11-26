@@ -33,7 +33,7 @@ if(file.exists(path)) {
 run <- m$runs[1]
 RCP <- 'Current'
 stopifnot(run == qm_l$run) # there may be cases where this doesn't need to be true
-
+qual_cutoff <- qm_l$qual_cutoff
 # dataframes etc --------------------------------------------------------------
 
 clim <- m$clim
@@ -113,8 +113,8 @@ pdp_line <- function() {
             aes(x = x_value, y = yhat*2))
 }
 
-pdf(paste0('figures/bio_matching/RAP-vs-sw_hists_', run, '.pdf'),
-    width = 8)
+pdf(paste0('figures/bio_matching/RAP-vs-sw_hists_', run, '_qm', qual_cutoff, 
+           '.pdf'), width = 8)
 
 # interpolated data comparison
 g1 <- ggplot() +
@@ -131,21 +131,21 @@ g1 <- ggplot() +
   linetype() +
   labs(x = lab_bio0)
 
-g1 +
+print(g1 +
   geom_density(data = sw_comb[sw_comb$dataset == 'interpolated', ], 
                aes(biomass, color = graze, linetype = fire)) +
   labs(subtitle = 'Interpolated  stepwat data',
        caption = paste('Histogram shows RAP data, colored lines show stepwat (', 
                        RCP, ' climate), black is fire model',
-                       cap_interp, cap_match)) 
+                       cap_interp, cap_match)))
 
-g1 +
+print(g1 +
   geom_density(data = sw_comb[sw_comb$dataset == 'interpolated', ], 
                aes(biomass_qm, color = graze, linetype = fire)) +
   labs( subtitle = 'Interpolated stepwat (quantile mapped) data',
        caption = paste('Histogram shows RAP data, colored lines show stepwat quantile mapped values\n',
                        cap_qm,
-                       cap_interp, cap_match))
+                       cap_interp, cap_match)))
 
 # stepwat site level comparison
 
@@ -163,17 +163,17 @@ g2 <- ggplot() +
   linetype() +
   labs(x = lab_bio0)
 
-g2 +
+print(g2 +
   geom_density(data = sw_comb[sw_comb$dataset != 'interpolated', ], 
                aes(biomass, color = graze, linetype = fire)) +
   labs(subtitle = 'Stepwat site level data (not interpolated)',
-     caption = cap_sites) 
+     caption = cap_sites))
 
-g2 +
+print(g2 +
   geom_density(data = sw_comb[sw_comb$dataset != 'interpolated', ], 
                aes(biomass_qm, color = graze, linetype = fire)) +
   labs(subtitle = 'Stepwat (quantile mapped) site level data (not interpolated)',
-       caption = paste(cap_sites, '\n', cap_qm))
+       caption = paste(cap_sites, '\n', cap_qm)))
 
 # histograms of just stepwat data 
 # showing these seperately because density curves may be hiding details
@@ -208,6 +208,6 @@ g <- ratio %>%
        caption = paste('Current climate conditions.\n',
                        run))
 
-pdf('figures/bio_matching/Pherb_ratio_qm.pdf')
-g
+pdf(paste0('figures/bio_matching/Pherb_ratio_qm', qual_cutoff, '.pdf'))
+print(g)
 dev.off()
