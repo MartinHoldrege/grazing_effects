@@ -16,7 +16,7 @@ runs <- c("fire1_eind1_c4grass1_co20_2311", "fire0_eind1_c4grass1_co20")
 
 # matching quality cutoff, this decides
 # the cells from which both stepwat and rap data will be pulled from
-qual_cutoff <- 0.5 # 1 # 
+qual_cutoff <- 0.5 # 1 # decided to use 0.5, (results are similar to using 1)
 RCP <- 'Current'
 # dependencies ------------------------------------------------------------
 
@@ -50,8 +50,14 @@ paths <- list.files("data_processed/interpolated_rasters/biomass/",
 basename(paths)
 r_sw1 <- rast(paths)
 
+# for filter which data to use
 r_qual <- rast(paste0("data_processed/interpolation_quality/matching_quality",
                  version_interp, ".tif"))
+
+# for later reproducibility (i.e., know which sites were used, where)
+# gives the site number, of the site that was matched to the given pixel
+r_site <- rast(paste0("data_processed/interpolation_data/interp_locations_200sites_",
+                     version_interp, ".tif"))
 
 # vectors ----------------------------------------------------------------
 
@@ -120,9 +126,11 @@ cell_nums2 <- extend(cell_nums, r_qual)
 mask0 <- r_qual < qual_cutoff & !is.na(cell_nums2)
 mask <- classify(mask0, rcl = cbind(FALSE, NA))
 
-r_sw2 <- mask(r_sw1, mask)
-df_pherb <- r_sw2[[str_subset(names(r_sw2), 'Pherb')]]
-df_aherb <- r_sw2
+r_site2 <- mask(r_site, mask)
+names(r_site2) <- 'site'
+r_sw2 <- c(mask(r_sw1, mask), r_site2)
+
+
 cell_nums_m <- mask(cell_nums2, mask)
 cell_nums_mv <- as.numeric(cell_nums_m[!is.na(cell_nums_m)]) # vector
 
@@ -139,17 +147,17 @@ rap_comb <- bind_rows(rap_df_m, rap_sub2) # all the rap data
 df_sw1 <- as_tibble(r_sw2) 
 df_sw1$cell_num <- terra::cells(r_sw2)
 
-info1 <- create_rast_info(r_sw2)
+info1 <- create_rast_info(r_sw1)
 
 df_sw2 <- df_sw1 %>% 
-  pivot_longer(cols = -cell_num,
+  pivot_longer(cols = -c(cell_num, site),
                names_to = 'id',
                values_to = 'biomass') %>% 
   left_join(info1, by = 'id') %>% 
   mutate(fire = str_extract(run, 'fire\\d'))
 
 tmp1 <- df_sw2 %>% 
-  select(run, fire, biomass, PFT, graze, cell_num) %>% 
+  select(run, fire, biomass, PFT, graze, cell_num, site) %>% 
   mutate(dataset = 'interpolated') 
 
 sw_comb <- sw_site_bio1 %>% 
@@ -213,3 +221,19 @@ out <- list(
 
 saveRDS(out, 'data_processed/temp_rds/rap_sw_matching.rds')
 
+# saving these csv's for reproducibility
+if(qual_cutoff == 0.5) {
+  sw <- sw_comb %>% 
+    filter(dataset == 'interpolated',
+           fire == 'fire0')
+  
+  rap <- rap_comb %>% 
+    filter(dataset == 'interpolated') %>% 
+    select(-site)
+  
+  write_csv(sw, paste0('data_processed/qm/stepwat_for_qm_', qual_cutoff, 
+                       'match.csv'))
+  
+  write_csv(rap, paste0('data_processed/qm/rap_for_qm_', qual_cutoff, 
+                       'match.csv'))
+}

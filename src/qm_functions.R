@@ -73,5 +73,10 @@ qm_from_quantiles <- function(x, from, to) {
 }
 
 
+qm_quant_factory <- function(from, to) {
+  function(x) {
+    qm_from_quantiles(x, from = from, to = to)
+  }
+}
 
 
