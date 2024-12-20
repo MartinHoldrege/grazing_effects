@@ -33,7 +33,8 @@ rap1 <- read_csv(paste0('data_processed/qm/rap_for_qm_', qual_cutoff,
 # vectors -----------------------------------------------------------------
 
 pfts <- c('Pherb' = 'Pherb', 'Aherb' = 'Aherb')
-
+pft_lookup <- c('pfgAGB', 'afgAGB')
+names(pft_lookup) <- pfts
 # fitting cdfs ------------------------------------------------------------
 
 # fit emperical cdfs to interpolated data
@@ -67,7 +68,12 @@ to_long <- function(l, values_to) {
 out <- to_long(quants$rap, values_to = 'biomass_rap') %>% 
   left_join(to_long(quants$sw, values_to = 'biomass_stepwat'),
             by = c('quantile', 'PFT')) %>% 
-  arrange(PFT, quantile)
+  arrange(PFT, quantile) %>% 
+  mutate(biomass_rap = round(biomass_rap, digits = 2),
+         biomass_stepwat = round(biomass_stepwat, digits = 2),
+         # doing this so same names used as in stepwat code
+         PFT = pft_lookup[PFT]
+         )
 
 
 # functions ---------------------------------------------------------------
@@ -91,6 +97,7 @@ create_seq <- function(pft) {
   seq(from = 0, to = m + 10, length.out = 200)
 }
 
+
 df_seq <- tibble(Aherb = create_seq('Aherb'),
                  Pherb = create_seq('Pherb'))
 
@@ -105,12 +112,18 @@ for(pft in pfts) {
   seq1$biomass_qm[seq1$PFT == pft] <- qm_quant[[pft]](seq1$biomass[seq1$PFT == pft] )
 }
 
-ggplot(seq1, aes(biomass, biomass_qm)) +
+png("figures/bio_matching/q-q_plots_qm0.5_12p_simple.png",
+     width = 4, height = 7, units = 'in', res = 600)
+seq1 %>% 
+  mutate(PFT = pft_lookup[PFT]) %>% 
+  ggplot(aes(biomass, biomass_qm)) +
   geom_line() +
   facet_wrap(~PFT, ncol = 1, scales = 'free') +
   geom_abline(color = 'gray') +
-  geom_point(data = out, aes(biomass_stepwat, biomass_rap), color = 'blue')
-
+  geom_point(data = out, aes(biomass_stepwat, biomass_rap), color = 'blue') +
+  labs(x = 'Stepwat biomass ("from")',
+       y = 'RAP scale biomass ("to")')
+dev.off()
 
 # save objects ------------------------------------------------------------
 
@@ -118,6 +131,6 @@ run <- unique(sw1$run)
 
 stopifnot(length(run) == 1)
 
-name <- paste0('quantiles_for_qm_', qual_cutoff, 'match', run, '.csv')
+name <- paste0('quantiles_for_qm_', qual_cutoff, 'match_', run, '.csv')
 
 write_csv(out, file.path('data_processed/qm', name))
