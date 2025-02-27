@@ -139,7 +139,7 @@ fill_raster <- function(df, template) {
   full_df <- tibble(cell_num = 1:terra::ncell(template[[1]]))
   
   full_df2 <- full_join(full_df, df, by = 'cell_num') %>% 
-    select(-cell_num)
+    dplyr::select(-cell_num)
   
   stopifnot(nrow(full_df) == nrow(full_df2))
   

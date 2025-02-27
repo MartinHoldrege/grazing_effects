@@ -14,9 +14,11 @@ sage_cutoffs <- c(1, 2, 5) # rcmap sage cover of 30 pixel (%), for it
 # to be 'counted' [this only applies to pixels that are within the SCD study area]
 
 test_run <- FALSE # runs some code at low resolution for testing
-rerun <- FALSE # recreate intermediate objects (used so some slow code doesn't need to rerun)
+rerun <- TRUE # recreate intermediate objects (used so some slow code doesn't need to rerun)
 include_palm <- TRUE # should the study area include the full extent of previous
 # studies (e.g. Palmquist et al 2021), makes the study area larger
+# this doesn't apply to the output that 
+
 
 # read in data ------------------------------------------------------------
 
@@ -183,6 +185,15 @@ df_bioclim2 <- df_bioclim1 %>%
   left_join(site2, by = 'cellnumber') %>% 
   filter(!is.na(bio1))
 
+summary(df_bioclim1$prop_scd_all)
+
+
+# only cell numbers where proportion scd cells >50% -----------------------
+
+id_scd50 <- id1
+tmp <- fill_raster(df_bioclim2[, c('cellnumber', 'prop_scd_all')], id1)
+id_scd50[tmp < 0.5] <- NA
+
 # save outputs ------------------------------------------------------------
 
 if(!test_run) {
@@ -191,6 +202,9 @@ if(!test_run) {
                    'daymet-v', v, '_', period, ".csv"))
   
   writeRaster(id1, "data_processed/interpolation_data/cellnumbers.tif",
+              overwrite = TRUE)
+  
+  writeRaster(id_scd50, "data_processed/interpolation_data/cellnumbers_scd50.tif",
               overwrite = TRUE)
 }
 
