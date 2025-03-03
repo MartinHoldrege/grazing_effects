@@ -14,6 +14,7 @@
 library(tidyverse)
 library(DBI)
 source('src/paths.R') # db files stored on hard-drive
+
 # connect to db -----------------------------------------------------------
 
 # naming convention:
@@ -22,28 +23,20 @@ source('src/paths.R') # db files stored on hard-drive
 # Site-specific eind – 0/1
 # C4 grass expansion under future conditions – 0/1
 # CO2 – 0/1
+# runs done in 2025--quantile mapping for fire equation has been 
+# implemented
 
 db_paths <- c(
-  # first full run done by Kyle in 2023 (new dynamic eind implementation, 
-  # and new fire equation, co2 water use efficiency adjustment is turned off)
-  # (rerun Nov 2023, new fire equation)
-  # these all are for light grazing
-  "fire1_eind1_c4grass1_co20_2311" =
-    file.path(path_sw, "WildfireNov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass1.co20.sqlite"),
-  # co2 functionality turned on (run Nov 2023, new fire equation)
-  "fire1_eind1_c4grass1_co21_2311" =
-    file.path(path_sw, "WildfireCO2Nov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass1.co21.sqlite"),
-  # no co2, no fire 
-  "fire0_eind1_c4grass1_co20" =
-    file.path(path_sw, "NoWildfireJuly2023Runs/Output_fire0_grazL_eind1_c4grass1_co20.sqlite"),
-  # fire, NO c4 grass expansion, no co2
-  "fire1_eind1_c4grass0_co20_2311" =
-    file.path(path_sw, "WildfireC4grassesOffNov2023Runs/Output.Nov23.fire1.grazL.eind1.c4grass0.co20.sqlite"),
-  # additional runs w/ other grazing levels
-  "fire1_eind1_c4grass1_co20_2402" = 
-    file.path(path_sw, "WildfireGrazingFeb2024Runs/Output_fire1_grazMHVH_eind1_c4grass1_co20.sqlite"),
-  "fire1_eind1_c4grass0_co20_2402" = 
-    file.path(path_sw, "WildfireGrazingFeb2024Runs/Output_fire1_grazMHVH_eind1_c4grass1_co20.sqlite")
+  "fire1_eind1_c4grass1_co20_2502" =
+    file.path(path_sw, "fire1_eind1_c4grass1_co20_grazMHVH_2502", 
+              "Output_fire1_eind1_c4grass1_co20_grazMHVH_2502.sqlite"),
+  "fire1_eind1_c4grass1_co20_2502" =
+    file.path(path_sw, "fire1_eind1_c4grass1_co20_grazL_2502", 
+              "Output_fire1_eind1_c4grass1_co20_grazL_2502.sqlite"),
+  "fire1_eind1_c4grass0_co20_2502" =
+    file.path(path_sw, "fire1_eind1_c4grass0_co20_grazLMHVH_2502", 
+              "Output_fire1_eind1_c4grass0_co20_grazLMHVH_2502.sqlite")
+  
   )
 
 stopifnot(map_lgl(db_paths, file.exists))
@@ -61,8 +54,6 @@ stopifnot(map_dbl(tables, length) == 1)
 
 # list columns
 cols <- map2(db_connects, tables, dbListFields)
-
-cols
 
 #stopifnot(cols[[1]] == cols[[2]]) # the two tables should have exactly the same
 # structure
@@ -122,6 +113,7 @@ map(bio2[, group_cols], unique)
 
 # avg across years and make into long form
 bio2a <- bio2 %>% 
+  # filter(SoilTreatment == 'soils_fixed1') %>% 
   select(
     # numeric columns not interested in
     # only including biomass and indivs (# of individuals), columns
@@ -145,7 +137,8 @@ bio2a <- bio2 %>%
   # long format
   pivot_longer(# cols selection needs to be updated as different columns are 
                # selected above
-               cols = sagebrush:oppo) 
+               cols = sagebrush:oppo_Indivs) 
+
 
 bio3a <- bio2a %>% 
   # determine whether name value belongs to an indivs data or biomass data
@@ -194,6 +187,7 @@ bio3$n <- NULL
 # original version of this file (bio_mean_by_site-PFT.csv) was created with
 # data from the 2021/2022 implementationof stepwat (old cheatgrass fire, no C02,
 # and no dynamic eind implementation)
-write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v4.csv")
+write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v5.csv")
 
 map(db_connects, dbDisconnect) # disconnect
+

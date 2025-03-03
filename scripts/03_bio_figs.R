@@ -30,7 +30,13 @@ hfig_box2 <- 5 # height of 5 panel boxplots
 # number of columns of panels in boxplots
 ncol_box <- 3
 
-# * vectors/dfs for 'looping' ---------------------------------------------
+
+# dataframes --------------------------------------------------------------
+
+# TO DO
+# load dataframes from rds file here (instead of sourcing 02_summarize_bio.R)
+
+# vectors/dfs for 'looping' ---------------------------------------------
 
 # for looping
 levs_pft <- unique(pft5_bio2$PFT) # all pft levels in the main datafile
@@ -77,7 +83,7 @@ fire_med2 <- fire_med1 %>%
 # * boxplot ---------------------------------------------------------------
 
 # boxplots of utilization and biomass for all functional groups
-pdf("figures/biomass/bio-util-boxplot_all.pdf",
+pdf("figures/biomass/bio-util-boxplot_all_v2.pdf",
     height = 8, width = wfig_box1)
 
 figs_l <- map(runs_graze, function(x) {
@@ -168,7 +174,7 @@ dev.off()
 
 # each combination PFt and C4 on or off is plotted on seperate pages
 # facets are RCP/year combinations, colors are grazing
-pdf("figures/biomass/bio_vs_climate_v3.pdf",
+pdf("figures/biomass/bio_vs_climate_v4.pdf",
     width = 6, height = 5)
 
 # here pmap is working by taking the column names (i.e. iterating over rows)
@@ -279,7 +285,7 @@ cheat_df <- pft5_bio2 %>%
   filter(PFT == "Cheatgrass", RCP %in% c("Current", "RCP45")) %>% 
   select(run, years, RCP, graze, site, biomass, utilization)
 
-pdf("figures/biomass/light_vs_heavy_graze_scatterplot.pdf",
+pdf("figures/biomass/light_vs_heavy_graze_scatterplot_v2.pdf",
     width = 6, height = 6)
 
 for(r in runs_graze) {
@@ -345,7 +351,7 @@ compare_runs_scatter <- function(pft, var) {
     theme(legend.position = c(0.85, 0.15))
 }
 
-pdf("figures/biomass/bio-util_compare-runs.pdf",
+pdf("figures/biomass/bio-util_compare-runs_v2.pdf",
     width = 9, height = 7)
 
 map(levs_pft, function(x) {
@@ -366,7 +372,7 @@ g <- C3_Pgrass_ratio %>%
   labs(subtitle = "Ratio of C3Pgrass biomass to total Pgrass biomass",
        caption = "Separately showing data from simulations with C4 expansion on and off") 
 g
-ggsave("figures/biomass/C3_Pgrass_ratio.jpeg", g, 
+ggsave("figures/biomass/C3_Pgrass_ratio_v2.jpeg", g, 
        width = 6, height = 4)
 
 # biomass change -------------------------------------------------------
@@ -380,7 +386,7 @@ ggsave("figures/biomass/C3_Pgrass_ratio.jpeg", g,
 # conditions for that same grazing level (i.e. this is the climate effect)
 
 
-pdf("figures/biomass/pft5_bio-util_diff_boxplots_v1.pdf",
+pdf("figures/biomass/pft5_bio-util_diff_boxplots_v2.pdf",
     height = 8, width = wfig_box1)
 
 # scaled % change (see pre-2024 code)
@@ -460,7 +466,7 @@ dev.off()
 
 # effect size vs MAP and MAT, for for ref class of light grazing, for
 # each RCP/time period and PFT
-pdf("figures/biomass/bio-util-diff_vs_climate_v1.pdf",
+pdf("figures/biomass/bio-util-diff_vs_climate_v2.pdf",
     width = 6, height = 5)
 # scaled %change[see pre 2024 code]
 
@@ -511,7 +517,7 @@ dev.off()
 
 
 # ** boxplots -------------------------------------------------------------
-pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v2.pdf", 
+pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v3.pdf", 
     height = 8, width = wfig_box1)
 
 # effect size
@@ -599,7 +605,7 @@ dev.off()
 ref_threshold2 <- ref_threshold %>% 
   mutate(string = paste(round(threshold, 0), "g/m^2"))
 
-pdf("figures/threshold/threshold_dotplots_v2.pdf", 
+pdf("figures/threshold/threshold_dotplots_v3.pdf", 
     height = 6.5, width = wfig_box1)
 
 map(runs_graze, function(x) {
@@ -782,7 +788,7 @@ dev.off()
 # level
 
 # total utilization
-pdf("figures/biomass/tot-util_boxplot.pdf",
+pdf("figures/biomass/tot-util_boxplot_v2.pdf",
     height = 4, width = 4)
 
 figs_l <- map(runs_graze, function(x) {
@@ -856,7 +862,7 @@ map(runs_graze, function(x) {
 
 # * fire vs climate -------------------------------------------------------
 
-pdf("figures/fire/fire_vs_clim_v1.pdf",
+pdf("figures/fire/fire_vs_clim_v3.pdf",
     width = 8, height = 7)
 
 rn <- runs_graze['default']

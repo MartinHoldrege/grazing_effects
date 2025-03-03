@@ -737,7 +737,7 @@ pcc <- function(x){
 #' (the main analysis only includes a subset of scenarios), and focuses 
 #' on a given run
 filter_rcp_run <- function(df, PFT = FALSE, current = TRUE,
-                          run = "fire1_eind1_c4grass1_co20_2311") {
+                          run = "fire1_eind1_c4grass1_co20_2502") {
   rcp_levs <- c("Current", "RCP45")
   year_levs <- c("Current", "2070-2100")
   run_string <- run

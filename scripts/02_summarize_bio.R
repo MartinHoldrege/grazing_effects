@@ -30,7 +30,7 @@ n_iter <- 200 # number of iterations run
 
 # site level means of biomass across years, for each treatment and PFT
 # created in 01_query_db.R script
-bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v4.csv",
+bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v5.csv",
                  show_col_types = FALSE)
 
 # climate seasonality (file created in 01_summarize_clim.R)
@@ -90,7 +90,7 @@ seas2 <- seas1 %>%
 clim_all1 <- bio4 %>% 
   # arbitrarily filtering for one graze and PFT, so rows aren't duplicated
   filter(graze == "Light", PFT == "sagebrush",
-         run == "fire0_eind1_c4grass1_co20") %>% 
+         run == "fire1_eind1_c4grass1_co20_2502") %>% 
   select(site, PPT, Temp, years, RCP, GCM) %>% 
   left_join(seas2, by = join_by(site, years, RCP, GCM))
 
@@ -156,8 +156,8 @@ runs_graze0 <- pft5_bio1 %>%
   filter(n == 4) %>% 
   pull(run)
 
-runs_graze <- c('NoC4Exp' = "fire1_eind1_c4grass0_co20_2311", 
-                'default' = "fire1_eind1_c4grass1_co20_2311")
+runs_graze <- c('NoC4Exp' = "fire1_eind1_c4grass0_co20_2502", 
+                'default' = "fire1_eind1_c4grass1_co20_2502")
 
 # make sure selecting runs for which all grazing levs exist
 stopifnot(runs_graze %in% runs_graze0) 
@@ -571,9 +571,16 @@ fire_d_wgraze <- fire_med1 %>%
 out <- list(
   pft5_bio1 = pft5_bio1,
   pft5_bio2 = pft5_bio2,
+  pft5_bio_d2 = pft5_bio_d2,
+  pft5_bio_es1 = pft5_bio_es1,
+  pft5_d_wgcm = pft5_d_wgcm,
+  pft5_d_grefs = pft5_d_grefs,
+  pft5_es_wgcm = pft5_es_wgcm,
   fire0 = fire0,
   fire_med1 = fire_med1,
-  clim_all2 = clim_all2
+  clim_all2 = clim_all2,
+  runs_graze = runs_graze,
+  group_cols = group_cols
 )
 
 saveRDS(out, 'data_processed/site_means/summarize_bio.RDS')
