@@ -13,22 +13,30 @@
 
 # params ------------------------------------------------------------------
 
-rerun <- FALSE # re-create rasters that have already been interpolated?
+rerun <- FALSe # re-create rasters that have already been interpolated?
 test_run <- FALSE # TRUE # 
-date <- "20240605" # for appending to select file names
-version <- 'v3'
+date <- "20250228" # for appending to select file names
+version <- 'v4'
 # v1--1st version of criteria (i.e. based on calculating mathcing criteria across the region)
 # v2--second version of criteria (i.e. basing matching criteria just on 200 sites)
 # v3--criteria used in palmquist et al 2021 and renne et al 2024
+# v4-- criteria same as v3, but new study area mask used (more restrictive)
 run_climate <- TRUE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
-run_fire <- FALSE
+run_fire <- TRUE
+
 # for filtering output, put NULL if don't want to filter that variable
-PFT2run = c('Pherb', 'Aherb') #c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 'Pherb', 'Aforb', 'Pgrass')
-run2run = 'fire0_eind1_c4grass1_co20' # or NULL
-years2run = 'Current'
+PFT2run =c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 
+           'Pherb', 'Aherb', 'Aforb','Pgrass')
+
+run2run = NULL # 'fire0_eind1_c4grass1_co20' # or NULL
+years2run =  NULL #'Current'
 
 v2paste <- if(version == 'v1') "" else version # for pasting to interpolated tiffs
+
+subset_in_target <- FALSE
+exclude_poor_matches <- TRUE
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -37,18 +45,29 @@ library(rMultivariateMatching)
 library(doParallel)
 library(dtplyr)
 source("src/general_functions.R")
-
+source("src/mapping_functions.R")
 # read in data ------------------------------------------------------------
 # list dataframes of stepwat2 output created in "scripts/02_summarize_bio.R" 
 bio <- readRDS('data_processed/site_means/summarize_bio.RDS') 
 
-# template raster
-path_template <- "data_processed/interpolation_data/cellnumbers.tif"
+# template raster, only 1km pixels that contain at least 50% scd pixels
+# file created in 01_interpolation_data.R
+
+# actual area for interpolation
+path_template <- "data_processed/interpolation_data/cellnumbers_scd50.tif"
 template <- raster(path_template)
+
+# cell numbers corresponding to the climate data (broader b/ some
+# sites outside of the new mask, but cellnumbers still match that in the template)
+template_clim <- raster("data_processed/interpolation_data/cellnumbers.tif")
+
+if(version < 'v4') {
+  template <- template_clim
+}
 
 # Read in raw bioclim data for sagebrush extent and set cellnumbers as rownames
 # (tc stands for 'targetcells')
-tc1 <- read_csv("data_processed/interpolation_data/clim_for_interp_daymet-v4_1991-2020.csv",
+tc0 <- read_csv("data_processed/interpolation_data/clim_for_interp_daymet-v4_1991-2020.csv",
                 col_types = cols(site_id = 'd'),
                 show_col_types = FALSE)
 
@@ -58,17 +77,13 @@ tc1 <- read_csv("data_processed/interpolation_data/clim_for_interp_daymet-v4_199
 # * Target cell data ------------------------------------------------------
 # prepare the bioclim data
 
-tc1 <- as.data.frame(tc1) %>%  # col names for tibbles are deprecated
-  # creating dummy x and y coordinates (using projected data here
-  # so lat/lon isn't approprate anymore), but location identifying x,y
-  # is needed by multivarmatch()
-  mutate(x = cellnumber,
-         y = cellnumber)
+tc0 <- as.data.frame(tc0) # colnmaes for tibbles are deprecated
 
 # need x and y coordinates for the rmultivarmatch
-coords <- raster::coordinates(template)
-tc1$x <- coords[, 'x'][tc1$cellnumber]
-tc1$y <- coords[, 'y'][tc1$cellnumber]
+coords <- as.data.frame(raster::coordinates(template_clim))
+coords$cellnumber <- values(template_clim) 
+tc1 <- tc0 %>% 
+  left_join(coords, by = 'cellnumber')
 
 rownames(tc1) <- tc1$cellnumber # needed for multivarmatch fun
 
@@ -77,7 +92,8 @@ rownames(tc1) <- tc1$cellnumber # needed for multivarmatch fun
 bioclim_vars <- c("bio1", "bio4", "bio9", "bio12", 
                   "bio15", "bio18")
 
-tc2 <- tc1[, c("cellnumber", 'site_id', 'x', 'y', bioclim_vars)]
+tc2a <- tc1[, c("cellnumber", 'site_id', 'x', 'y', bioclim_vars)]
+
 
 # criteria for matchingvars function (here using 10% of range of data)
 # this is for scaling the variables
@@ -91,7 +107,7 @@ if (version == 'v1') {
   })
   criteria <- criteria_v2
   # for v2, switching to base matching variables on the grid-cells with sites
-} else if (version == 'v3') {
+} else if (version == 'v3' | version == 'v4') {
   # criteria used in Renne et al 2024 
   criteria_v3 <- c(bio1 = 1.55, 
                    bio4 = 61.1, 
@@ -112,14 +128,21 @@ write_csv(data.frame(variable = names(criteria), criteria = criteria),
 # done
 
 # sc stands for 'subset cell'
-sc1 <-  tc2 %>% 
+sc1 <-  tc2a %>% 
   filter(!is.na(site_id))
+
+
+# filter down the tc2a dataframe to only include the 
+# cells in the template
+cellnumbers <- as.numeric(values(template))
+cellnumbers <- cellnumbers[!is.na(cellnumbers)]
+tc2 <- tc2a %>% 
+  filter(cellnumber %in% cellnumbers)
 
 # check (should be 200 sites)
 if(nrow(sc1) != 200 | any(duplicated(sc1$site_id))) {
-  warning("Problem with dataframe")
+  stop("Problem with dataframe")
 }
-
 
 # stepwat2 outputs --------------------------------------------------------
 
@@ -148,7 +171,8 @@ pft5_bio_w1 <- bio$pft5_bio1 %>%
               values_from = "biomass")
 
 # joining in cell numbers
-pft5_bio_w2 <- join_subsetcells(step_dat = pft5_bio_w1, sc_dat = sc1)
+pft5_bio_w2 <- join_subsetcells(step_dat = pft5_bio_w1, sc_dat = sc1,
+                                subset_in_target = subset_in_target)
 
 # * wildfire --------------------------------------------------------------
 
@@ -163,7 +187,7 @@ fire_w1 <- bio$fire0 %>%
   pivot_wider(id_cols = "site",
               names_from = "id",
               values_from = "fire_prob") %>% 
-  join_subsetcells(sc_dat = sc1)
+  join_subsetcells(sc_dat = sc1, subset_in_target = subset_in_target)
 }
 
 # * climate ---------------------------------------------------------------
@@ -171,7 +195,7 @@ fire_w1 <- bio$fire0 %>%
 # but date attached in case in future runs are based on a different climate
 # dataset
 clim_all_w1 <- bio$clim_all2 %>% 
-  filter(.data$years %in% years2run | is.null(.data$years)) %>% 
+  filter(.data$years %in% years2run | is.null(years2run)) %>% 
   pivot_longer(cols = c("MAP", "MAT", 'psp')) %>% 
   ungroup() %>% 
   mutate(id = paste(name, "climate", RCP, years, GCM, date, version, sep = "_")) %>% 
@@ -181,7 +205,8 @@ clim_all_w1 <- bio$clim_all2 %>%
               values_from = "value")
 
 # joining in cell numbers
-clim_all_w2 <- join_subsetcells(step_dat = clim_all_w1, sc_dat = sc1)
+clim_all_w2 <- join_subsetcells(step_dat = clim_all_w1, sc_dat = sc1,
+                                subset_in_target = subset_in_target)
 
 # code removed for following sections--see 2022 commits to get code
 # *crossing threshold ----------------------------------------------------
@@ -203,54 +228,63 @@ if(!all(rownames(sc1 %in% rownames(tc2)))) {
 # not sure why "In max(raster::values(x), na.rm = TRUE..."
 # warning is being thrown, but output looks ok
 #no non-missing arguments to max; returning -In
+
+# STOP: continue here--troubleshoot the
+# the problem that subset_in_target = FALSE flag
+# arg should be used, but that's causing additional problems
+sc2 <- sc1[, c("site_id", 'x', 'y', bioclim_vars)]
+rownames(sc2) <- sc2$site_id
 match1 <- multivarmatch(
   matchingvars = drop_na(dplyr::select(tc2, -site_id)),
-  # I'm not sure the site ID column is needed/doing anything here
-  subsetcells = sc1[, c("x", "y", "site_id")],
+  # subset cells include cells that are not
+  subsetcells = sc2,
   matchingvars_id = "cellnumber",
   subsetcells_id = "site_id",
   criteria = criteria,
   raster_template = template,
-  subset_in_target = TRUE
+  subset_in_target = subset_in_target,
+  addpoints = FALSE
 )
+
 
 # *plotting interpolation quality -----------------------------------------
 
-interp <- template
-
-interp_ordered <- template
 
 tmp_site_id <- match1 %>% 
-  mutate(subset_cell = as.numeric(subset_cell)) %>% 
-  left_join(sc1, by = c("subset_cell" = "cellnumber")) %>% 
-  pull(site_id)
+  mutate(
+    # site from which data pulled
+    site_id = as.numeric(subset_cell),
+    # cellnumber of the cell interpolated to
+    cellnumber = as.numeric(target_cell)) %>% 
+  dplyr::select(site_id, cellnumber)
 
 # for each pixels this raster shows which stepwat site the data was drawn
 # from for interpolation
-interp_ordered[as.numeric(match1$target_cell)] <- tmp_site_id
+interp_ordered <- fill_raster(tmp_site_id, template = template,
+                              use_template_values = TRUE)
+
 writeRaster(interp_ordered, 
             paste0("data_processed/interpolation_data/interp_locations_200sites_", version, ".tif"),
             overwrite = TRUE)
 
 set.seed(1234)
-# map of where site_ids are interpolated to
-interp[as.numeric(match1$target_cell)] <- tmp_site_id %>% 
-  factor() %>% 
-  forcats::fct_shuffle()
 
+rand <- sample(1:200, 200)
 pal <- colorRampPalette(rev(RColorBrewer::brewer.pal(10, 'RdBu')))(200)
 jpeg(paste0("figures/interpolation_quality/interpolation_areas_", version, ".jpeg"),
      res = 600, units = 'in', width = 8, height = 8)
-  plot(interp, main = 'interpolation areas (site numbers jumbled)',
-       col = pal)
+  plot(interp_ordered, main = 'interpolation areas (random colors)',
+       col = pal[rand])
 dev.off()
 
 
 # proportion cells with decent matching quality
-mean(match1$matching_quality < 1.5) # ~93%
+mean(match1$matching_quality < 1.5) # ~87%
 
-match_quality <- template
-match_quality[as.numeric(match1$target_cell)] <- match1$matching_quality
+match_quality <-  match1 %>% 
+  mutate(cell_num = as.numeric(target_cell)) %>% 
+  dplyr::select(cell_num, matching_quality) %>% 
+  fill_raster(template, use_template_values = TRUE)
 
 jpeg(paste0("figures/interpolation_quality/matching_quality_", version, ".jpeg"),
      res = 600, units = 'in', width = 8, height = 8)
@@ -283,13 +317,15 @@ writeRaster(match_quality,
 min_size <- file.size(path_template)*0.2 # 0.5 multiplier is arbitrary, and maybe not strict enough
 
 # which columns haven't already been upscaled
+path_bio <- file.path("data_processed/interpolated_rasters/biomass", version)
+if(!dir.exists(path_bio)) {
+  dir.create(path_bio)
+}
 todo2 <- which_todo(df = pft5_bio_w2,
-                   path = "data_processed/interpolated_rasters/biomass",
+                   path = path_bio,
                    pattern = ".tif$",
                     min_size = min_size,
                    rerun = rerun)
-
-todo2
 
 # num cores, this includes logical cores (threads)
 num.cores <- parallel::detectCores() 
@@ -299,7 +335,6 @@ registerDoParallel(num.cores)
 # if all have been upscaled then todo just includes 'cellnumbers'
 if(length(todo2) > 1) {
   
-
 if(test_run) {
   todo2 <- todo2[1:3]
 }
@@ -318,14 +353,14 @@ foreach (x = vecs_l) %dopar% {
   rMultivariateMatching::interpolatePoints(
     matches = match1,
     output_results = pft5_bio_w3[, c(1, x)], 
-    exclude_poor_matches = FALSE,
+    exclude_poor_matches = exclude_poor_matches,
     subset_cell_names = "subset_cell",
     quality_name = "matching_quality",
     matching_distance = 1.5,
     raster_template = template,
     plotraster = FALSE,
     saveraster = TRUE,
-    filepath = "./data_processed/interpolated_rasters/biomass",
+    filepath = path_bio,
     overwrite = TRUE
   )
 }
@@ -333,11 +368,17 @@ foreach (x = vecs_l) %dopar% {
 print('biomass done')
 print(Sys.time())
 }
+
 # * fire ------------------------------------------------------------------
 if(run_fire) {
 # which columns haven't already been upscaled
+  
+  path_fire <- file.path("data_processed/interpolated_rasters/fire", version)
+  if(!dir.exists(path_fire)) {
+    dir.create(path_fire)
+  }
 todo3 <- which_todo(df = fire_w1,
-                    path = "data_processed/interpolated_rasters/fire",
+                    path = path_fire,
                     pattern = ".tif$",
                     min_size = min_size,
                     rerun = rerun)
@@ -361,14 +402,14 @@ foreach (x = vecs_l2) %dopar% {
   rMultivariateMatching::interpolatePoints(
     matches = match1,
     output_results = fire_w2[, c(1, x)], 
-    exclude_poor_matches = FALSE,
+    exclude_poor_matches = exclude_poor_matches,
     subset_cell_names = "subset_cell",
     quality_name = "matching_quality",
     matching_distance = 1.5,
     raster_template = template,
     plotraster = FALSE,
     saveraster = TRUE,
-    filepath = "./data_processed/interpolated_rasters/fire",
+    filepath = path_fire,
     overwrite = TRUE
   )
 }
@@ -382,19 +423,24 @@ print(Sys.time())
 # * climate ---------------------------------------------------------------
 
 if (run_climate) {
+  path_clim <- file.path("data_processed/interpolated_rasters/climate", version)
+  if(!dir.exists(path_clim)) {
+    dir.create(path_clim)
+  }
   rMultivariateMatching::interpolatePoints(
     matches = match1,
     output_results = clim_all_w2, 
-    exclude_poor_matches = FALSE,
+    exclude_poor_matches = exclude_poor_matches,
     subset_cell_names = "subset_cell",
     quality_name = "matching_quality",
     matching_distance = 1.5,
     raster_template = template,
     plotraster = FALSE,
     saveraster = TRUE,
-    filepath = "./data_processed/interpolated_rasters/climate",
+    filepath = path_clim,
     overwrite = TRUE
   )
+  
 }
 
 if(run_climate_daymet){
@@ -410,14 +456,14 @@ names(daymet1)[-1] <- paste0(names(daymet1)[-1], "_daymet-climate_", date, "_", 
 rMultivariateMatching::interpolatePoints(
   matches = match1,
   output_results = daymet1, 
-  exclude_poor_matches = FALSE,
+  exclude_poor_matches = exclude_poor_matches,
   subset_cell_names = "subset_cell",
   quality_name = "matching_quality",
   matching_distance = 1.5,
   raster_template = template,
   plotraster = FALSE,
   saveraster = TRUE,
-  filepath = "./data_processed/interpolated_rasters/climate",
+  filepath = path_clim,
   overwrite = TRUE
 )
 }

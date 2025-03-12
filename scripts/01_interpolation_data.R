@@ -14,7 +14,7 @@ sage_cutoffs <- c(1, 2, 5) # rcmap sage cover of 30 pixel (%), for it
 # to be 'counted' [this only applies to pixels that are within the SCD study area]
 
 test_run <- FALSE # runs some code at low resolution for testing
-rerun <- TRUE # recreate intermediate objects (used so some slow code doesn't need to rerun)
+rerun <- FALSE # recreate intermediate objects (used so some slow code doesn't need to rerun)
 include_palm <- TRUE # should the study area include the full extent of previous
 # studies (e.g. Palmquist et al 2021), makes the study area larger
 # this doesn't apply to the output that 
@@ -192,7 +192,8 @@ summary(df_bioclim1$prop_scd_all)
 
 id_scd50 <- id1
 tmp <- fill_raster(df_bioclim2[, c('cellnumber', 'prop_scd_all')], id1)
-id_scd50[tmp < 0.5] <- NA
+id_scd50[is.na(tmp) | tmp < 0.5] <- NA
+id_scd50 <- trim(id_scd50)
 
 # save outputs ------------------------------------------------------------
 

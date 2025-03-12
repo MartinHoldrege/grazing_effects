@@ -128,25 +128,50 @@ rast_diff <- function(rast, ref_layer, target_layer) {
 #' @param template template raster (terra spatraster)
 #' @param df dataframe with 1 or more data columns and 1 cellnum column
 #' where the cellnums correspond to the cellnumbers of the template raster
+#' @param use_template_values logical, use the actuall cell velues of the
+#' template rasters as the cell numbers to match by (as opposed to just
+#' calculating the cellnumbers of the template). Important distinction
+#' if the template raster was created, and contains cell numbers but was
+#' then trimmed so cell values don't match the cellnumbers derived from ncell
 #' 
 #' @return spatraster
-fill_raster <- function(df, template) {
+fill_raster <- function(df, template,
+                        use_template_values = FALSE) {
   stopifnot(is.data.frame(df),
             'cell_num' %in% names(df) | 'cellnumber' %in% names(df))
   if('cellnumber' %in% names(df)) {
     df <- rename(df, cell_num = cellnumber)
   }
-  full_df <- tibble(cell_num = 1:terra::ncell(template[[1]]))
   
-  full_df2 <- full_join(full_df, df, by = 'cell_num') %>% 
-    dplyr::select(-cell_num)
-  
-  stopifnot(nrow(full_df) == nrow(full_df2))
+  if(!use_template_values) {
+    full_df <- tibble(cell_num = 1:terra::ncell(template[[1]]))
+    
+    full_df2 <- full_join(full_df, df, by = 'cell_num') %>% 
+      dplyr::select(-cell_num)
+    
+    stopifnot(nrow(full_df) == nrow(full_df2))
+  } else {
+    stopifnot(terra::nlyr(terra::rast(template)) == 1)
+    full_df <- as.data.frame(template) %>% 
+      tidyr::drop_na()
+    names(full_df) <- 'cell_num'
+    
+    stopifnot(all(full_df$cell_num %in% df$cell_num))
+
+    full_df2 <- left_join(full_df, df, by = 'cell_num') %>% 
+      dplyr::select(-cell_num)
+  }
+
   
   r_out <- terra::rast(template[[1]], nlyrs = ncol(full_df2))
   names(r_out) <- names(full_df2)
   
-  terra::values(r_out) <- as.matrix(full_df2)
+  if(!use_template_values) {
+    terra::values(r_out) <- as.matrix(full_df2)
+  } else {
+    r_out[!is.na(r_out)] <- as.matrix(full_df2)
+  }
+  
   r_out
 }
 

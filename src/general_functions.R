@@ -820,19 +820,31 @@ filter_clim_extremes <- function(df) {
 #' @param step_dat stepwat data (wide format)
 #' @param sc_dat subset cell information (including cell numbers and 
 #' site number corresponding)
+#' @param subset_in_target is the matching function using subset_in_target? If false then no cell numbers are used, instead site numbers are used instead of cell numbers (otherwise the interpolatePoints function doesn't work properly)
 #'
 #' @return Dataframe with the two df's joined, and cell number for rownames
-join_subsetcells <- function(step_dat, sc_dat) {
+join_subsetcells <- function(step_dat, sc_dat,
+                             subset_in_target = FALSE) {
   
   # join in cell number info
-  out <- sc_dat[, c("cellnumber", "site_id")] %>% 
-    rename(site = site_id) %>% 
-    inner_join(step_dat, by = "site") %>% 
-    dplyr::select(-site)
-  
+  if(subset_in_target) {
+    out <- sc_dat[, c("cellnumber", "site_id")] %>% 
+      rename(site = site_id) %>% 
+      inner_join(step_dat, by = "site") %>% 
+      dplyr::select(-site)
+    
+
+  } else {
+    # in this case, the unique identifier is 
+    # the site, which is used instead of the 
+    # "cell number"
+    out <- step_dat %>% 
+      rename("cellnumber" = "site")
+  }
+
   # rownames needed for interpolatePoints()
+  out <- as.data.frame(out) # can't be a tibble b/ of rMultivariateMatching
   rownames(out) <- out$cellnumber
-  
   stopifnot(nrow(out) == 200) # check for join issues
   
   out
