@@ -21,10 +21,11 @@ source("src/general_functions.R")
 
 # params ------------------------------------------------------------------
 
+v <- 'v4' # interpolation version
 # multiple runs may need to listed if different runs done for different
 # grazing levels
-runs <- c('fire1_eind1_c4grass0_co20_2311',
-         'fire1_eind1_c4grass0_co20_2402')
+
+runs <- c('fire1_eind1_c4grass1_co20_2502')
 run <- runs[[1]] # used for output file naming
 
 # read in data ------------------------------------------------------------
@@ -33,7 +34,7 @@ run <- runs[[1]] # used for output file naming
 
 # data up-scaled for each GCM
 regex <- if(length(runs) == 1) runs else paste0('(', paste(runs, collapse = ')|('), ")")
-bio_files <- list.files("data_processed/interpolated_rasters/biomass/",
+bio_files <- list.files(file.path("data_processed/interpolated_rasters/biomass", v),
                         pattern = regex,
                         full.names = TRUE)
 length(bio_files)

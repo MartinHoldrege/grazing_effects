@@ -13,7 +13,7 @@
 
 # params ------------------------------------------------------------------
 
-rerun <- FALSe # re-create rasters that have already been interpolated?
+rerun <- FALSE # re-create rasters that have already been interpolated?
 test_run <- FALSE # TRUE # 
 date <- "20250228" # for appending to select file names
 version <- 'v4'

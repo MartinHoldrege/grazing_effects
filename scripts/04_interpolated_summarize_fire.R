@@ -17,8 +17,8 @@ source("src/general_functions.R")
 
 # params ------------------------------------------------------------------
 
-runs <- c('fire1_eind1_c4grass0_co20_2311')
-
+v <- 'v4' # interpolation version
+runs <- c('fire1_eind1_c4grass0_co20_2502', 'fire1_eind1_c4grass1_co20_2502')
 # some terra operations can be done in parallel and need 
 # to know num of cores
 num.cores <- parallel::detectCores(logical = FALSE) 
@@ -31,7 +31,7 @@ print(run)
 # * rasters ---------------------------------------------------------------
 
 # data up-scaled for each GCM
-fire_files <- list.files("data_processed/interpolated_rasters/fire/",
+fire_files <- list.files(file.path("data_processed/interpolated_rasters/fire/", v),
                         pattern = run,
                         full.names = TRUE)
 length(fire_files)
@@ -129,3 +129,4 @@ writeRaster(diff_cref2,
             overwrite = TRUE)
 
 } # end loopoing over runs
+
