@@ -50,7 +50,8 @@ into <- c("type", "RCP", "years",
 rast_info <- create_rast_info(rast1, into = into) %>% 
   mutate(layer_num = 1:nrow(.),
          # remove GCM from the string
-         id_noGCM = str_replace(id, "_[^_]*$", "")) %>% 
+         id_noGCM = str_replace(id, "_[^_]*$", ""),
+         id_noGraze = str_replace(id, "_(Light|Moderate|Heavy|VeryHeavy)", "")) %>% 
   # the ordering is important for later creation of spatraster dataset
   arrange(id)
 
@@ -110,6 +111,50 @@ diff_cref2 <- rast(diff_cref1)
 names(diff_cref2) <- map(diff_cref1, names) %>% 
   unlist()
 
+
+# change relative to light grazing of same gcm -------------------------
+
+# e.g. this shows percentage point change when going from light grazing, to heavy
+# grazing for RCP 8.5 end of century
+# (wgcm = comparisons are  'within gcm')
+id_noGraze <- unique(rast_info$id_noGraze)
+ref_graze <- 'Light'
+
+diff_wgcm_graze_gcm <- map(id_noGraze, function(id) {
+  info <- rast_info %>% 
+    filter(id_noGraze == !!id) %>% 
+    arrange(graze)
+  
+  r1 <- rast1[[info$id[info$graze != ref_graze]]]
+  
+  r_ref <- rast1[[info$id[info$graze == ref_graze]]]
+  stopifnot(nlyr(r1) == 3,
+            nlyr(r_ref) == 1)
+  r1 - r_ref # percentage point difference, for the given gcm
+}) %>% 
+  rast()
+
+id_noGCM_noref <- rast_info %>% 
+  filter(graze != ref_graze) %>% 
+  pull(id_noGCM) %>% 
+  unique()
+
+diff_wgcm_graze_med <- map(id_noGCM_noref, function(id) {
+  info <- rast_info %>% 
+    filter(id_noGCM == !!id)
+  
+  r <- diff_wgcm_graze_gcm[[info$id]]
+  med <- median(r)
+  names(med) <- id
+  med
+}) %>% 
+  rast()
+
+stopifnot(
+  # 3grazing levels *(4 future + 1 current scenario)
+  nlyr(diff_wgcm_graze_med) == 3*(4 + 1) 
+)
+
 # save files ---------------------------------------------------------
 
 # * rasters ---------------------------------------------------------------
@@ -128,5 +173,12 @@ writeRaster(diff_cref2,
                       paste0(run, "_fire-prob-rdiff-cref_median.tif")),
             overwrite = TRUE)
 
-} # end loopoing over runs
+# within GCM difference relative to reference graze
+writeRaster(diff_wgcm_graze_med, 
+            file.path("data_processed/interpolated_rasters", 
+                      paste0(run, "_fire-prob-wgcmDiff-", ref_graze, "_median.tif")),
+            overwrite = TRUE)
+
+
+} # end looping over runs
 

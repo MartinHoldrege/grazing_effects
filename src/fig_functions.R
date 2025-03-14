@@ -373,6 +373,8 @@ rcp_label <- function(rcp, years, add_letters = FALSE,
   x2
 }
 
+
+
 # color functions ---------------------------------------------------------
 
 # grazing colors (cols_graze defined in the fig_params.R script)
