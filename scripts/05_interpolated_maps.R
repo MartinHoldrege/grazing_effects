@@ -7,397 +7,153 @@
 # based on STEPWAT2 output for 200 sites (for each plant functional
 # type and climate and grazing scenario) that has been upscaled across
 # the west. The rasters of interpolated data are created
-# in the 03_interpolate.R script which can takes ~ 4 hours to run on
-# my laptop (when excluding RCP4.5) and rasters created in the
-# the 04_inperpolated_summarize.R script, 
+# in the 03_interpolate.R script
 
 # dependencies ------------------------------------------------------------
 
-library(tidyverse) 
 library(terra)
-source("src/mapping_functions.R")
+library(tidyverse)
+library(stars)
+library(patchwork)
 source("src/general_functions.R")
+source("src/fig_params.R")
+source("src/mapping_functions.R")
+source('src/fig_functions.R')
 
-# read in data ------------------------------------------------------------
+# params ------------------------------------------------------------------
 
-p <- "data_processed/interpolated_rasters"
+run <- 'fire1_eind1_c4grass1_co20_2502'
+graze_levels <- c("grazL" = "Light")
 
-# * rasters ---------------------------------------------------------------
-gref <- "Moderate" # current grazing level to compare to (for filter below)
+# PFTs for which to plot 
+PFTs2plot <- c("Sagebrush", "Aherb", "Pherb", 'C4Pgrass', "C3Pgrass", "Pforb", 
+               "Cheatgrass", "Aforb")
 
-# median biomass across GCMs
-med2 <- rast(file.path(p, "bio_future_median_across_GCMs.tif"))
+v <- 'v1' # for appending to output file names
 
-# ratio of C3Pgrass/total Pgrass, median across GCMs
-gratio_med2 <- rast(file.path(p, "C3Pgrass-Pgrass-ratio_by-scenario_median.tif"))
+# Read in data ------------------------------------------------------------
 
-# scaled % change of PGrass relative to current conditions of the same intensity
-# (i.e. 'wgraze'). Median across GCMs
-rast_d_Pgrass <- rast(file.path(p, "Pgrass_bio-diff-wgraze_median.tif"))
+# selecting which rasters to load
+# interpolated rasters of stepwat data
+path_r <- "data_processed/interpolated_rasters"
 
-# minimum grazing level at which biomass threshold is exceeded
-min_graze_files <- list.files(file.path(p, "min_graze/"),
-                              full.names = TRUE)
+# * median biomass (across GCMs) --------------------------------------------
+list.files(path_r, "bio_future_median_across_GCMs")
+path <- paste0(path_r, "/", run, "_bio_future_median_across_GCMs.tif")
+r1 <- rast(path)
 
-rast_min_gr1 <- rast(min_graze_files)
+into <- c("PFT", "type", "RCP", "years", 
+          "graze")
+info0 <- create_rast_info(r1, into = into)
 
-# withing GCM scaled % change in biomass
-# these are medians across GCMs
-# e.g. change from heavy to light or moderate for RCP8.5 mid-century
-wgcm_files <- list.files(file.path(p, "bio_diff"),
-                         pattern = "_bio-diff-wgcm-heavy_",
-                         full.names = TRUE)
+info1 <- info0 %>% 
+  filter(graze %in% graze_levels,
+         PFT %in% PFTs2plot)
 
-rast_wgcm1 <- rast(wgcm_files)
+r3 <- r1[[info1$id]]
 
-# within grazing level scaled % change in biomass
-# (i.e. current to future, for given grazing level), medians across GCMs
-wgraze_files <- list.files(file.path(p, "bio_diff"),
-                           pattern = "bio-diff-wgraze.*median.tif$",
-                           full.names = TRUE)
 
-rast_wgraze1 <- rast(wgraze_files)
+# *median delta biomass ---------------------------------------------------
 
-# scaled % change from current moderate or heavy grazing to future (RCP8.5-mid) 
-# light graze
-# median across GCMs
+# raw difference relative to historical climate conditions
+path_rdiff <- paste0(path_r, "/", run, "_bio-rdiff-cref_median.tif")
 
-rast_diff_gref <- rast(file.path(p, "bio-diff-gref-cur-heavy_median.tif"))
+rdiff1 <- rast(path_rdiff)
 
-# * raster info -------------------------------------------------------------
-# These files have been created in the 
-# 04_interpolated_summarize.R script
+info_rdiff1 <- create_rast_info(rdiff1, into = into)%>% 
+  filter(graze %in% graze_levels,
+         PFT %in% PFTs2plot) %>% 
+  # for exploratory reasons just looking at the most and least
+  # extreme scenarios
+  filter_clim_extremes()
 
-# names of the raster layers, and treatment info, 
-rast_info <- readRDS(file.path(p, "raster_info.RDS"))
+rdiff2 <- rdiff1
 
-# names/info of median grass layers (for c3pgrass)
-grass_info_med <- readRDS(file.path(p, "grass_info_med.RDS"))
 
-# names info about perennial grass layers
-Pgrass_info_med <- readRDS(file.path(p, "Pgrass_info_med.RDS"))
+# Figures -----------------------------------------------------------------
 
-# Maps ----------------------------------------------------------
+# combining difference and absolute biomass
+info_c1 <- bind_rows(info1, info_rdiff1) %>% 
+  filter_clim_extremes() %>% 
+  filter(PFT %in% PFTs2plot) %>% 
+  mutate(type = fct_rev(factor(type))) %>% 
+  arrange(run, PFT, RCP, type, years)
 
-# maps: wgcm & w-graze & gref----------------------------------------------
-# change in biomass within a grazing level
-# 9 panels for each PFT. 
-# top row current: moderat grazing bio, heavy grazing, and delta from heavy to ligth
-# middle row, same thing but for one future scenario. 
-# bottom row, scaled percent change in biomass from current to RCP8.5 mid century,
-# for moderate grazing, and second figure the same but for heavy grazing.
-# 3rd figure (bottom right corner): change from current heavy grazing to future
-# moderate
+r_c1 <- c(r3, rdiff2) # combined raster
 
-into_vars <- c("c4", "PFT", "type", "RCP", "years", "graze")
-wgcm_info1 <- create_rast_info(
-  rast_wgcm1, into = into_vars) %>% 
-  # change from heavy grazing to gref (ie. light or moderate)
-  filter(graze == gref)
+# maps of biomass and raw difference --------------------------------------
 
-wgraze_info1 <- create_rast_info(rast_wgraze1) %>%  
-  select(-GCM) %>% # this is just 'median'
-  filter(graze %in% c(gref, "Heavy")) %>% 
-  arrange(PFT, desc(graze)) %>% 
-  group_by(PFT) %>% 
-  # making a higher numbered order variable so these plotted last on the page
-  mutate(order = 1:n() + 6) 
+# One big map on the left of historical biomass, and 4 panels on the left
+# showing 2 future time periods and for each time period 1 map shows
+# biomass the other shows delta biomass
+info_c_l <- info_c1 %>% 
+  group_by(PFT, run2) %>% 
+  group_split() # split into list
 
-gref_info <- create_rast_info(rast_diff_gref, into = into_vars) %>% 
-  group_by(PFT) %>% 
-  # making a higher numbered order variable so these plotted last on the page
-  mutate(order = 9) %>% 
-  filter(graze == gref)
-
-# combing information on median biomass and wgcm and wgraze biomass difference
-wgcm_info2 <- rast_info %>% 
-  dplyr::select(-GCM,-id, -layer_num) %>% 
-  rename(id = id_noGCM) %>% 
-  filter_rcp_c4() %>% 
-  filter(graze %in% c(gref, "Heavy")) %>% 
-  distinct() %>% 
-  bind_rows(wgcm_info1) %>% 
-  # putting in order want to use when plotting
-  arrange(PFT, RCP, desc(type), desc(graze)) %>% 
-  group_by(PFT) %>% 
-  mutate(order = 1:n()) %>% 
-  bind_rows(wgraze_info1) %>% 
-  bind_rows(gref_info) %>% 
-  arrange(PFT, order)
+pdf(paste0("figures/biomass_maps/bio-rdiff-cref_", v, "_", run, ".pdf"),
+          width = 11, height = 7)
+for(df in info_c_l){
+  print(df$id[1])
+  bio_id <- df$id[df$type == 'biomass']
+  diff_id <- df$id[df$type != 'biomass']
+  stopifnot(length(bio_id) == 3)
+  stopifnot(length(diff_id) == 2)
   
-wgcm_info2
-
-# this figure creation takes a few minutes.
-
-# NOTE that currently, some of the change values (heavy to light),
-# are >100%. Those are throwing warnings (in the image_bio_diff function).
-
-pdf("figures/biomass_maps/bio_wgcm-bio-diff_c4on_v5.pdf",
-    width = wfig6, height = hfig6*3/2)
-
-par(mar = mar, mgp = mgp)
-layout(layout.matrix9, widths = widths9, heights = heights9)
-
-pft_ids <- ""
-#for (i in 1:9) { # for testing
-for (i in 1:nrow(wgcm_info2)) {
- 
-  row <- wgcm_info2[i, ]
-  RCP <- if (row$RCP == "Current") {
-    as.character(row$RCP)
-  } else {
-    #paste0(row$RCP, " (", row$years, ")") # uncomment if want years in title
-    as.character(row$RCP)
-  }
+  # ids for all runs for this PFT
+  bio_id_all <- info_c1 %>% 
+    filter(df$PFT[[1]] == PFT,
+           type == "biomass") %>% 
+    pull(id)
   
-  if(row$type == "biomass") {
+  diff_id_all <- info_c1 %>% 
+    filter(df$PFT[[1]] == PFT,
+           type != "biomass") %>% 
+    pull(id)
+  
+  # want to get range across run types so that figures will
+  # have comparable colors across runs for given pft
+  range_b <- range(as.numeric(minmax(r_c1[[bio_id_all]])))
+  range_d <- range(as.numeric(minmax(r_c1[[diff_id_all]])))
+  
+  m <- max(abs(range_d)) # for colour gradient b/ can't sent midpoint
+  title_diff <- "Delta biomass" # delta
+  
+  # plots of biomass
+  maps_bio1 <- map(bio_id, function(id) {
     
-    # extracting min/max for all rasters of that PFT, so panels 
-    # have the same range
-    pft_ids_new <- wgcm_info2 %>% 
-      filter(row$PFT == PFT, row$type == type) %>% pull(id)
+    d <- create_rast_info(id, into = into)
     
-    # so vector isn't being extracted repeatedly for the same PFT
-    if(any(pft_ids_new != pft_ids)) {
-      # very inefficient, but minmax() doesn't work when the raster contains
-      # zero's which are plotted differently
-      vec <- values(med2[[pft_ids_new]]) %>% as.vector()
-    }
+    plot_map_inset(r = r_c1[[id]],
+                   colors = cols_map_bio(10),
+                   tag_label = paste("Biomass", rcp_label(d$RCP, d$years)),
+                   limits = range_b,
+                   scale_name = lab_bio0)
     
+  })
+  
+  # maps of biomass difference (for each time period)
+  maps_diff1 <- map(diff_id, function(id) {
     
-    # biomass figures
-    title <- paste0(row$PFT, " ", RCP, ", ", row$graze, " grazing")
+    d <- create_rast_info(id, into = into)
     
-    image_bio(med2, subset = row$id, title = title,
-              vec = vec)
+    plot_map_inset(r = r_c1[[id]],
+                   colors = cols_map_bio_d,
+                   tag_label = paste(title_diff, rcp_label(d$RCP, d$years)),
+                   limits = c(-m, m),
+                   scale_name = lab_bio1)
     
-    pft_ids <- pft_ids_new
-    # effect of grazing within a climate scenario
-  } else if(row$type == "bio-diff-wgcm-heavy") {
-    # bio diff (within gcm) figure
-    title <- substitute(paste(Delta, PFT, ", ", RCP, ", ", "heavy to ", 
-                               graze, " grazing"),
-                        list(c4 = row$c4,
-                             PFT = as.character(row$PFT), 
-                             graze = tolower(as.character(row$graze)),
-                             RCP = RCP))
-    image_bio_diff(rast_wgcm1, subset = row$id, title = title)
-    # climate effect withing grazing trmt
-  } else if (row$type == "bio-diff-wgraze") {
-    title <- substitute(paste(Delta, PFT, ", Current to ", RCP, ", ", 
-                              graze, " grazing"),
-                        list(c4 = row$c4,
-                             PFT = as.character(row$PFT), 
-                             graze = tolower(as.character(row$graze)),
-                             RCP = RCP))
-    image_bio_diff(rast_wgraze1, subset = row$id, title = title)
-    # change in climate and grazing
-  } else {
-    title <- substitute(paste(Delta, PFT, ", Current heavy to ", RCP, ", ", 
-                              graze),
-                        list(c4 = row$c4,
-                             PFT = as.character(row$PFT), 
-                             graze = tolower(as.character(row$graze)),
-                             RCP = as.character(row$RCP)))
-    image_bio_diff(rast_diff_gref, subset = row$id, title = title)
-  }
+  })
+  
+  # combining the plots
+  p <- maps_bio1[[1]] + ((maps_bio1[[2]] + maps_diff1[[1]])/(maps_bio1[[3]] + maps_diff1[[2]])) 
+  
+  p2 <- (p + plot_layout(guides = 'collect'))&
+    theme(legend.position = 'bottom')
+  
+  p3 <- p2+
+    patchwork::plot_annotation(df$PFT[1],
+                               caption = df$run2[1])
+  print(p3)
 }
 
 dev.off()
-
-
-# maps--9 panel figure ---------------------------------------------------
-# for manuscript
-# 3 figs per row (1 row per pft)
-# scaled percent change in biomass from current to RCP8.5 mid century,
-# for heavy grazing, and second figure the same but for moderate grazing.
-# 3rd figure change from current heavy grazing to future
-# moderate
-
-wgcm_info_pft4 <- wgcm_info2 %>% 
-  filter(PFT %in% c("Sagebrush", "C3Pgrass", "Pforb"),
-         # just the 'bottom row' of figures
-         order %in% 7:9) %>% 
-  ungroup() %>% 
-  mutate(row = 1:nrow(.))
-
-stopifnot(nrow(wgcm_info_pft4) == 9) # should be 1 row per panel
-
-# labels for 'columns' of figures
-col_labs <- c(
-  "Current climate to RCP8.5\n under heavy grazing",
-  "Current climate to RCP8.5\n under moderate grazing",
-  "Current climate heavy grazing\n to RCP8.5 moderate grazing")
-
-jpeg("figures/biomass_maps/9-panel-maps_wgraze_gref_v1.jpeg",
-    width = wfig6, height = hfig6*3/2, units = 'in',
-    res = 600)
-
-par(mar = c(1, 0.25, 0, 0.25), mgp = mgp,
-    oma = c(0, 4.5, 6.5, 0))
-layout(matrix(1:9, nrow = 3, byrow = TRUE), 
-       widths = widths9, 
-       # heights vary b/ only bottom row has legend
-       heights = c(0.81, 0.81, 1))
-
-for (i in 1:nrow(wgcm_info_pft4)) {
-  
-  row <- wgcm_info_pft4[i, ]
-  RCP <- as.character(row$RCP)
-  
-  # only add legend to bottom rows
-  adjust_ylim <- if (row$PFT == "Pforb") {
-    FALSE
-  } else {
-    TRUE
-  }
-  
-  if (row$type == "bio-diff-wgraze") {
-    image_bio_diff(rast_wgraze1, subset = row$id,
-                   # only add legend to bottom center figure
-                   legend = (i == 8),
-                   adjust_ylim = adjust_ylim, 
-                   cex = 1)
-    # change in climate and grazing
-  } else {
-    image_bio_diff(rast_diff_gref, subset = row$id,
-                                      legend = FALSE, 
-                   adjust_ylim = adjust_ylim)
-  }
-  if(row$row %in% c(1, 4, 7)) {
-    # adding PFT row labels
-    mtext(row$PFT, side = 2, cex = 1, outer = FALSE, line = 0)
-  }
-  # adding column labels
-  if(row$row %in% c(1:3)) {
-    # adding PFT row labels
-    mtext(col_labs[row$row], side = 3, outer = FALSE, line = 1, title = NULL)
-  }
-  
-}
-mtext("Plant functional type", side = 2, cex = 2, outer = TRUE, line = 1.5)
-mtext("Change in scenario", side = 3, cex = 2, outer = TRUE, line = 4.1)
-
-dev.off()
-
-
-# maps--min graze -------------------------------------------------------
-#showing two panels for each PFT, the min graze for current, and min
-# graze, for one future scenario.
-
-min_gr_info <- tibble(id = names(rast_min_gr1),
-                    id2 = id) %>% 
-  separate(col = id2,
-           into = c("c4", "PFT", "type", "RCP", "years"),
-           sep = "_") %>% 
-  df_factor() %>% 
-  arrange(PFT, RCP)
-
-pdf("figures/min_graze_maps/min_graze_c4on_v2.pdf",
-    width = wfig6, height = hfig6)
-
-par(mar = mar, mgp = mgp)
-layout(layout.matrix4, widths = widths6, heights = heights6)
-
-for (i in 1:nrow(min_gr_info)) {
-  row <- min_gr_info[i, ]
-  
-  RCP <- if (row$RCP == "Current") {
-    row$RCP
-  } else {
-    paste0(row$RCP, " (", row$years, ")")
-  }
-  title <- paste(row$PFT, RCP)
-  image_min_gr(rast_min_gr1, subset = row$id,
-               title = title)
-}
-
-dev.off()
-
-# same figures as above but just for pforb and c3pgrass, on single page
-jpeg("figures/min_graze_maps/min_graze_c3pgrass-pforb_c4on_v1.jpeg",
-    width = wfig6, height = hfig6, units = "in",
-    res = 800)
-
-par(mar = mar, mgp = mgp)
-layout(layout.matrix4, widths = widths6, heights = heights6)
-
-df <- min_gr_info %>% 
-  filter(PFT %in% c("C3Pgrass", "Pforb"))
-
-for (i in 1:nrow(df)) {
-  row <- df[i, ]
-  
-  RCP <- if (row$RCP == "Current") {
-    row$RCP
-  } else {
-    paste0(row$RCP, " (", row$years, ")")
-  }
-  title <- paste(row$PFT, RCP)
-  image_min_gr(rast_min_gr1, subset = row$id,
-               title = title)
-}
-
-dev.off()
-
-# maps--Pgrass and C3Pgrass/Pgrass ------------------------------------------
-
-# testing
-# either pass the name of the layer or the layer number
-image_bio(med2, subset = 1, title = "test",
-          vec = c(0, 0.1, 1),
-          show0legend = FALSE,
-          legend_lab = "C3Pgrass/Pgrass")
-
-
-pdf("figures/biomass_maps/C3-ratio_and_Pgrass_c4on-off_v2.pdf",
-  width = wfig6, height = hfig6)
-
-# C3Pgrass/Pgrass maps (not showing % change just the ratio)
-
-## Set parameters and layout:
-par(mar = mar, mgp = mgp)
-layout(layout.matrix6, widths = widths6, heights = heights6)
-
-for(i in 1:nrow(grass_info_med)) {
-  row <- grass_info_med[i, ]
-  if(row$RCP == "Current") {
-    title = paste0("Current, ", tolower(row$graze), " grazing")
-  } else {
-    title = paste0(row$c4, " (", row$RCP, " ",
-                   row$years, "), ", tolower(row$graze), " grazing")
-  }
-  
-  image_bio(gratio_med2, subset = row$id_noGCM, title = title,
-            vec = c(0, 0.1, 1),
-            show0legend = FALSE,
-            legend_lab = "C3Pgrass/Pgrass",
-            n_breaks = 31)
-}
-
-# Pgrass maps, showing current, and percent change from current
-# for that grazing level for c4 on and c4 off
-
-for(i in 1:nrow(Pgrass_info_med)) {
-  row <- Pgrass_info_med[i, ]
-
-  if(row$RCP == "Current") {
-    title = paste0("Current Pgrass, ", tolower(row$graze), " grazing")
-    
-    image_bio(med2, subset = row$id_noGCM, title = title)
-  } else {
-    title <- substitute(paste(c4," ", Delta, " Pgrass (", RCP, " ", years,") ", 
-                              graze, " grazing"),
-                        list(c4 = row$c4,
-                             PFT = as.character(row$PFT), 
-                             years = as.character(row$years), 
-                             graze = as.character(row$graze),
-                             RCP = as.character(row$RCP)))
-    
-    image_bio_diff(rast_d_Pgrass, subset = row$id_noGCM, title = title)
-  }
-}
-
-dev.off()
-
-
