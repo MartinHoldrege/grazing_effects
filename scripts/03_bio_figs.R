@@ -71,9 +71,6 @@ pft5_bio_b <- pft5_bio2 %>%
   # consider removing 0s so boxplot doesn't show sites with 0 biomass
  mutate(biomass = ifelse(biomass == 0, NA, biomass))
 
-fire_med2 <- fire_med1 %>% 
-  left_join(clim1, by = 'site')
-
 
 # absolute biomass ------------------------------------------------------
 # This figure meant to be analogous to M.E.'s thesis figure 9.
@@ -803,78 +800,3 @@ figs_l <- map(runs_graze, function(x) {
 
 dev.off()
 
-# fire --------------------------------------------------------------------
-
-# boxplot of fire return interval by RCP, and grazing intensity
-
-map(runs_graze, function(x) {
-  df <- fire_med2 %>% 
-    filter(run == x) 
-  g1 <- ggplot(df, aes(x = id, y = fire_prob, fill = RCP)) +
-    geom_text(data = ~box_anno(., var = "fire_prob",
-                               group_by = c("graze")),
-              aes(x, y, label = graze, fill = NULL),
-              size = 2.5) +
-    geom_boxplot() + 
-    scale_fill_manual(values = cols_rcp, name = "Scenario") +
-    scale_x_discrete(labels = id2year) +
-    geom_vline(xintercept = line_loc, linetype = 2) +
-    theme(legend.position = "top",
-          axis.text = element_text(size = 7))  +
-    labs(x = lab_yrs,
-         y = lab_firep0) 
-  
-  g2 <- ggplot(df, aes(x = rcp_label(RCP, years, include_parenth = FALSE), 
-                 y = fire_prob, fill = graze))+
-    geom_boxplot() +
-    scale_fill_graze() +
-    theme(axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1)) +
-    labs(y = lab_firep0,
-         x = NULL)
-  
-  # fire difference boxplot
-  g3 <- fire_d_wgraze %>% 
-    filter(run == x) %>% 
-    group_by(id) %>% 
-    #remove_outliers(var = "fire_prob_diff") %>% 
-    ggplot(aes(id2, fire_prob_diff, fill = graze)) +
-    geom_text(data = ~box_anno(., var = "fire_prob_diff", 
-                               group_by = c("RCP"), id = "id2"),
-              aes(x, y, label = RCP, fill = NULL),
-              size = 2.5) +
-    geom_hline(yintercept = 0, linetype = 3) +
-    geom_boxplot(position = "dodge",
-                 outlier.color = NA) +
-    scale_fill_graze() +
-    # so just display the RCP
-    scale_x_discrete(labels = id2year) +
-    theme(legend.position = "none") +
-    geom_vline(xintercept = 2.5, linetype = 2) +
-    labs(x = lab_yrs,
-         y = lab_firep1)
-  
-  jpeg(paste0("figures/fire/fire_return_boxplots_", x, ".jpeg"),
-       height = 7, width = 7, res = 600, units = "in")
-  print(g1 + g2 + g3 + guide_area() + patchwork::plot_layout(guides = 'collect'))
-  dev.off()
-})
-
-
-# * fire vs climate -------------------------------------------------------
-
-pdf("figures/fire/fire_vs_clim_v3.pdf",
-    width = 8, height = 7)
-
-rn <- runs_graze['default']
-g1 <- fire_med2 %>% 
-  filter(run == rn) %>% 
-  ggplot(aes(y = fire_prob, color = graze)) +
-  facet_rep_wrap(~RCP + years) + 
-  scale_color_graze() +
-  labs(y = lab_firep0, 
-     caption = paste(rn, '\n x-axis shows current climate in all panels')) +
-  theme(legend.position = c(0.85, 0.15),
-      axis.text = element_text(size = 7))
-
-climate_scatter(g1, include_psp = TRUE)
-dev.off() 

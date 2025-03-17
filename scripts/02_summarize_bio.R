@@ -566,6 +566,25 @@ fire_d_wgraze <- fire_med1 %>%
   create_id2()
 
 
+# * graze effect within GCM -----------------------------------------------
+
+# e.g. this shows the effects of going from light grazing, to heavy
+# grazing for RCP 8.5 end of century
+
+# naming" d = difference, wgcm = within gcm comparison
+
+fire_d_wgcm <- fire0 %>% 
+  scaled_change(by = c("run", "RCP", "GCM", "years"), 
+                     var = "fire_prob",
+                     ref_graze = "Light", percent = FALSE, effect_size = FALSE,
+                     within_GCM = TRUE) %>% 
+  # median across GCMs
+  group_by(run, site, years, RCP, graze, id) %>% 
+  summarise(fire_prob_diff = median(fire_prob_diff)) %>% 
+  create_id2()
+
+stopifnot(sum(is.na(fire_d_wgcm$fire_prob_diff)) == 0)
+
 # save outputs ------------------------------------------------------------
 
 out <- list(
@@ -578,7 +597,10 @@ out <- list(
   pft5_es_wgcm = pft5_es_wgcm,
   fire0 = fire0,
   fire_med1 = fire_med1,
+  fire_d_wgraze = fire_d_wgraze,
+  fire_d_wgcm = fire_d_wgcm,
   clim_all2 = clim_all2,
+  clim1 = clim1,
   runs_graze = runs_graze,
   group_cols = group_cols
 )
