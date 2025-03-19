@@ -391,3 +391,46 @@ scale_fill_graze <- function(exclude = NULL) {
 
   scale_fill_manual(values = col, name = "Grazing")
 }
+
+#' create values vector for ggplot, with midpoint, not 
+#' at mathematical midpoint, useful for not centered diverging color pallets
+#'
+#' @param colors vector of colors
+#' @param midpoint 
+#' @param limits vector contain the min and max
+#'
+#' @returns
+#' vector 
+#' 
+#' @examples
+#' colors <- c("#bd0026", "#e31a1c", "#fc4e2a", "#feb24c", "#fed976", "#ffeda0", 
+#' "grey", "grey", "#deebf7", "#c6dbef", "#9ecae1", "#4292c6", "#08519c", 
+#' "#08306b")
+#' values_about_midpoint(colors, midpoint = 0, limits = c(-1, 4))
+values_about_midpoint <- function(colors, midpoint, limits) {
+  stopifnot(midpoint > limits[1] & midpoint < limits[2],
+            length(limits) == 2,
+            length(colors) >= 3
+  ) 
+  
+  n <- length(colors)
+  
+  # odd number of colors, put middle color at the midpoint
+  if(n %% 2 == 1) {
+    seq1 <- seq(from = limits[1], to = midpoint, length.out = (n+1)/2)
+    seq2 <- seq(from = midpoint, to = limits[2], length.out = (n+1)/2)
+    values <- scales::rescale(c(seq1, seq2[-1]))
+  } else {
+    # even number, putting the middle two colors centered around the midpoint
+    seq1 <- seq(from = limits[1], to = midpoint, length.out = n/2)
+    seq2 <- seq(from = midpoint, to = limits[2], length.out = n/2)
+    
+    delta <- min(c(diff(seq1), diff(seq2)))/2 # half a the min distance between numbers
+    seq1 <- seq1 - delta # moving numbers down 'half' a unit
+    seq2 <- seq2 + delta # moving numbers up 'half' a unit
+    values <- scales::rescale(c(seq1, seq2))
+  }
+  
+  values
+}
+  

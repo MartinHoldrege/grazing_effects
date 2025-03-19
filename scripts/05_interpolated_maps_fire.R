@@ -160,6 +160,41 @@ for(df in info_c_l){
   p3 <- p2+
     patchwork::plot_annotation(caption = paste('simulation settings:',  df$run2))
   print(p3)
+  
+  # create same plot but with right figures showing % change instead 
+  # of absolute difference
+  
+  perc_diff <-(r_c1[[diff_id]]/r_c1[[fire_id[1]]])*100
+  tmp <- max(abs(as.vector(minmax(perc_diff))))
+  if(tmp>100) {
+    range_perc <- c(-100, min(300, tmp))
+    cap_perc <- '(% Change range truncated)'
+  } else {
+    range_perc <- c(-tmp, tmp)
+    cap_perc <- ""
+  }
+  
+  maps_perc1 <- map(diff_id, function(id) {
+    
+    d <- create_rast_info(id, into = into)
+    
+    plot_map_inset(r = perc_diff[[id]],
+                   colors = rev(cols_map_bio_d),
+                   tag_label = paste('% change', rcp_label(d$RCP, d$years)),
+                   limits = range_perc,
+                   midpoint = 0,
+                   scale_name = '% change')
+    
+  })
+  # combining the plots
+  p <- maps_fire1[[1]] + ((maps_fire1[[2]] + maps_perc1[[1]])/(maps_fire1[[3]] + maps_perc1[[2]])) 
+  
+  p2 <- (p + plot_layout(guides = 'collect'))&
+    theme(legend.position = 'bottom')
+  
+  p3 <- p2+
+    patchwork::plot_annotation(caption = paste(df$run2[1], cap_perc))
+  print(p3)
 }
 
 

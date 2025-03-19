@@ -9,6 +9,7 @@
 # dependencies ------------------------------------------------------------
 
 source("src/fig_params.R") # for cols_map_bio() color ramp function
+source("src/fig_functions.R")
 
 # misc --------------------------------------------------------------------
 
@@ -211,7 +212,9 @@ plot_map_inset <- function(r,
                            scale_name = NULL,
                            limits = NULL,
                            add_vertical0 = FALSE,
-                           values = NULL
+                           values = NULL,
+                           midpoint = NULL,
+                           oob = scales::squish
 )  {
   
   
@@ -226,6 +229,13 @@ plot_map_inset <- function(r,
   
   s <- stars::st_as_stars(r)
   
+  # allows for asymetrical colors (i.e. if midpoint isn't in the middle)
+  if(!is.null(midpoint) & is.null(values)) {
+    values <- values_about_midpoint(colors = colors, midpoint = midpoint,
+                                    limits = limits)
+    
+  }
+  
   map <- newRR3::plot_map(s, 
                   st_geom_state = states,
                   add_coords = TRUE) +
@@ -234,7 +244,8 @@ plot_map_inset <- function(r,
                          limits = limits,
                          name = scale_name,
                          colors = colors,
-                         values = values) +
+                         values = values,
+                         oob = oob) +
     newRR3::add_tag_as_label(tag_label) 
   
   map + inset_element2(inset)

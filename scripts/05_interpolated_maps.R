@@ -88,7 +88,8 @@ r_c1 <- c(r3, rdiff2) # combined raster
 # biomass the other shows delta biomass
 info_c_l <- info_c1 %>% 
   group_by(PFT, run2) %>% 
-  group_split() # split into list
+  group_split() %>%  # split into list
+  map(\(x) arrange(x, RCP, years))
 
 pdf(paste0("figures/biomass_maps/bio-rdiff-cref_", v, "_", run, ".pdf"),
           width = 11, height = 7)
@@ -104,6 +105,8 @@ for(df in info_c_l){
     filter(df$PFT[[1]] == PFT,
            type == "biomass") %>% 
     pull(id)
+  
+  stopifnot(is.factor(df$RCP)) # check so that RCP correctly sorted
   
   diff_id_all <- info_c1 %>% 
     filter(df$PFT[[1]] == PFT,
@@ -154,6 +157,38 @@ for(df in info_c_l){
     patchwork::plot_annotation(df$PFT[1],
                                caption = df$run2[1])
   print(p3)
+  
+  # create same plot but with right figures showing % change instead 
+  # of absolute difference
+  
+  perc_diff <-(r_c1[[diff_id]]/r_c1[[bio_id[1]]])*100
+  tmp <- max(abs(as.vector(minmax(perc_diff))))
+  if(tmp>100) {
+    tmp <- 100
+  }
+  range_perc <- c(-tmp, tmp)
+  maps_perc1 <- map(diff_id, function(id) {
+    
+    d <- create_rast_info(id, into = into)
+    
+    plot_map_inset(r = perc_diff[[id]],
+                   colors = cols_map_bio_d,
+                   tag_label = paste('% change', rcp_label(d$RCP, d$years)),
+                   limits = range_perc,
+                   scale_name = '% change')
+    
+  })
+  # combining the plots
+  p <- maps_bio1[[1]] + ((maps_bio1[[2]] + maps_perc1[[1]])/(maps_bio1[[3]] + maps_perc1[[2]])) 
+  
+  p2 <- (p + plot_layout(guides = 'collect'))&
+    theme(legend.position = 'bottom')
+  
+  p3 <- p2+
+    patchwork::plot_annotation(df$PFT[1],
+                               caption = df$run2[1])
+  print(p3)
+  
 }
 
 dev.off()
