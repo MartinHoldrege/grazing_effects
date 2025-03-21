@@ -215,7 +215,7 @@ if (run_fire_attribution) {
   
   dominant_driver_w1 <- attrib$dominant_driver1 %>% 
     filter_scenarios(run = run2run, years = years2run) %>% 
-    mutate(id = paste0(run, v2paste, "_","fire-dom-driver", "_", id, "_median"),
+    mutate(id = paste0(run, v2paste, "_","fire-dom-driver", "_", id, "_mode"),
            dominant_driver = as.numeric(dominant_driver)) %>% 
     dplyr::select(site, id, dominant_driver) %>% 
     pivot_wider(id_cols = "site",

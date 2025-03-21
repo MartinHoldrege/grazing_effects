@@ -47,6 +47,9 @@ cols_map_bio_d <- c(rev(c("#ffeda0","#fed976","#feb24c","#fc4e2a","#e31a1c",
           "#deebf7","#c6dbef","#9ecae1","#4292c6",
           "#08519c","#08306b")
 
+index <- which(cols_map_bio_d == 'grey')[1]
+cols_map_bio_d2 <- cols_map_bio_d[-index] # shorter gray area when continuous
+
 cols_map_bio_dr <- colorRampPalette(cols_map_bio_d, interpolate = 'spline')
 
 # Standard color ramp for current biomass:
@@ -61,6 +64,10 @@ cols_pred <- list(
   pfg = c(low = '#f7fcb9', high = '#004529'),
   afg = c(low = '#f7fcb9', high = '#004529')
 )
+
+# for maps showing primary driver of change
+cols_pred_vars <- c(MAP = "#1f78b4", MAT = "#e31a1c", PSP = "#a6cee3", 
+                    Aherb = "#b2df8a", Pherb = "#33a02c")
 
 # axis labels -------------------------------------------------------------
 # meaning of endings: 0= raw value, 1 = raw change, 2 = % change

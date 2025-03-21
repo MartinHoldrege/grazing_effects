@@ -190,14 +190,14 @@ inset_element2 <- function(x) {
 }
 
 # some of these functions rely on the newRR3 package (by Daniel Schlaepfer)
-plot_map2 <- function(r, ...)  {
+plot_map2 <- function(r, add_coords = TRUE,...)  {
   
   
   s <- stars::st_as_stars(r)
   
   map <- newRR3::plot_map(s, 
                   st_geom_state = states,
-                  add_coords = TRUE,
+                  add_coords = add_coords,
                   ...) +
     newRR3::ggplot2_map_theme() +
     theme(plot.tag = element_text(face = 'plain'))
