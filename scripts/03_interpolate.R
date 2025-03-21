@@ -14,22 +14,24 @@
 # params ------------------------------------------------------------------
 
 rerun <- FALSE # re-create rasters that have already been interpolated?
-test_run <- FALSE # TRUE # 
+test_run <- FALSE
 date <- "20250228" # for appending to select file names
 version <- 'v4'
 # v1--1st version of criteria (i.e. based on calculating mathcing criteria across the region)
 # v2--second version of criteria (i.e. basing matching criteria just on 200 sites)
 # v3--criteria used in palmquist et al 2021 and renne et al 2024
 # v4-- criteria same as v3, but new study area mask used (more restrictive)
-run_climate <- TRUE # whether to upscale the climate data (doesn't need to be
+run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
-run_fire <- TRUE
+run_fire <- FALSE
+# interpolate data showing which vars caused changes in fire?
+run_fire_attribution <- TRUE 
 
 # for filtering output, put NULL if don't want to filter that variable
 PFT2run =c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 
            'Pherb', 'Aherb', 'Aforb','Pgrass')
 
-run2run = NULL # 'fire0_eind1_c4grass1_co20' # or NULL
+run2run = 'fire1_eind1_c4grass1_co20_2502' # NULL # 
 years2run =  NULL #'Current'
 
 v2paste <- if(version == 'v1') "" else version # for pasting to interpolated tiffs
@@ -46,6 +48,8 @@ library(doParallel)
 library(dtplyr)
 source("src/general_functions.R")
 source("src/mapping_functions.R")
+source("src/interpolation_functions.R")
+
 # read in data ------------------------------------------------------------
 # list dataframes of stepwat2 output created in "scripts/02_summarize_bio.R" 
 bio <- readRDS('data_processed/site_means/summarize_bio.RDS') 
@@ -70,6 +74,11 @@ if(version < 'v4') {
 tc0 <- read_csv("data_processed/interpolation_data/clim_for_interp_daymet-v4_1991-2020.csv",
                 col_types = cols(site_id = 'd'),
                 show_col_types = FALSE)
+
+if(run_fire_attribution) {
+  # created in 02b_fire_attribution.R
+  attrib <- readRDS("data_processed/site_means/fire_dominant_drivers.RDS")
+}
 
 # Prep data -------------------------------------------------------------
 # prep input data files for interpolation
@@ -190,6 +199,36 @@ fire_w1 <- bio$fire0 %>%
   join_subsetcells(sc_dat = sc1, subset_in_target = subset_in_target)
 }
 
+
+# * fire attribution ------------------------------------------------------
+
+if (run_fire_attribution) {
+  one_change_w1 <- attrib$one_change3 %>% 
+    filter_scenarios(run = run2run, years = years2run) %>% 
+    mutate(id = paste0(run, v2paste, "_","fire-delta-", 
+                       pred_var_cur, "_", id, "_median")) %>% 
+    dplyr::select(site, id, delta_1var) %>% 
+    pivot_wider(id_cols = "site",
+                names_from = "id",
+                values_from = "delta_1var")%>% 
+    join_subsetcells(sc_dat = sc1, subset_in_target = subset_in_target)
+  
+  dominant_driver_w1 <- attrib$dominant_driver1 %>% 
+    filter_scenarios(run = run2run, years = years2run) %>% 
+    mutate(id = paste0(run, v2paste, "_","fire-dom-driver", "_", id, "_median"),
+           dominant_driver = as.numeric(dominant_driver)) %>% 
+    dplyr::select(site, id, dominant_driver) %>% 
+    pivot_wider(id_cols = "site",
+                names_from = "id",
+                values_from = "dominant_driver") %>% 
+    join_subsetcells(sc_dat = sc1, subset_in_target = subset_in_target)
+  
+  # combine
+  fire_attrib_w <- dominant_driver_w1 %>% 
+    left_join(one_change_w1, by = 'cellnumber')
+  
+}
+
 # * climate ---------------------------------------------------------------
 # climate data doesn't have a 'run' name attached b/ runs have same climate
 # but date attached in case in future runs are based on a different climate
@@ -234,7 +273,10 @@ if(!all(rownames(sc1 %in% rownames(tc2)))) {
 # arg should be used, but that's causing additional problems
 sc2 <- sc1[, c("site_id", 'x', 'y', bioclim_vars)]
 rownames(sc2) <- sc2$site_id
-match1 <- multivarmatch(
+
+# creating a hash so multivarmatch doesn't need to be re-run unecessarily
+# these are the arguments passed to multivarmatch below
+args <- list(
   matchingvars = drop_na(dplyr::select(tc2, -site_id)),
   # subset cells include cells that are not
   subsetcells = sc2,
@@ -245,10 +287,32 @@ match1 <- multivarmatch(
   subset_in_target = subset_in_target,
   addpoints = FALSE
 )
+hash <- digest::digest(args)
 
+path_hash <- "data_processed/interpolation_data/multivarmatch_hash.txt"
+path_match <- "data_processed/interpolation_data/multivarmatch.csv"
+rerun_match <- TRUE
+
+if(!file.exists(path_hash)) {
+  write_lines(hash, path_hash)
+} else {
+  old_hash <- read_lines(path_hash)
+  
+  if(old_hash == hash & file.exists(path_match)) {
+    rerun_match <- FALSE
+    match1 <- read_csv(path_match, show_col_types = FALSE) %>% 
+      as.data.frame()
+  } else {
+    write_lines(hash, path_hash)
+  }
+}
+
+if(rerun_match) {
+  match1 <- rlang::exec(multivarmatch, !!!args)
+  write_csv(match1, path_match)
+}
 
 # *plotting interpolation quality -----------------------------------------
-
 
 tmp_site_id <- match1 %>% 
   mutate(
@@ -312,160 +376,90 @@ writeRaster(match_quality,
 # https://nceas.github.io/oss-lessons/parallel-computing-in-r/parallel-computing-in-r.html
 # to run this in parallel
 
+# num cores, this includes logical cores (threads)
+num.cores <- parallel::detectCores() 
+registerDoParallel(num.cores)
 
 # if file was corrupted, and really small then re-create
 min_size <- file.size(path_template)*0.2 # 0.5 multiplier is arbitrary, and maybe not strict enough
 
 # which columns haven't already been upscaled
 path_bio <- file.path("data_processed/interpolated_rasters/biomass", version)
-if(!dir.exists(path_bio)) {
-  dir.create(path_bio)
-}
-todo2 <- which_todo(df = pft5_bio_w2,
-                   path = path_bio,
-                   pattern = ".tif$",
-                    min_size = min_size,
-                   rerun = rerun)
 
-# num cores, this includes logical cores (threads)
-num.cores <- parallel::detectCores() 
-
-registerDoParallel(num.cores)
-
-# if all have been upscaled then todo just includes 'cellnumbers'
-if(length(todo2) > 1) {
-  
-if(test_run) {
-  todo2 <- todo2[1:3]
-}
-pft5_bio_w3 <- pft5_bio_w2[, todo2]
-
-
-
-# making list of columns to use each time through dopar loop
-vecs_l <- col_nums_parallel(pft5_bio_w3, by = 50)
-
-print('biomass start')
-print(Sys.time())
-
-# seperately running interpolation on different sets of columns
-foreach (x = vecs_l) %dopar% {
-  rMultivariateMatching::interpolatePoints(
-    matches = match1,
-    output_results = pft5_bio_w3[, c(1, x)], 
-    exclude_poor_matches = exclude_poor_matches,
-    subset_cell_names = "subset_cell",
-    quality_name = "matching_quality",
-    matching_distance = 1.5,
-    raster_template = template,
-    plotraster = FALSE,
-    saveraster = TRUE,
-    filepath = path_bio,
-    overwrite = TRUE
-  )
-}
-
-print('biomass done')
-print(Sys.time())
-}
+# separately running interpolation on different sets of columns
+run_interpolatePoints(df = pft5_bio_w2,
+                      match = match1,
+                      template = template,
+                      path = path_bio,
+                      min_size = min_size,
+                      rerun = rerun,
+                      exclude_poor_matches = exclude_poor_matches)
 
 # * fire ------------------------------------------------------------------
 if(run_fire) {
-# which columns haven't already been upscaled
-  
+
   path_fire <- file.path("data_processed/interpolated_rasters/fire", version)
-  if(!dir.exists(path_fire)) {
-    dir.create(path_fire)
-  }
-todo3 <- which_todo(df = fire_w1,
-                    path = path_fire,
-                    pattern = ".tif$",
-                    min_size = min_size,
-                    rerun = rerun)
 
-# if all have been upscaled then todo just includes 'cellnumbers'
-if(length(todo3) > 1) {
-if(test_run) {
-  todo3 <- todo3[1:3]
-}
-fire_w2 <- fire_w1[, todo3]
-
-
-# making list of columns to use each time through dopar loop
-vecs_l2 <- col_nums_parallel(fire_w2, by = 20)
-
-print('fire start')
-print(Sys.time())
-
-# seperately running interpolation on different sets of columns
-foreach (x = vecs_l2) %dopar% {
-  rMultivariateMatching::interpolatePoints(
-    matches = match1,
-    output_results = fire_w2[, c(1, x)], 
-    exclude_poor_matches = exclude_poor_matches,
-    subset_cell_names = "subset_cell",
-    quality_name = "matching_quality",
-    matching_distance = 1.5,
-    raster_template = template,
-    plotraster = FALSE,
-    saveraster = TRUE,
-    filepath = path_fire,
-    overwrite = TRUE
-  )
-}
-print('fire end')
-print(Sys.time())
-
+  # separately running interpolation on different sets of columns
+  run_interpolatePoints(df = fire_w1,
+                        match = match1,
+                        template = template,
+                        path = path_fire,
+                        min_size = min_size,
+                        rerun = rerun,
+                        exclude_poor_matches = exclude_poor_matches)
 
 }
+
+# * fire attribution ------------------------------------------------------
+
+if(run_fire_attribution) {
+
+  path_attrib <- file.path("data_processed/interpolated_rasters/fire_attrib", version)
+
+  run_interpolatePoints(df = fire_attrib_w,
+                        match = match1,
+                        template = template,
+                        path = path_attrib,
+                        min_size = min_size,
+                        rerun = rerun,
+                        exclude_poor_matches = exclude_poor_matches)
+
 }
+
 
 # * climate ---------------------------------------------------------------
 
+path_clim <- file.path("data_processed/interpolated_rasters/climate", version)
+
 if (run_climate) {
-  path_clim <- file.path("data_processed/interpolated_rasters/climate", version)
-  if(!dir.exists(path_clim)) {
-    dir.create(path_clim)
-  }
-  rMultivariateMatching::interpolatePoints(
-    matches = match1,
-    output_results = clim_all_w2, 
-    exclude_poor_matches = exclude_poor_matches,
-    subset_cell_names = "subset_cell",
-    quality_name = "matching_quality",
-    matching_distance = 1.5,
-    raster_template = template,
-    plotraster = FALSE,
-    saveraster = TRUE,
-    filepath = path_clim,
-    overwrite = TRUE
-  )
+
+  run_interpolatePoints(df = clim_all_w2,
+                        match = match1,
+                        template = template,
+                        path = path_clim,
+                        min_size = min_size,
+                        rerun = rerun,
+                        exclude_poor_matches = exclude_poor_matches)
   
 }
 
 if(run_climate_daymet){
-daymet1 <- tc1 %>% 
-  filter(!is.na(site_id)) %>% 
-  dplyr::select(cellnumber, ptcor, bio1, bio12) %>% 
-  rename(PTcor = ptcor, MAT = bio1, MAP = bio12)
+  daymet1 <- tc1 %>% 
+    filter(!is.na(site_id)) %>% 
+    dplyr::select(cellnumber, ptcor, bio1, bio12) %>% 
+    rename(PTcor = ptcor, MAT = bio1, MAP = bio12)
 
-# criteria refers to the criteria used for interpolation
-# original criteria= using 0.1 of the range of variables across expansive scd study area
-
-names(daymet1)[-1] <- paste0(names(daymet1)[-1], "_daymet-climate_", date, "_", version)
-rMultivariateMatching::interpolatePoints(
-  matches = match1,
-  output_results = daymet1, 
-  exclude_poor_matches = exclude_poor_matches,
-  subset_cell_names = "subset_cell",
-  quality_name = "matching_quality",
-  matching_distance = 1.5,
-  raster_template = template,
-  plotraster = FALSE,
-  saveraster = TRUE,
-  filepath = path_clim,
-  overwrite = TRUE
-)
+  names(daymet1)[-1] <- paste0(names(daymet1)[-1], "_daymet-climate_", date, "_", version)
+  
+  run_interpolatePoints(df = daymet1,
+                        match = match1,
+                        template = template,
+                        path = path_clim,
+                        min_size = min_size,
+                        rerun = rerun,
+                        exclude_poor_matches = exclude_poor_matches)
 }
+
 # When you're done, clean up the cluster
 stopImplicitCluster()
