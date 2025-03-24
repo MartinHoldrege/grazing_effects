@@ -21,9 +21,8 @@ source('src/mapping_functions.R')
 # params ------------------------------------------------------------------
 
 # date in input file names
-date_in <- "20230919"
-date <- '20240515' # appended to output file names
-
+date <- '20250324' # appended to output file names
+version <- 'v4' # interpolation version
 # Read in data ------------------------------------------------------------
 
 # selecting which rasters to load
@@ -33,7 +32,7 @@ path_r <- "data_processed/interpolated_rasters"
 
 # * median climate vars (across GCMs) -------------------------------------
 
-r1 <- rast(paste0(path_r, '/climate_median_across_GCMs_', date_in, '.tif'))
+r1 <- rast(paste0(path_r, '/climate_median_across_GCMs_', version, '.tif'))
 
 into <- c("type", "description", "RCP", "years")
 info1 <- create_rast_info(r1, into = into, run_regex = "^")
@@ -43,7 +42,7 @@ r2 <- r1[[info1$id]]
 # *median delta climate ---------------------------------------------------
 
 # raw difference relative to historical 
-rdiff1 <- rast(paste0(path_r, '/climate_rdiff-cref_median_', date_in, '.tif'))
+rdiff1 <- rast(paste0(path_r, '/climate_rdiff-cref_median_', version, '.tif'))
 
 info_rdiff1 <- create_rast_info(rdiff1, into = into, run_regex = '^')
 

@@ -17,22 +17,23 @@ source("src/general_functions.R")
 
 # params ------------------------------------------------------------------
 
-date <- '20230919' # date associated w/ the climate data (this date, in file name,
+date <- '20250228' # date associated w/ the climate data (this date, in file name,
 # would be updated if new climate data source, or sites, etc. were used. )
 
 # some terra operations can be done in parallel and need 
 # to know num of cores
 num.cores <- parallel::detectCores(logical = FALSE) 
-
+version <- 'v4' # interpolation version
 
 # read in data ------------------------------------------------------------
 
 # * rasters ---------------------------------------------------------------
 
 # data up-scaled for each GCM
-clim_files <- list.files("data_processed/interpolated_rasters/climate/",
-                         pattern = paste0('climate.*', date, '.tif'),
-                         full.names = TRUE)
+clim_files <- list.files(
+  file.path("data_processed/interpolated_rasters/climate/", version),
+  pattern = paste0('climate.*', date, '_', version, '.tif'),
+  full.names = TRUE)
 length(clim_files)
 
 # this is kind of a 'raster stack', where each layers is a tif
@@ -43,14 +44,14 @@ rast1 <- terra::rast(clim_files) # class SpatRast
 # descriptions of layers of raster stack
 r_names <- names(rast1)
 
-into <- c("type", "category", "RCP", "years", "GCM", 'date')
+into <- c("type", "category", "RCP", "years", "GCM", 'date', 'version')
 
 rast_info <- create_rast_info(rast1, into = into, run_regex = '^') %>% 
   # removing trailing GCM, and date
-  mutate(id_noGCM = str_replace(id, '_[^_]+_\\d{8}$', '')) %>% 
+  mutate(id_noGCM = str_replace(id, '_[^_]+_\\d{8}_v\\d$', '')) %>% 
   # the ordering is important for later creation of spatraster dataset
   arrange(id) %>% 
-  select(-date, -run, -category)
+  select(-date, -run, -category, -version)
 
 # median by GCM -----------------------------------------------------------
 # for each treatment/scenario combination calculate the median
@@ -88,7 +89,7 @@ med2 <- rast(med1)
 
 rast_info_med <- create_rast_info(med2, 
                                   into = c("type", "climate", 'RCP', "years"),
-                                  run = '^')
+                                  run_regex = '^')
 
 info_med_l <- split(rast_info_med, f = rast_info_med$type)
 
@@ -115,12 +116,12 @@ names(diff_cref2) <- map(diff_cref1, names) %>%
 # median across GCMs, for all future scenarios
 writeRaster(med2, 
             file.path("data_processed/interpolated_rasters", 
-                      paste0("climate_median_across_GCMs_", date, ".tif")),
+                      paste0("climate_median_across_GCMs_", version, ".tif")),
             overwrite = TRUE)
 
 # difference in climate (raw) relative to current conditions 
 writeRaster(diff_cref2, 
             file.path("data_processed/interpolated_rasters", 
-                      paste0("climate_rdiff-cref_median_", date, ".tif")),
+                      paste0("climate_rdiff-cref_median_", version, ".tif")),
             overwrite = TRUE)
 
