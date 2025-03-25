@@ -11,6 +11,8 @@
 dataset_abbrev <- 'interp'
 method_abbrev <- 'ecdf'
 
+compare_runs <- TRUE # run additional code to compare runs
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -22,7 +24,7 @@ theme_set(theme_custom1())
 
 # list created in 01_combine_data.R
 m <- readRDS('data_processed/temp_rds/rap_sw_matching.rds') 
-run <- "fire1_eind1_c4grass1_co20_2311"
+run <- "fire0_eind1_c4grass1_co20"
 
 # vectors -----------------------------------------------------------------
 
@@ -178,7 +180,7 @@ df_seq2 <- dat %>%
 
 n <- length(probs) # number of probability (quantile) levels used
 pdf(paste0("figures/bio_matching/q-q_plots_qm", m$qual_cutoff, "_", 
-           n, "p.pdf"))
+           n, "p_", run, ".pdf"))
 g <- ggplot(df_seq2, aes(x = biomass, y = biomass_qm)) +
   geom_abline(slope = 1, color = 'gray') +
   geom_line(aes(linetype = method, color = dataset)) +
@@ -215,4 +217,26 @@ out <- list('Aherb' = qm_comb[[name]]$Aherb,
             'dataset' = lookup_dataset[dataset_abbrev],
             qual_cutoff = m$qual_cutoff,
             run = run)
+
 saveRDS(out, 'data_processed/temp_rds/qm_funs.rds')
+
+
+# compare biomass between runs --------------------------------------------
+
+if(compare_runs) {
+  stopifnot(length(unique(m$sw_comb$run)) == 2)
+  sw_comb <- m$sw_comb
+
+  tmp <- sw_comb %>% 
+    filter(dataset == 'site level') %>% 
+    select(-run) %>% 
+    pivot_wider(values_from = "biomass",
+                names_from = "fire")
+  
+  ggplot(tmp, aes(fire0, fire1, color = graze)) +
+    geom_point() +
+    facet_wrap(~PFT) +
+    geom_abline(slope = 1)
+  
+
+}
