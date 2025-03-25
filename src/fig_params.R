@@ -121,6 +121,9 @@ lab_fire1 <- "Change in fire return interval (years)"
 lab_firep0 <- "# fires/century"
 lab_firep1 <- expression(Delta~"# fires/century")
 
+# fire area
+lab_ba0 <- "Expected burned area (ha/yr)"
+
 # climate
 lab_map <- "MAP (mm)"
 lab_mat <- expression("MAT ("*degree*C*")")
