@@ -4,6 +4,10 @@
 # probability this way is a good enough approximation
 # of how changing (biomass) inputs will change fire probability in stepwat)
 
+# NOTE: this code would need to be updated to work properly 
+# (reads in summarize_bio.RDS, which is of more recent runs than
+# when the code was developed)
+
 # Author: Martin Holdrege
 
 # Started: Nov 8, 2024

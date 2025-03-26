@@ -1,6 +1,8 @@
 # Purpose: See what effect quantile matching has (spatially) on 
 # the derivative of the fire equation for both perennials and annuals
 
+# Note: to run, this could needs to be updated to deal with upstream
+# input changes
 
 # Author: Martin Holdrege
 

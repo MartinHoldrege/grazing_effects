@@ -12,7 +12,7 @@
 version_interp <- 'v3' # interpolation version (see 03_interpolate.R)
 # the first run in the vector is the 'main' one, ( and compared to the
 # no fire run in some figures)
-runs <- c("fire1_eind1_c4grass1_co20_2311", "fire0_eind1_c4grass1_co20")
+runs <- c("fire1_eind1_c4grass1_co20_2311")
 
 # matching quality cutoff, this decides
 # the cells from which both stepwat and rap data will be pulled from
@@ -32,11 +32,7 @@ rap_df1 <- read_csv("../cheatgrass_fire/data_processed/data_publication/Wildfire
 
 cell_nums <- rast("../cheatgrass_fire/data_processed/data_publication/cell_nums.tif")
 
-# created in grazing_effects/scripts/02_summarize_bio.R
-pft5_bio2 <- readRDS('data_processed/site_means/summarize_bio.RDS')$pft5_bio2
-
 sites1 <- read_csv("data_raw/site_locations.csv")
-clim1 <- read_csv("data_processed/site_means/dbWeather_200sites.csv")
 
 # * interpolated stepwat --------------------------------------------------
 PFTs <- c('Aherb', 'Pherb')
@@ -82,23 +78,6 @@ cell_nums_sites <- extract(cell_nums, sites2[, ]) %>%
 site_ids <- cell_nums_sites$site[!is.na(cell_nums_sites$cell_num)]
 
 # filter site level data
-
-sw_site_bio1 <- pft5_bio2 %>% 
-  calc_aherb(group_cols = c('run', 'years', 'RCP', 'graze', 'id', 
-                            'site')) %>% 
-  filter(.data$run %in% !!runs,
-         RCP == "Current",
-         site %in% site_ids,
-         PFT %in% unname(pft_lookup)) %>% 
-  mutate(fire = str_extract(run, 'fire\\d'))
-
-# * evaluate clim of stepwat sites ------------------------------------------
-# see if the subset of stepwat sites, that overlap with the rap data from the
-# fire data are representative of all sites
-
-clim2 <- clim1 %>% 
-  mutate(dataset_overlap = Site_id %in% site_ids)
-
 
 
 # ** extract RAP data --------------------------------------------------------
@@ -160,10 +139,7 @@ tmp1 <- df_sw2 %>%
   select(run, fire, biomass, PFT, graze, cell_num, site) %>% 
   mutate(dataset = 'interpolated') 
 
-sw_comb <- sw_site_bio1 %>% 
-  select(run, fire, biomass, PFT, graze, site) %>% 
-  mutate(dataset = 'site level') %>% 
-  bind_rows(tmp1) %>% 
+sw_comb <- tmp1%>% 
   # remove the (interpolation) version number
   # so run names are the same between site level and interpolated
   mutate(run = str_replace(run, 'v\\d$', ""))
@@ -215,7 +191,6 @@ out <- list(
   runs = runs,
   sw_comb = sw_comb,
   rap_comb = rap_comb,
-  clim = clim2,
   qual_cutoff = qual_cutoff
 )
 
@@ -224,16 +199,15 @@ saveRDS(out, 'data_processed/temp_rds/rap_sw_matching.rds')
 # saving these csv's for reproducibility
 if(qual_cutoff == 0.5) {
   sw <- sw_comb %>% 
-    filter(dataset == 'interpolated',
-           fire == 'fire0')
+    filter(dataset == 'interpolated')
   
   rap <- rap_comb %>% 
     filter(dataset == 'interpolated') %>% 
     select(-site)
   
   write_csv(sw, paste0('data_processed/qm/stepwat_for_qm_', qual_cutoff, 
-                       'match.csv'))
+                       'match_v2.csv'))
   
   write_csv(rap, paste0('data_processed/qm/rap_for_qm_', qual_cutoff, 
-                       'match.csv'))
+                       'match_v2.csv'))
 }

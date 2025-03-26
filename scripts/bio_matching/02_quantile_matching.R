@@ -5,13 +5,13 @@
 # Started: Nov 8, 2024
 
 # params ------------------------------------------------------------------
-
 # quantile matching functions fit using two dataset and two methods
 # but only one is outputted, specified here
 dataset_abbrev <- 'interp'
 method_abbrev <- 'ecdf'
 
-compare_runs <- TRUE # run additional code to compare runs
+graze_levels <- c("L" = "Light", "M" = "Moderate", "H" = "Heavy")
+run <- "fire1_eind1_c4grass1_co20_2311"
 
 # dependencies ------------------------------------------------------------
 
@@ -24,7 +24,6 @@ theme_set(theme_custom1())
 
 # list created in 01_combine_data.R
 m <- readRDS('data_processed/temp_rds/rap_sw_matching.rds') 
-run <- "fire0_eind1_c4grass1_co20"
 
 # vectors -----------------------------------------------------------------
 
@@ -37,7 +36,10 @@ stopifnot(run %in% m$runs)
 rap_df <- m$rap_comb
 
 sw_df <- m$sw_comb %>% 
-  filter(run == !!run)
+  filter(run == !!run,
+         graze %in% graze_levels)
+
+stopifnot(graze_levels %in% sw_df$graze)
 
 # fit emperical cdfs to interpolated data
 cdfs_interp <- list()
@@ -49,18 +51,6 @@ cdfs_interp$rap <- map(pfts, function(pft) {
 
 cdfs_interp$sw <- map(pfts, function(pft) {
   x <- sw_df[sw_df$PFT == pft & sw_df$dataset == dataset, ]$biomass
-  ecdf(x)
-})
-
-# ecdfs fit to site level (not interpolated data)
-cdfs_site <- list()
-cdfs_site$rap <- map(pfts, function(pft) {
-  x <- rap_df[rap_df$PFT == pft & rap_df$dataset != dataset, ]$biomass
-  ecdf(x)
-})
-
-cdfs_site$sw <- map(pfts, function(pft) {
-  x <- sw_df[sw_df$PFT == pft & sw_df$dataset != dataset, ]$biomass
   ecdf(x)
 })
 
@@ -99,16 +89,11 @@ quants_interp_df <- bind_cols(quants_interp$sw) %>%
                values_to = 'biomass',
                names_to = 'PFT')
 
-quants_site <-map(cdfs_site, function(l) {
-  map(l, \(x) as.numeric(quantile(x, probs = probs)))
-})
-
 
 # create functions where input is a vector of biomass
 # and output is a vector of adjusted biomass, so that it
 # is on the same scale as RAP
 qm_interp <- map(pfts, \(x) qm_factory(x, cdfs_interp)) # list of two functions
-qm_site <- map(pfts, \(x) qm_factory(x, cdfs_site))
 
 # functions for quantile matching using  fixed set of a few quantiles
 qm_quant_interp <- map(pfts, function(pft) {
@@ -117,18 +102,10 @@ qm_quant_interp <- map(pfts, function(pft) {
   
 })
 
-qm_quant_site <- map(pfts, function(pft) {
-  qm_quant_factory(from = quants_site$sw[[pft]],
-                   to = quants_site$rap[[pft]])
-  
-})
-
 # list of list of functions
 qm_comb <- list(
   'ecdf_interp' = qm_interp,
-  'ecdf_site' = qm_site,
-  'quant_interp' = qm_quant_interp,
-  'quant_site' = qm_quant_site
+  'quant_interp' = qm_quant_interp
 )
 
 # figures ----------------------------------------------------------------
@@ -179,8 +156,9 @@ df_seq2 <- dat %>%
          method = lookup_method[method])
 
 n <- length(probs) # number of probability (quantile) levels used
+run2 <- paste0(run, '_graz', paste(names(graze_levels), collapse = ''))
 pdf(paste0("figures/bio_matching/q-q_plots_qm", m$qual_cutoff, "_", 
-           n, "p_", run, ".pdf"))
+           n, "p_", run2, ".pdf"))
 g <- ggplot(df_seq2, aes(x = biomass, y = biomass_qm)) +
   geom_abline(slope = 1, color = 'gray') +
   geom_line(aes(linetype = method, color = dataset)) +
@@ -213,30 +191,14 @@ out <- list('Aherb' = qm_comb[[name]]$Aherb,
                             'used for quantile mapping,',
                             '\n with',
                             dataset_descript,
-                            'data from', run),
+                            'data from', run2),
             'dataset' = lookup_dataset[dataset_abbrev],
             qual_cutoff = m$qual_cutoff,
-            run = run)
+            graze_levels = graze_levels,
+            run = run,
+            run2 = run2)
 
 saveRDS(out, 'data_processed/temp_rds/qm_funs.rds')
 
 
-# compare biomass between runs --------------------------------------------
 
-if(compare_runs) {
-  stopifnot(length(unique(m$sw_comb$run)) == 2)
-  sw_comb <- m$sw_comb
-
-  tmp <- sw_comb %>% 
-    filter(dataset == 'site level') %>% 
-    select(-run) %>% 
-    pivot_wider(values_from = "biomass",
-                names_from = "fire")
-  
-  ggplot(tmp, aes(fire0, fire1, color = graze)) +
-    geom_point() +
-    facet_wrap(~PFT) +
-    geom_abline(slope = 1)
-  
-
-}

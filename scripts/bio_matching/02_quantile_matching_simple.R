@@ -14,6 +14,10 @@ probs <- c(0, 0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.98, 0.995, 1)
 qual_cutoff <- 0.5 # matching quality cutoff used determine how good
 # the interpolation needed to be
 
+# excluding # very high grazing, because the other three are more representative
+# (we think) of what's common on the landscape
+graze_levels <- c("L" = "Light", "M" = "Moderate", "H" = "Heavy")
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -22,12 +26,12 @@ source('src/qm_functions.R')
 # read in data ------------------------------------------------------------
 
 # files created in 01_combine_data.R
-sw1 <- read_csv(paste0('data_processed/qm/stepwat_for_qm_', qual_cutoff, 
-                     'match.csv'),
+sw0 <- read_csv(paste0('data_processed/qm/stepwat_for_qm_', qual_cutoff, 
+                     'match_v2.csv'),
                 show_col_types = FALSE)
 
 rap1 <- read_csv(paste0('data_processed/qm/rap_for_qm_', qual_cutoff, 
-                      'match.csv'),
+                      'match_v2.csv'),
                  show_col_types = FALSE)
 
 # vectors -----------------------------------------------------------------
@@ -35,6 +39,16 @@ rap1 <- read_csv(paste0('data_processed/qm/rap_for_qm_', qual_cutoff,
 pfts <- c('Pherb' = 'Pherb', 'Aherb' = 'Aherb')
 pft_lookup <- c('pfgAGB', 'afgAGB')
 names(pft_lookup) <- pfts
+
+run <- unique(sw0$run)
+stopifnot(length(run) == 1) # code currently only set up for a single run at a time
+# prepare dfs -------------------------------------------------------------
+
+stopifnot(graze_levels %in% sw0$graze)
+
+sw1 <- sw0 %>% 
+  filter(.data$graze %in% graze_levels)
+
 # fitting cdfs ------------------------------------------------------------
 
 # fit emperical cdfs to interpolated data
@@ -112,7 +126,8 @@ for(pft in pfts) {
   seq1$biomass_qm[seq1$PFT == pft] <- qm_quant[[pft]](seq1$biomass[seq1$PFT == pft] )
 }
 
-png("figures/bio_matching/q-q_plots_qm0.5_12p_simple.png",
+run2 <- paste0(run, '_graz', paste(names(graze_levels), collapse = ''))
+png(paste0("figures/bio_matching/q-q_plots_qm0.5_12p_simple_",run, ".png"),
      width = 4, height = 7, units = 'in', res = 600)
 seq1 %>% 
   mutate(PFT = pft_lookup[PFT]) %>% 
@@ -127,10 +142,7 @@ dev.off()
 
 # save objects ------------------------------------------------------------
 
-run <- unique(sw1$run) 
+name <- paste0('quantiles_for_qm_', qual_cutoff, 'match_', run2)
 
-stopifnot(length(run) == 1)
-
-name <- paste0('quantiles_for_qm_', qual_cutoff, 'match_', run, '.csv')
-
-write_csv(out, file.path('data_processed/qm', name))
+write_csv(out, file.path('data_processed/qm', paste0(name, '.csv')))
+write_tsv(out, file.path('data_processed/qm', paste0(name, '.tsv')))

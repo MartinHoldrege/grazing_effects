@@ -30,16 +30,16 @@ if(file.exists(path)) {
 
 # params ------------------------------------------------------------------
 
-run <- m$runs[1]
+run <- qm_l$run
+run2 <- qm_l$run2
 RCP <- 'Current'
-stopifnot(run == qm_l$run) # there may be cases where this doesn't need to be true
+stopifnot(run == unique(m$sw_comb$run)) # there may be cases where this doesn't need to be true
 qual_cutoff <- qm_l$qual_cutoff
+
 # dataframes etc --------------------------------------------------------------
 
-clim <- m$clim
 sw_comb <- m$sw_comb
 rap_comb <- m$rap_comb
-qual_cutoff <- m$qual_cutoff
 
 # *prepare pdp predictions -------------------------------------------------
 pft_lookup <- c('pfgAGB' = 'Pherb','afgAGB' = 'Aherb')
@@ -62,35 +62,21 @@ for (pft in pfts) {
 
 # Pherb:total herb
 ratio <- sw_comb %>% 
-  filter(dataset == 'site level') %>% 
-  pivot_wider(id_cols = c('run', 'fire', 'graze', 'dataset', 'site'),
+  filter(dataset != 'site level') %>% 
+  pivot_wider(id_cols = c('run', 'fire', 'graze', 'dataset', 'site', "cell_num"),
               values_from = c('biomass', 'biomass_qm'),
               names_from = 'PFT') %>% 
   mutate(P_ratio_qm = biomass_qm_Pherb/(biomass_qm_Aherb + biomass_qm_Pherb),
          P_ratio_raw = biomass_Pherb/(biomass_Aherb + biomass_Pherb))
 
 
+# fig params --------------------------------------------------------------
+
+
+
 # climate figures -------------------------------------------------------------
 
-g <- ggplot(clim, aes(color = dataset_overlap)) +
-  theme_bw() +
-  scale_color_manual(name = 'STEPWAT site falls on \nHoldrege et al 2024 1km cell',
-                     values = c('darkgrey', 'blue' ))
-
-g1 <- g + geom_point(aes(MAT_C, MAP_mm))
-
-g2 <- g + geom_point(aes(CorrTP2, MAP_mm)) +
-  labs(x = 'T-P correlation')
-g3 <- g + geom_point(aes(CorrTP2, MAT_C)) +
-  labs(x = 'T-P correlation')
-p <- g1 + g2 + g3 + plot_layout(guides = 'collect',
-                                ncol = 2) 
-p&theme(legend.position = 'top')
-
-linetype <- function() {
-  scale_linetype_manual(name = NULL, 
-                        values = c("fire1" = 1, "fire0" = 2))
-}
+# need to use December 2024 version of repo for these figures
 
 # density figures ---------------------------------------------------------
 
@@ -128,12 +114,11 @@ g1 <- ggplot() +
   scale_y_continuous(sec.axis = sec_axis(~./2, name = 'Mean predicted fire probability')) +
   expand_limits(x = 0) +
   theme(legend.position = 'top') +
-  linetype() +
   labs(x = lab_bio0)
 
 print(g1 +
   geom_density(data = sw_comb[sw_comb$dataset == 'interpolated', ], 
-               aes(biomass, color = graze, linetype = fire)) +
+               aes(biomass, color = graze)) +
   labs(subtitle = 'Interpolated  stepwat data',
        caption = paste('Histogram shows RAP data, colored lines show stepwat (', 
                        RCP, ' climate), black is fire model',
@@ -141,60 +126,25 @@ print(g1 +
 
 print(g1 +
   geom_density(data = sw_comb[sw_comb$dataset == 'interpolated', ], 
-               aes(biomass_qm, color = graze, linetype = fire)) +
+               aes(biomass_qm, color = graze)) +
   labs( subtitle = 'Interpolated stepwat (quantile mapped) data',
        caption = paste('Histogram shows RAP data, colored lines show stepwat quantile mapped values\n',
                        cap_qm,
                        cap_interp, cap_match)))
 
 # stepwat site level comparison
+# see 12/2024 version of repo
 
-g2 <- ggplot() +
-  geom_histogram(data = rap_comb[rap_comb$dataset != 'interpolated',], 
-                 aes(biomass, y = after_stat(density)),
-                 bins = 100) + 
-  pdp_line() +
-  scale_color_manual(values = cols_graze,
-                     name = 'STEPWAT2 grazing') +
-  facet_wrap(~PFT, ncol = 1, scales = 'free') +
-  scale_y_continuous(sec.axis = sec_axis(~. /2, name = 'Mean predicted fire probability')) +
-  expand_limits(x = 0) +
-  theme(legend.position = 'top') +
-  linetype() +
-  labs(x = lab_bio0)
 
-print(g2 +
-  geom_density(data = sw_comb[sw_comb$dataset != 'interpolated', ], 
-               aes(biomass, color = graze, linetype = fire)) +
-  labs(subtitle = 'Stepwat site level data (not interpolated)',
-     caption = cap_sites))
-
-print(g2 +
-  geom_density(data = sw_comb[sw_comb$dataset != 'interpolated', ], 
-               aes(biomass_qm, color = graze, linetype = fire)) +
-  labs(subtitle = 'Stepwat (quantile mapped) site level data (not interpolated)',
-       caption = paste(cap_sites, '\n', cap_qm)))
-
-# histograms of just stepwat data 
-# showing these seperately because density curves may be hiding details
-
-for (pft in pft_lookup) {
-  g <- sw_comb %>% 
-    filter(PFT == pft) %>% 
-    ggplot(aes(x = biomass, y = after_stat(density), fill = fire)) +
-    geom_histogram() +
-    facet_grid(dataset~graze) +
-    labs(title = pft,
-         subtitle = 'Comparing site level and interpolated stepwat biomass')
-  print(g)
-}
 
 dev.off()
 
 # Pherb/total herb ratio -------------------------------------------------------
 
 # how does the perenial fraction change with quantile matching?
+set.seed(1234)
 g <- ratio %>% 
+  slice_sample(n = 1000) %>% 
   filter(run == !!run) %>% 
   ggplot(aes(P_ratio_raw, P_ratio_qm)) +
   geom_point(aes(color = graze)) +
@@ -206,8 +156,8 @@ g <- ratio %>%
        y = 'Pherb/(Pherb + Aherb) [quantile mapped biomass]',
        subtitle = 'Proportion perennials before and after quantile mapping',
        caption = paste('Current climate conditions.\n',
-                       run))
+                       run2, "\n Sample of pixels shown"))
 
-pdf(paste0('figures/bio_matching/Pherb_ratio_qm', qual_cutoff, '.pdf'))
+pdf(paste0('figures/bio_matching/Pherb_ratio_qm', qual_cutoff, "_", run2, '.pdf'))
 print(g)
 dev.off()
