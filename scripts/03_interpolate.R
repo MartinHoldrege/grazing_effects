@@ -23,7 +23,7 @@ version <- 'v4'
 # v4-- criteria same as v3, but new study area mask used (more restrictive)
 run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
-run_fire <- FALSE
+run_fire <- TRUE
 # interpolate data showing which vars caused changes in fire?
 run_fire_attribution <- TRUE 
 
@@ -31,7 +31,7 @@ run_fire_attribution <- TRUE
 PFT2run =c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 
            'Pherb', 'Aherb', 'Aforb','Pgrass')
 
-run2run = 'fire1_eind1_c4grass1_co20_2502' # NULL # 
+run2run = NULL # 'fire1_eind1_c4grass1_co20_2503' # 
 years2run =  NULL #'Current'
 
 v2paste <- if(version == 'v1') "" else version # for pasting to interpolated tiffs

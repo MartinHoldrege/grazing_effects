@@ -14,7 +14,6 @@
 library(tidyverse)
 library(DBI)
 source('src/paths.R') # db files stored on hard-drive
-
 # connect to db -----------------------------------------------------------
 
 # naming convention:
@@ -25,19 +24,27 @@ source('src/paths.R') # db files stored on hard-drive
 # CO2 – 0/1
 # runs done in 2025--quantile mapping for fire equation has been 
 # implemented
+# 2502--first runs that used quantile mapping for fire probability inputs
+# 2503 runs have corrected the quantile mapping values used for fire probability
 
-db_paths <- c(
-  "fire1_eind1_c4grass1_co20_2502" =
-    file.path(path_sw, "fire1_eind1_c4grass1_co20_grazMHVH_2502", 
-              "Output_fire1_eind1_c4grass1_co20_grazMHVH_2502.sqlite"),
-  "fire1_eind1_c4grass1_co20_2502" =
-    file.path(path_sw, "fire1_eind1_c4grass1_co20_grazL_2502", 
-              "Output_fire1_eind1_c4grass1_co20_grazL_2502.sqlite"),
-  "fire1_eind1_c4grass0_co20_2502" =
-    file.path(path_sw, "fire1_eind1_c4grass0_co20_grazLMHVH_2502", 
-              "Output_fire1_eind1_c4grass0_co20_grazLMHVH_2502.sqlite")
+
+# enter details here (for constructing file paths)
+run_details <- list(
+  c('run' = 'fire1_eind1_c4grass1_co20_2503', 'graze' = 'grazLMHVH'),
+   c('run' = 'fire1_eind1_c4grass0_co20_2503', 'graze' = 'grazLMHVH')
+)
+
+# construct file paths
+db_paths <- map(run_details, function(x) {
+  run2 <- str_replace(x['run'], '_\\d{4}$', 
+                      paste0('_', x['graze'], "\\0"))
   
-  )
+  # adding in the grazing levels to the filename
+  file.path(path_sw, run2, 
+            paste0('Output_', run2, '.sqlite'))
+})
+names(db_paths) <- map_chr(run_details, \(x) x['run'])
+
 
 stopifnot(map_lgl(db_paths, file.exists))
 
@@ -187,7 +194,7 @@ bio3$n <- NULL
 # original version of this file (bio_mean_by_site-PFT.csv) was created with
 # data from the 2021/2022 implementationof stepwat (old cheatgrass fire, no C02,
 # and no dynamic eind implementation)
-write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v5.csv")
+write_csv(bio3, "data_processed/site_means/bio_mean_by_site-PFT_v6.csv")
 
 map(db_connects, dbDisconnect) # disconnect
 

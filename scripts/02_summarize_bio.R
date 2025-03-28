@@ -26,11 +26,15 @@ n_years <- 50 # number of years of data from simulations we're using (i.e.
 
 n_iter <- 200 # number of iterations run
 
+# runs with all grazing levels
+runs_graze <- c('NoC4Exp' = "fire1_eind1_c4grass0_co20_2503", 
+                'default' = "fire1_eind1_c4grass1_co20_2503")
+
 # read in files -----------------------------------------------------------
 
 # site level means of biomass across years, for each treatment and PFT
 # created in 01_query_db.R script
-bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v5.csv",
+bio3 <- read_csv("data_processed/site_means/bio_mean_by_site-PFT_v6.csv",
                  show_col_types = FALSE)
 
 # climate seasonality (file created in 01_summarize_clim.R)
@@ -90,7 +94,7 @@ seas2 <- seas1 %>%
 clim_all1 <- bio4 %>% 
   # arbitrarily filtering for one graze and PFT, so rows aren't duplicated
   filter(graze == "Light", PFT == "sagebrush",
-         run == "fire1_eind1_c4grass1_co20_2502") %>% 
+         run == runs_graze['default']) %>% 
   select(site, PPT, Temp, years, RCP, GCM) %>% 
   left_join(seas2, by = join_by(site, years, RCP, GCM))
 
@@ -155,9 +159,6 @@ runs_graze0 <- pft5_bio1 %>%
   summarize(n = n()) %>% 
   filter(n == 4) %>% 
   pull(run)
-
-runs_graze <- c('NoC4Exp' = "fire1_eind1_c4grass0_co20_2502", 
-                'default' = "fire1_eind1_c4grass1_co20_2502")
 
 # make sure selecting runs for which all grazing levs exist
 stopifnot(runs_graze %in% runs_graze0) 
