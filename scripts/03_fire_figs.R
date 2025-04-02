@@ -159,10 +159,10 @@ dev.off()
 
 # * fire vs climate -------------------------------------------------------
 
-pdf("figures/fire/fire_vs_clim_v3.pdf",
+rn <- runs_graze['default']
+pdf(paste0("figures/fire/fire_vs_clim_", rn, ".pdf"),
     width = 8, height = 7)
 
-rn <- runs_graze['default']
 g1 <- fire_med2 %>% 
   filter(run == rn) %>% 
   ggplot(aes(y = fire_prob, color = graze)) +

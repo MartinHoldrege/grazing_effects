@@ -38,6 +38,42 @@ prob_geometric_rule <- function(p, a = 0, b) {
   prob_a_b*p # the sequence must occur after a fire
 }
 
+
+# helper funs -------------------------------------------------------------
+
+create_age_groups <- function() {
+  # for area by age class group
+  # these intervals of years
+  # to answer the question of (e.g) what is the expected area of the region
+  # that will have burned between 0 and 10 years ago
+  age_groups <- list(
+    c(a = 0, b = 10),
+    c(a = 11, b = 25),
+    c(a = 26, b = 75),
+    c(a = 76, b = 150),
+    c(a = 151, b = Inf)
+  )
+  
+  names(age_groups) <- map_chr(age_groups, function(x) {
+    out <- if(is.finite(x['b'])) {
+      paste0(x['a'], '-',  x['b'])
+    } else {
+      paste0(x['a'], ' +')
+    }
+    out
+  })
+  
+  age_groups
+  
+}
+
+
+
+
+
+# testing -----------------------------------------------------------------
+
+
 if (FALSE) {
   n <- 1e6
   

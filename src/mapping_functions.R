@@ -89,6 +89,21 @@ create_breaks_cols <- function(x,
   out
 }
 
+# for calculating the 2nd lowest and 2nd highest values
+# across 13 GCMs
+calc_low <- function(r) {
+  stopifnot(nlyr(r) == 13)
+  out <- terra::sort(r, decreasing = FALSE)[[2]]
+  names(out) <- 'low'
+  out
+}
+
+calc_high <- function(r) {
+  stopifnot(nlyr(r) == 13)
+  out <- terra::sort(r, decreasing = TRUE)[[2]]
+  names(out) <- 'high'
+  out
+}
 
 # operations on rasters ---------------------------------------------------
 

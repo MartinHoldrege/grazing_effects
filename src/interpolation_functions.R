@@ -107,7 +107,7 @@ run_interpolatePoints <- function(df,
     # making list of columns to use each time through dopar loop
     vecs_l <- col_nums_parallel(df2, by = 20)
     
-    message(paste(path, 'done'))
+    message(paste(path, 'start'))
     message(Sys.time())
     
     # separately running interpolation on different sets of columns

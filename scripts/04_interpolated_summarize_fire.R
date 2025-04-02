@@ -18,7 +18,7 @@ source("src/general_functions.R")
 # params ------------------------------------------------------------------
 
 v <- 'v4' # interpolation version
-runs <- c('fire1_eind1_c4grass0_co20_2502', 'fire1_eind1_c4grass1_co20_2502')
+runs <- c('fire1_eind1_c4grass0_co20_2503', 'fire1_eind1_c4grass1_co20_2503')
 # some terra operations can be done in parallel and need 
 # to know num of cores
 num.cores <- parallel::detectCores(logical = FALSE) 
@@ -82,6 +82,23 @@ stopifnot(map_dbl(rast_gcm_l, nlyr) == rast_info %>%
 med1 <- map(rast_gcm_l, app, fun = "median")
 
 med2 <- rast(med1)
+
+# exclude current time-period
+rast_gcm_l_fut <- discard(rast_gcm_l, \(x) nlyr(x) == 1)
+
+# calculate low (2nd lowest) and high (2nd highest)
+# estimates across GCMs
+low <- map(rast_gcm_l_fut, calc_low)
+names(low) <- paste0(names(low), "_low")
+
+high <- map(rast_gcm_l_fut, calc_high)
+names(high) <- paste0(names(high), "_high")
+
+med3 <- med2
+names(med3) <- paste0(names(med2), "_median")
+
+comb1 <- c(med3, rast(low), rast(high))
+comb1 <- comb1[[sort(names(comb1))]]
 
 # delta biomass cref ------------------------------------------------------
 # change in fire probability (percentage points) relative to ambient climate (c)
@@ -162,9 +179,9 @@ stopifnot(
 # median across GCMs, for all future scenarios
 
 
-writeRaster(med2, 
+writeRaster(comb1, 
             file.path("data_processed/interpolated_rasters", 
-                      paste0(run, "_fire-prob_future_median_across_GCMs.tif")),
+                      paste0(run, "_fire-prob_future_summary_across_GCMs.tif")),
             overwrite = TRUE)
 
 # difference in biomass (raw) relative to current conditions (within a grazing level)
