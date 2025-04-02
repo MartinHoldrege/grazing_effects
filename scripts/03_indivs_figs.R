@@ -87,7 +87,7 @@ levs_pft_l$other = levs_pft[!levs_pft %in% levs_pft_l$pft5]
 
 # c4 on and off in side by side panels 
 # for each pft
-pdf("figures/indivs/indivs_boxplot_by_run_v1.pdf",
+pdf("figures/indivs/indivs_boxplot_by_run_v2.pdf",
     height = 9, width = 6)
 
 map(levs_pft_l, function(x) {
@@ -110,7 +110,7 @@ dev.off()
 
 # each combination PFt and C4 on or off is plotted on seperate pages
 # facets are RCP/year combinations, colors are grazing
-pdf("figures/indivs/indivs_vs_climate_v2.pdf",
+pdf("figures/indivs/indivs_vs_climate_v3.pdf",
     width = 6, height = 5)
 
 # here pmap is working by taking the column names (i.e. iterating over rows)
@@ -169,7 +169,7 @@ dev.off()
 # conditions for that same grazing level (i.e. this is the climate effect)
 
 
-pdf("figures/indivs/pft5_indivs_diff_boxplots_v2.pdf",
+pdf("figures/indivs/pft5_indivs_diff_boxplots_v4.pdf",
     height = 8, width = wfig_box1)
 
 # % change
@@ -219,7 +219,7 @@ dev.off()
 
 # ** boxplots -------------------------------------------------------------
 
-pdf("figures/indivs/pft5_indivs-diff_wgcm_boxplots_v2.pdf", 
+pdf("figures/indivs/pft5_indivs-diff_wgcm_boxplots_v5.pdf", 
     height = 8, width = wfig_box1)
 
 # % change

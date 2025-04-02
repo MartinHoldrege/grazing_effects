@@ -80,7 +80,7 @@ pft5_bio_b <- pft5_bio2 %>%
 # * boxplot ---------------------------------------------------------------
 
 # boxplots of utilization and biomass for all functional groups
-pdf("figures/biomass/bio-util-boxplot_all_v2.pdf",
+pdf("figures/biomass/bio-util-boxplot_all_v3.pdf",
     height = 8, width = wfig_box1)
 
 figs_l <- map(runs_graze, function(x) {
@@ -171,7 +171,7 @@ dev.off()
 
 # each combination PFt and C4 on or off is plotted on seperate pages
 # facets are RCP/year combinations, colors are grazing
-pdf("figures/biomass/bio_vs_climate_v4.pdf",
+pdf("figures/biomass/bio_vs_climate_v5.pdf",
     width = 6, height = 5)
 
 # here pmap is working by taking the column names (i.e. iterating over rows)
@@ -282,15 +282,15 @@ cheat_df <- pft5_bio2 %>%
   filter(PFT == "Cheatgrass", RCP %in% c("Current", "RCP45")) %>% 
   select(run, years, RCP, graze, site, biomass, utilization)
 
-pdf("figures/biomass/light_vs_heavy_graze_scatterplot_v2.pdf",
+pdf("figures/biomass/light_vs_heavy_graze_scatterplot_v3.pdf",
     width = 6, height = 6)
 
 for(r in runs_graze) {
 df <- cheat_df %>% 
   filter(graze == "Light") %>% 
-  left_join(filter(cheat_df, graze == "Heavy"),
+  left_join(filter(cheat_df, graze == "Very Heavy"),
             by = c("run", "RCP", "years", "site"),
-            suffix = c("_light", "_heavy")) %>% 
+            suffix = c("_light", "_veryheavy")) %>% 
   filter(run == r)
 
 g <- ggplot(df) +
@@ -300,13 +300,13 @@ g <- ggplot(df) +
 
 print(g +
   labs(x = "Biomass (light grazing)",
-       y = "Biomass (heavy grazing)") +
-  geom_point(aes(biomass_light, biomass_heavy)))
+       y = "Biomass (very heavy grazing)") +
+  geom_point(aes(biomass_light, biomass_veryheavy)))
 
 print(g +
   labs(x = "Utilization (light grazing)",
-       y = "Utilization (heavy grazing)") +
-  geom_point(aes(utilization_light, utilization_heavy))
+       y = "Utilization (very heavy grazing)") +
+  geom_point(aes(utilization_light, utilization_veryheavy))
   )
 }
 dev.off()
@@ -348,7 +348,7 @@ compare_runs_scatter <- function(pft, var) {
     theme(legend.position = c(0.85, 0.15))
 }
 
-pdf("figures/biomass/bio-util_compare-runs_v2.pdf",
+pdf("figures/biomass/bio-util_compare-runs_v3.pdf",
     width = 9, height = 7)
 
 map(levs_pft, function(x) {
@@ -369,7 +369,7 @@ g <- C3_Pgrass_ratio %>%
   labs(subtitle = "Ratio of C3Pgrass biomass to total Pgrass biomass",
        caption = "Separately showing data from simulations with C4 expansion on and off") 
 g
-ggsave("figures/biomass/C3_Pgrass_ratio_v2.jpeg", g, 
+ggsave("figures/biomass/C3_Pgrass_ratio_v3.jpeg", g, 
        width = 6, height = 4)
 
 # biomass change -------------------------------------------------------
@@ -383,7 +383,7 @@ ggsave("figures/biomass/C3_Pgrass_ratio_v2.jpeg", g,
 # conditions for that same grazing level (i.e. this is the climate effect)
 
 
-pdf("figures/biomass/pft5_bio-util_diff_boxplots_v2.pdf",
+pdf("figures/biomass/pft5_bio-util_diff_boxplots_v3.pdf",
     height = 8, width = wfig_box1)
 
 # scaled % change (see pre-2024 code)
@@ -423,7 +423,7 @@ dev.off()
 # boxplots showing change in biomass (and effect size) relative to current time 
 # period and a given grazing intensity ('reference class')
 
-pdf("figures/biomass/pft5_bio-util_diff_gref_boxplots_v1.pdf", 
+pdf("figures/biomass/pft5_bio-util_diff_gref_boxplots_v2.pdf", 
     height = 6.5, width = wfig_box1)
 
 # % change
@@ -463,7 +463,7 @@ dev.off()
 
 # effect size vs MAP and MAT, for for ref class of light grazing, for
 # each RCP/time period and PFT
-pdf("figures/biomass/bio-util-diff_vs_climate_v2.pdf",
+pdf("figures/biomass/bio-util-diff_vs_climate_v3.pdf",
     width = 6, height = 5)
 # scaled %change[see pre 2024 code]
 
@@ -514,7 +514,7 @@ dev.off()
 
 
 # ** boxplots -------------------------------------------------------------
-pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v3.pdf", 
+pdf("figures/biomass/pft5_bio_diff_wgcm_boxplots_v4.pdf", 
     height = 8, width = wfig_box1)
 
 # effect size
@@ -785,7 +785,7 @@ dev.off()
 # level
 
 # total utilization
-pdf("figures/biomass/tot-util_boxplot_v2.pdf",
+pdf("figures/biomass/tot-util_boxplot_v3.pdf",
     height = 4, width = 4)
 
 figs_l <- map(runs_graze, function(x) {

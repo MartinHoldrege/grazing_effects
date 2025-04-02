@@ -18,7 +18,7 @@ source("src/mapping_functions.R")
 source('src/fig_functions.R')
 # params ------------------------------------------------------------------
 
-runs <- c('fire1_eind1_c4grass1_co20_2502')
+runs <- c('fire1_eind1_c4grass1_co20_2503')
 names(runs) <- runs
 v_out <- "v1" # version appended to output
 
@@ -35,19 +35,26 @@ path_r <- "data_processed/interpolated_rasters"
 # * median fire probability (across GCMs) --------------------------------------------
 
 paths <- list.files(path_r, full.names = TRUE,
-                    pattern = 'fire-prob_future_median_across_GCMs.tif') %>% 
+                    pattern = 'fire-prob_future_summary_across_GCMs.tif') %>% 
   str_subset(pattern = paste("(", runs, ")", collapse = "|", sep = "")) 
 
 r1 <- rast(paths)
 
-into <- c("type", "RCP", "years", 
-          "graze")
-info0 <- create_rast_info(r1, into = into)
+into0 <- c("type", "RCP", "years", 
+          "graze", 'summary') 
+into <- into0[-length(into0)]
+info0 <- create_rast_info(r1, into = into0)
 
 info1 <- info0 %>% 
-  filter(graze %in% graze_levels)
+  filter(graze %in% graze_levels,
+         summary == 'median') 
+  
 
 r2 <- r1[[info1$id]]
+names(r2) <- str_replace(names(r2), "_median$", "")
+
+info1 <- info1 %>% 
+  mutate(id = str_replace(id, "_median$", ""))
 
 # *median delta fire-prob ---------------------------------------------------
 
@@ -231,7 +238,7 @@ for (run in runs) {
     })
     
     id <- paste0(unique(info$id_noGraze), '_', ref_graze)
-    map_ref <-plot_map_inset(r = r1[[id]],
+    map_ref <-plot_map_inset(r = r2[[id]],
                              colors = cols_firep,
                              tag_label = paste0("Fire probability (", ref_graze, 
                                                 " grazing)"),

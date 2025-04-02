@@ -19,7 +19,7 @@ source('src/fig_functions.R')
 
 # params ------------------------------------------------------------------
 
-run <- 'fire1_eind1_c4grass1_co20_2502'
+run <- 'fire1_eind1_c4grass1_co20_2503'
 v_out <- "v1" # version appended to output
 v_interp <- 'v4' # interpolation version
 graze_levels <- c("grazL" = "Light", "grazH" = "Heavy")

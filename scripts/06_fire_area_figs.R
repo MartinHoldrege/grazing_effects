@@ -15,17 +15,20 @@ run <- 'fire1_eind1_c4grass1_co20_2503'
 
 v <- 'v1' # version of input files (and for now also used in output file names)
 
+# create additional figures to explore how age groups/fire probability relate
+# (not using actual data)
+explanatory_figures <- TRUE 
+
 # dependencies ------------------------------------------------------------
 
 library(terra)
 library(tidyverse)
 library(patchwork)
-theme_set(theme_custom1())
 source("src/general_functions.R")
 source("src/fig_functions.R")
 source("src/fig_params.R")
 source("src/probability_functions.R")
-
+theme_set(theme_custom1())
 # read in data ------------------------------------------------------------
 
 ba3a <- read_csv(
@@ -42,6 +45,7 @@ area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v,".csv"),
 # vectors -----------------------------------------------------------------
 
 ecoregions <- area_eco$ecoregion
+age_groups <- create_age_groups()
 
 # fig params --------------------------------------------------------------
 
@@ -60,7 +64,7 @@ area_age_group3 <- df_factor(area_age_group3) %>%
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
          id2 = factor(id2, levels = unique(id2)),
          # not reproducible (yet)
-         age_group = factor(age_group, levels = names(create_age_groups())))
+         age_group = factor(age_group, levels = names(age_groups)))
 
 # expected burned area figs --------------------------------------------------
 
@@ -142,3 +146,43 @@ jpeg(paste0("figures/fire/area/area_age_group_", v, "_", run, '.jpg'),
      units = 'in', width = 14, height = 12, res = 600)
 g2
 dev.off()
+
+
+# explanatory figures -----------------------------------------------------
+
+if (explanatory_figures) {
+  p <- seq(from = 0.0001, to = 0.04, length.out = 100)
+  
+  df1 <- expand_grid(
+    p = p,
+    age_group = factor(names(age_groups), levels = names(age_groups))
+  )
+  
+  df1$a <- map_dbl(age_groups[df1$age_group], \(x) x['a']) # lower bound of group
+  df1$b <- map_dbl(age_groups[df1$age_group], \(x) x['b']) # upper bound
+  df1$prob_in_group <- pmap_dbl(df1[c('p', 'a', 'b')], prob_geometric_rule)
+  
+  # probabilities should sum to 1 
+  test <- df1 %>% 
+    group_by(p) %>% 
+    summarize(tot = sum(prob_in_group)) %>% 
+    pull(tot) 
+  
+  stopifnot(round(test, digits = 5) == 1)
+  
+  g <- ggplot(df1, aes(p, prob_in_group)) +
+    geom_line() +
+    facet_wrap(~age_group) +
+    theme_bw() +
+    labs(x = 'Fire probability (per year)',
+         y = 'Probability of a site being in the given years since fire group',
+         caption = paste("This is to help understand the relationship between", 
+                         "probability of occurrence (per year)",
+                         "\nand the probability of no occurrence (no fire) for",
+                         "a given interval ('year since fire group'),\n calculated via geometric rule"))
+  
+  jpeg("figures/fire/area/explanatory_fig_geometric-rule.jpg",
+       units = 'in', width = 7, height = 6, res = 600)
+  print(g)
+  dev.off()
+}
