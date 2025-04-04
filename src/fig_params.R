@@ -38,7 +38,18 @@ cols_herb <- cols_pft5_other[c("Cheatgrass","Pforb", "C4Pgrass", "C3Pgrass")]
 cols_firep <- RColorBrewer::brewer.pal(11, "RdYlBu")[9:2]
 
 
+# colors from the SEI repository, same colors as used in appendix
+# of Holdrege et al 2024 REM, cool colors are GCMs with lower temperatures
+# across 200 stepwat sites, and warmer colors are the hotter GCMs 
+cols_GCM1 <- c(inmcm4 = "#313695", `GISS-E2-R` = "#416AAE", `MRI-CGCM3` = "#649AC7", 
+               `FGOALS-s2` = "#8FC3DC", `FGOALS-g2` = "#BCE1ED", `CSIRO-Mk3-6-0` = "#E5F4EE", 
+               `CESM1-CAM5` = "#FFFFBF", MIROC5 = "#FEE597", `IPSL-CM5A-MR` = "#FDBE70", 
+               `HadGEM2-CC` = "#F88D52", CanESM2 = "#EA5839", `HadGEM2-ES` = "#CE2826", 
+               `MIROC-ESM` = "#A50026")
 
+cols_GCM2 <-  c('Historical' = 'black', cols_GCM1)
+
+         
 # * for maps --------------------------------------------------------------
 
 # Create color ramp that represents the proportional changes in biomass...

@@ -29,18 +29,33 @@ source("src/fig_functions.R")
 source("src/fig_params.R")
 source("src/probability_functions.R")
 theme_set(theme_custom1())
+
 # read in data ------------------------------------------------------------
 
+# created in the 05_fire_area.R script
+# expected burned area
 ba3a <- read_csv(
   paste0("data_processed/area/expected-burn-area_", v, "_", run,".csv"),
   show_col_types = FALSE)
 
+# expected burned area by gcm
+ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
+                            v, "_", run, ".csv"),
+                    show_col_types = FALSE)
+
+# expected area in different years since fire age groups
 area_age_group3 <- read_csv(
   paste0("data_processed/area/area-by-age-group_", v, "_", run, ".csv"),
   show_col_types = FALSE)
 
+# area of our study region in each of 3 ecoregions
 area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v,".csv"),
                      show_col_types = FALSE)
+
+# created in the 04_summarize_fire_drivers.R script
+# means, by ecoregion, of the drivers of fire probability
+drivers1 <- read_csv(paste0('data_processed/raster_means/', run, 
+                            '_fire-driver-means_by-ecoregion.csv'))
 
 # vectors -----------------------------------------------------------------
 
@@ -53,6 +68,7 @@ line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
 line_loc2 <- 1:4 + 0.5
 height_3p <- 6 # width for 3 panel figures
 width_3p <- 7# height for 3 panel figures
+
 # prepare dataframes ------------------------------------------------------
 
 ba3 <- df_factor(ba3a) %>% 
@@ -209,6 +225,75 @@ g2 <- g&theme(legend.position = 'bottom',
 jpeg(paste0("figures/fire/area/area_age_group_scen-grouping_", v, "_", run, '.jpg'),
      units = 'in', width = 10, height = 7, res = 600)
 g2
+dev.off()
+
+
+# burned area--attribution ------------------------------------------------
+
+drivers2 <- drivers1 %>% 
+  select(-id)
+
+ba_gcm2 <- ba_gcm1 %>% 
+  select(-type)
+
+ba_gcm3 <- drivers2 %>% 
+  filter(type == "climate") %>% 
+  select(-graze, -type) %>%  # grazing doesn't apply to climate variables
+  pivot_wider(values_from = 'mean',
+              names_from = variable) %>% 
+  right_join(ba_gcm2, by = join_by(ecoregion, RCP, years, GCM))
+  
+ba_gcm4 <- drivers2 %>% 
+  filter(type == "biomass") %>% 
+  select(-type) %>% 
+  pivot_wider(values_from = 'mean',
+              names_from = variable) %>% 
+  right_join(ba_gcm3, by = join_by(ecoregion, RCP, years, GCM, graze)) %>% 
+  rename(PSP = psp) %>% 
+  df_factor() %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
+
+driver_vars <- c("MAP", "MAT", "PSP", "Aherb", "Pherb")
+ba_gcm5 <- ba_gcm4 %>% 
+  pivot_longer(cols = driver_vars,
+               values_to = 'mean_driver',
+               names_to = 'driver') %>% 
+  mutate(GCM = factor(GCM, levels = c('Current', names(cols_GCM1))),
+         driver = factor(driver, levels = driver_vars))
+
+ba_current <- ba_gcm5 %>% 
+  filter(GCM == 'Current')
+
+rcp_year <- unique(ba_gcm4$rcp_year) %>% 
+  str_subset('RCP') %>% 
+  rev()
+
+
+plots <- map(rcp_year, function(x) {
+  ba_gcm5 %>% 
+    filter(rcp_year == x) %>% 
+    ggplot(aes(mean_driver, area)) +
+    geom_smooth(aes(linetype = graze), se = FALSE, color = 'gray') +
+    geom_point(aes(shape = graze, color = GCM)) +
+    geom_point(data = ba_current,
+               aes(shape = graze, color = 'Historical')) +
+    facet_grid(ecoregion~driver, scales = 'free', switch = 'x') +
+    scale_color_manual(values = cols_GCM2,
+                       name = 'GCM (or historical)') +
+    scale_linetype(name = 'Grazing') +
+    scale_shape(name = 'Grazing')+
+    labs(x = " ",
+         y = lab_ba0,
+         subtitle = x,
+         caption = 'Mean of fire probability predictor variable was calculated across
+         pixels in ecoregion, for a given GCM') +
+    theme(strip.placement.x = 'outside')
+  
+})
+
+pdf(paste0("figures/fire/area/expected_ba_vs_driver_by-GCM_", v, "_", run, '.pdf'),
+    width = 12, height = 7)
+plots
 dev.off()
 
 
