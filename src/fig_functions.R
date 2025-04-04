@@ -297,7 +297,7 @@ id2year <- function(x) {
 }
 
 # return the grazing level from an id string
-id2graze <- function(x) {
+id2graze <- function(x, abbrev = FALSE) {
   # x--id (character vector), that includes the grazing level in it
   # returns--character vector of the grazing level
   out <- case_when(
@@ -309,6 +309,11 @@ id2graze <- function(x) {
   )
   if(any(is.na(out))) {
     warning("Not all time years matched")
+  }
+  
+  # return just first letters
+  if(abbrev) {
+    out <- purrr::map_chr(str_extract_all(out, "\\b\\w"), \(x) paste(x, collapse = ""))
   }
   out
 }

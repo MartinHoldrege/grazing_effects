@@ -48,11 +48,9 @@ create_age_groups <- function() {
   # that will have burned between 0 and 10 years ago
   age_groups <- list(
     c(a = 0, b = 10),
-    c(a = 11, b = 25),
-    c(a = 26, b = 75),
-    c(a = 76, b = 150),
-    c(a = 151, b = Inf)
-  )
+    c(a = 11, b = 40),
+    c(a = 41, b = 100),
+    c(a = 101, b = Inf))
   
   names(age_groups) <- map_chr(age_groups, function(x) {
     out <- if(is.finite(x['b'])) {

@@ -50,6 +50,7 @@ age_groups <- create_age_groups()
 # fig params --------------------------------------------------------------
 
 line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
+line_loc2 <- 1:4 + 0.5
 height_3p <- 6 # width for 3 panel figures
 width_3p <- 7# height for 3 panel figures
 # prepare dataframes ------------------------------------------------------
@@ -64,7 +65,8 @@ area_age_group3 <- df_factor(area_age_group3) %>%
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
          id2 = factor(id2, levels = unique(id2)),
          # not reproducible (yet)
-         age_group = factor(age_group, levels = names(age_groups)))
+         age_group = factor(age_group, levels = names(age_groups)),
+         rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
 
 # expected burned area figs --------------------------------------------------
 
@@ -106,6 +108,9 @@ dev.off()
 
 # age_group figs -----------------------------------------------------
 
+
+# *grouped by grazing level -----------------------------------------------
+
 plots <- map(ecoregions, function(region) {
   total_area <- area_eco$area[area_eco$ecoregion == region]
   
@@ -113,7 +118,7 @@ plots <- map(ecoregions, function(region) {
     filter(ecoregion == region) 
   anno_data <- box_anno(
     df = df,
-    var = 'area_low',
+    var = 'area_high',
     id = "id2",
     mult = 0.1,
     group_by = c('graze', 'age_group'),
@@ -144,6 +149,65 @@ g2 <- g&theme(legend.position = 'bottom')
 
 jpeg(paste0("figures/fire/area/area_age_group_", v, "_", run, '.jpg'),
      units = 'in', width = 14, height = 12, res = 600)
+g2
+dev.off()
+
+
+# * grouped by climate scenario -------------------------------------------
+
+# figure of expected area in a age class  
+fig_area_by_scenario_group <- function(df, total_area) {
+  ggplot(df, aes(x = rcp_year))+
+    geom_errorbar(aes(ymin = area_low, ymax = area_high, group = graze), 
+                  position = position_dodge(width = 0.5), width = 0) +
+    geom_point(aes(y = area_median, color = graze), 
+               position = position_dodge(width = 0.5)) +
+    geom_vline(xintercept = line_loc2, linetype = 2) +
+    scale_color_manual(values = cols_graze, name = 'Grazing') +
+    facet_wrap(~age_group, nrow = 1) +
+    theme(axis.text.x = element_text(angle = 25, hjust = 1,
+                                     size = rel(0.8))) +
+    labs(x = NULL,
+         y = 'Expected area in age class (ha/yr)') +
+    scale_y_continuous(sec.axis = sec_axis(transform = \(x) x/total_area*100,
+                                           name = '% of ecoregion')) +
+    expand_limits(y = 0)
+}
+
+old_group <- levels(area_age_group3$age_group)[length(age_groups)]
+
+
+plots0 <- map(ecoregions, function(region) {
+  total_area <- area_eco$area[area_eco$ecoregion == region]
+  
+  df <- area_age_group3  %>% 
+    filter(ecoregion == region) 
+  
+  g1 <- df %>% 
+    filter(age_group != old_group) %>% 
+    fig_area_by_scenario_group(total_area = total_area) + 
+    labs(subtitle = region)
+  
+  
+  g2 <- df %>% 
+    filter(age_group == old_group) %>% 
+    fig_area_by_scenario_group(total_area = total_area)
+  
+  list(g1, g2)
+})
+
+plots <- reduce(plots0, c)
+g <- patchwork::wrap_plots(plots, ncol = 2, guides = 'collect',
+                           tag_level = 'keep',byrow = TRUE, widths = c(3, 1)) +
+  plot_layout(axis_titles = 'collect')
+
+g2 <- g&theme(legend.position = 'bottom',
+              axis.title.y = element_text(),
+              axis.title.y.right = element_text()
+)
+
+jpeg(paste0("figures/fire/area/area_age_group_scen-grouping_", v, "_", run, '.jpg'),
+     units = 'in', width = 10, height = 7, res = 600)
 g2
 dev.off()
 

@@ -91,17 +91,48 @@ create_breaks_cols <- function(x,
 
 # for calculating the 2nd lowest and 2nd highest values
 # across 13 GCMs
-calc_low <- function(r) {
-  stopifnot(nlyr(r) == 13)
-  out <- terra::sort(r, decreasing = FALSE)[[2]]
-  names(out) <- 'low'
+calc_low <- function(x) {
+  
+  if("SpatRaster" %in% class(x)) {
+    stopifnot(nlyr(x) == 13)
+    out <- terra::sort(x, decreasing = FALSE)[[2]]
+    names(out) <- 'low'
+  } else if (is.numeric(x)) {
+    
+    stopifnot(length(x) == 13 | length(x) == 1)
+    
+    if(length(x) == 13) {
+      out <- sort(x, decreasing = FALSE, na.last = TRUE)[[2]]
+    } else {
+      out <- NA
+    }
+  } else {
+    stop('class not supported')
+  }
+
   out
 }
 
-calc_high <- function(r) {
-  stopifnot(nlyr(r) == 13)
-  out <- terra::sort(r, decreasing = TRUE)[[2]]
-  names(out) <- 'high'
+calc_high <- function(x) {
+  
+  if("SpatRaster" %in% class(x)) {
+    stopifnot(nlyr(x) == 13)
+    out <- terra::sort(x, decreasing = TRUE)[[2]]
+    names(out) <- 'low'
+  } else if (is.numeric(x)) {
+    
+    stopifnot(length(x) == 13 | length(x) == 1)
+    
+    if(length(x) == 13) {
+      out <- sort(x, decreasing = TRUE, na.last = TRUE)[[2]]
+    } else {
+      out <- NA
+    }
+    
+  } else {
+    stop('class not supported')
+  }
+  
   out
 }
 

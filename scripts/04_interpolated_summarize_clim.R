@@ -20,9 +20,6 @@ source("src/general_functions.R")
 date <- '20250228' # date associated w/ the climate data (this date, in file name,
 # would be updated if new climate data source, or sites, etc. were used. )
 
-# some terra operations can be done in parallel and need 
-# to know num of cores
-num.cores <- parallel::detectCores(logical = FALSE) 
 version <- 'v4' # interpolation version
 
 # read in data ------------------------------------------------------------
