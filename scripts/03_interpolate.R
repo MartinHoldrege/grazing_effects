@@ -31,7 +31,7 @@ run_fire_attribution <- TRUE
 PFT2run =c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 
            'Pherb', 'Aherb', 'Aforb','Pgrass')
 
-run2run = NULL # 'fire1_eind1_c4grass1_co20_2503' # 
+run2run = 'fire1_eind1_c4grass1_co20_2503' # NULL # 
 years2run =  NULL #'Current'
 
 v2paste <- if(version == 'v1') "" else version # for pasting to interpolated tiffs

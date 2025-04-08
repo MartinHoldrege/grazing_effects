@@ -102,6 +102,29 @@ epoch2factor <- function(x) {
   factor(x2, levels = c('2031-2060', '2071-2100'))
 }
 
+# put '.' in RCP names
+update_rcp <- function(x) {
+  
+  if(is.factor(x)) {
+    levels <- levels(x)
+    labels_new <- levels %>% 
+      str_replace('RCP45', 'RCP4.5') %>% 
+      str_replace('RCP85', 'RCP8.5') %>% 
+      str_replace('Current', 'Historical')
+    
+    out <- factor(as.character(x), levels = levels,
+                  labels = labels_new)
+ 
+  } else {
+    out <- x %>% 
+      str_replace('RCP45', 'RCP4.5') %>% 
+      str_replace('RCP85', 'RCP8.5') %>% 
+      str_replace('Current', 'Historical')
+  }
+  out
+
+}
+
 # doesn't create a factor, but just to update the correct
 # epoch label for use in figures
 update_yr <- function(x) {

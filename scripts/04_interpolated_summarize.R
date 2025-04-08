@@ -25,7 +25,7 @@ v <- 'v4' # interpolation version
 # multiple runs may need to listed if different runs done for different
 # grazing levels
 
-runs <- c('fire1_eind1_c4grass1_co20_2502')
+runs <- c('fire1_eind1_c4grass1_co20_2503')
 run <- runs[[1]] # used for output file naming
 
 # read in data ------------------------------------------------------------

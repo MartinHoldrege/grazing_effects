@@ -222,6 +222,22 @@ fill_raster <- function(df, template,
   r_out
 }
 
+#' get range from raster
+#'
+#' @param x spatraster with one or more layers
+#' @param absolute get absolute range (for difference maps)
+range_raster <- function(x, absolute = FALSE) {
+  out <- terra::minmax(x) %>% 
+    unlist() %>% 
+    range(na.rm = TRUE)
+  
+  if(absolute) {
+    m <- max(abs(out))
+    out <- c(-m, m)
+  }
+  out
+}
+
 # maps --------------------------------------------------------------------
 
 
@@ -271,7 +287,8 @@ plot_map_inset <- function(r,
   
   inset <- newRR3::inset_densitycountplot(as.numeric(values(r)),
                                   limits = limits_inset,
-                                  add_vertical0 = add_vertical0)
+                                  add_vertical0 = add_vertical0) +
+    scale_x_continuous(n.breaks = 4)
   
   s <- stars::st_as_stars(r)
   
@@ -292,239 +309,139 @@ plot_map_inset <- function(r,
                          colors = colors,
                          values = values,
                          oob = oob) +
+    theme(axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          axis.text.y = element_blank(),
+          plot.margin = unit(c(0, 0, 0, 0), units = 'in')) +
     newRR3::add_tag_as_label(tag_label) 
   
   map + inset_element2(inset)
   
 }
 
-#' Create map of biomass data in western states
-#' 
-#' @description Note: this was designed to use SpatRaster objects, so 
-#' the 'terra' package should be loaded before using the function
-#'
-#' @param rast Raster of class "SpatRaster", from the terra package. 
-#' @param subset Number or string that identifies the layer of the rast
-#' that should be plotted
-#' @param title Title of figure
-#' @param vec Numeric vector (optional), to base the breaks/cut points used
-#' in plotting on. By default it uses the values of the cells in the raster.
-#' @param show0legend logical, if false suppresses the appearance of the 
-#' legend that shows 0 values in grey
-#' @param legend_lab label for the main legend
-#' @param n_breaks number of color bins used
-#'
-#' @return A map of biomass
-image_bio <- function(rast, subset, title = "", vec = NULL, 
-                      show0legend = TRUE,
-                      legend_lab = expression("Biomass ("*gm^-2*")"),
-                      n_breaks = 17 
-                      ) {
-  
-  stopifnot(
-    length(subset) == 1 # this function can only work with one raster layer
-  )
-  
-  # extract raster cell data as a fector
-  if(is.null(vec)) {
-    # I suspect extracting the actual values into memory like
-    # this is inefficient
-    vec <- values(subset(rast, subset = subset))
-  }
-  
-  # create list of colors and break points to use
-  b <- create_breaks_cols(x = vec, n_breaks = n_breaks)
-  
-  # main figure
-  image(subset(rast, subset = subset), # the layer to be plotted
-        # if default used, maps are more pixelated looking, not that with this
-        # higher resolution an error is sometimes thrown the first time the funcion
-        # is called (a similar issue
-        # is documented here: https://github.com/rspatial/terra/issues/30)
-        maxcell = 500000,
-        col = b$truecols, 
-        breaks = b$truebks, 
-        ylim = c(30, 49),
-        xlim = c(-125, -102.7), useRaster = TRUE,
-        xlab = "", ylab ="",
-        bty = "n", xaxt = "n",yaxt="n")
-  mtext(title, side = 3, line = 0, adj = 0, cex=0.7)
-  maps::map("state", interior = T, add = T)
-  
-  # Legend for zero values
-  if(show0legend & b$zero) {
-    polygon(x = c(-125,-125,-119,-119), y = c(32,35,35,32),
-            col = "white",border = "white")
-    legend(x = -120, y = 35.5, xjust = 0.7,
-           legend = expression("Biomass ("*gm^-2*") = 0"), 
-           fill = "darkgrey", bty = "n",cex = 0.8, 
-           border = "darkgrey", x.intersp = 0.2)
-  }
-  
-  # Color bar/legend at the bottom
-  polygon(x = c(-125,-125,-102.7,-102.7), y = c(29,32.7,32.7,29), 
-          border = "white", col = "white")
-  rasterImage(t(b$cols), -125, 31.75, -102.7, 32.5)
-  polygon(x = c(-125, -125, -102.7 ,-102.7), y = c(31.75, 32.5, 32.5, 31.75), 
-          lwd = 1.5)
-  mtext(legend_lab, side = 1, line = -0.49, cex = 0.7)
-  axis(side = 1, pos = 31.75, at = seq(-125,-102.7, length.out = 9),
-       cex.axis = 0.9, labels = b$legendbks)
-  
-}
-
-#' legend for bio diff map
-#'
-#' @param cols vector (colors to use)
-#' @param truebks vector of where breaks will occur
-#' @param cex defines size of legend label
-#'
-#' @return plots the legend on top of the current graphic
-legend_bio_diff <- function(cols, truebks, cex = 0.7) {
-  
-  # making background white
-  # polygon(x = c(-117,-117,-109,-109), y = c(32,34.5,34.5,32),col = "white",
-  #         border = "white")
-  polygon(x = c(-125,-125,-102.7,-102.7), y = c(-29.8,33.5,33.5,30),
-          border = "white", col = "white")
-  
-  # Color bar/legend at the bottom
-  # creating mini polygons for each legend color
-  axisat <- seq(-125, -102.7, length.out = length(cols) + 1)
-  for (i in 1:length(cols)){
-    polygon(x = c(axisat[i],axisat[i],axisat[i+1],axisat[i+1]), 
-            y = c(31.75,32.5,32.5,31.75),border = cols[i], col = cols[i])
-    
-  }
-  # black outline of color bar
-  polygon(x = c(-125, -125, -102.7 ,-102.7), y = c(31.75, 32.5, 32.5, 31.75), 
-          lwd = 1.5)
-  mtext(expression(paste("", Delta, " Biomass (%)")), side = 1, line = -0.49, 
-        cex = cex)
-  axis(side = 1, pos = 31.75, at = seq(-125,-102.7, length.out = length(truebks)),
-       cex.axis = 0.9, labels = truebks)
-}
-
-#' Create map of % change of biomass in western states
-#' 
-#' @description At the moment this figure uses fixed cut points for the colors
-#'
-#' @param rast Raster of class "SpatRaster", from the terra package. 
-#' @param subset Number or string that identifies the layer of the rast
-#' that should be plotted
-#' @param title Title of figure
-#' @param legend logical, whether to add a legend to the plot
-#' @param adjust_ylim logical, if true then adjust ylim when there is no
-#' legend (i.e. if no legend the ylims are restricted)
-#' @param cex defines size of legend label
-#'
-#' @return Map of percent change in biomass
-image_bio_diff <- function(rast, subset, title = "", legend = TRUE,
-                           adjust_ylim = TRUE, cex = 0.7) {
-  
-  # range of bio_diff is: -85.67349 103.51214
-  stopifnot(
-    length(subset) == 1, # this function can only work with one raster layer
-    is.logical(legend)
-  )
-  
-  # for now hard coding breaks and colors
-  bks <- c(60, 40, 30, 20, 10, 5)
-  # last break is 150 so that larger increases are included
-  # consider improving
-  truebks <- c(-100, -bks, 0, rev(bks), 150)
-  cols <-  cols_map_bio_d
-  
-  # run a check on whether truebks are excluding values
-  vec <- values(subset(rast, subset = subset))
-  min <- min(vec, na.rm = TRUE)
-  max <- max(vec, na.rm = TRUE)
-  if(min < min(truebks) | max > max(truebks)) {
-    warning(title, " Raster contains data outside of the range of the breaks",
-         'max value is ', round(max), ". Min value is ", round(min), '.')
-  }
-
-  if (legend | !adjust_ylim) {
-    ylim <- c(30, 49) # ylim larger to accommodate legend
-  } else {
-    ylim <- c(33.5, 49)
-  }
-  
-  # main figure
-  image(subset(rast, subset = subset), # the layer to be plotted
-        # if default used, maps are more pixelated looking
-        maxcell = 500000, 
-        col = cols, 
-        breaks = truebks, 
-        ylim = ylim,
-        xlim = c(-125, -102.7), useRaster = T,
-        xlab = "", ylab ="",
-        bty = "n", xaxt = "n",yaxt="n")
-  mtext(title, side = 3, line = 0, adj = 0, cex= 0.7)
-  maps::map("state", interior = T, add = T)
-  
-  if(!adjust_ylim) {
-    # making background white
-    # polygon(x = c(-117,-117,-109,-109), y = c(32,34.5,34.5,32),col = "white",
-    #         border = "white")
-    polygon(x = c(-125,-125,-102.7,-102.7), y = c(-29.8,33.5,33.5,30),
-            border = "white", col = "white")
-  }
-  
-  # add legend
-  if (legend) {
-    legend_bio_diff(cols = cols, truebks = truebks, cex = cex)
-  }
-  
-}
 
 
-#' Map of minimum grazing level needed to cross threshold
+#' 20 panel map
 #'
-#' @param rast raster
-#' @param subset layer of raster to plot (integer or character string)
-#' @param title map title (string)
+#' @param r raster with 20 layers
+#' @param info dataframe from create_rast_info
+#' @param type_absolute value in the 'type' column of info that denotes layers of absolute
+#' (non change) values
+#' @param type_diff  value in the type column denoting change layers
+#' @param title figure title
+#' @param name4absolute variable name for the 'absolute' layers
+#' @param name4diff variable name for the 'difference' layers
+#' @param legend_title_absolute title for the absolute layers
+#' @param legend_title_diff title for the difference layers
+#' @param palette_absolute color pallete
+#' @param palette_diff color palette
 #'
-#' @return Map
-image_min_gr <- function(rast, 
-                         subset, 
-                         title = ""
+#' @returns
+#' 4x5 plot matrix
+plot_map_20panel <- function(
+    r,
+    info,
+    type_absolute,
+    type_diff,
+    title = NULL,
+    name4absolute = "",
+    name4diff = paste("\u0394", name4absolute),
+    legend_title_absolute = name4absolute,
+    legend_title_diff = name4diff,
+    palette_absolute = cols_map_bio(10),
+    palette_diff = cols_map_bio_d2,
 ) {
   
+  # setup lookups
+  types <- c(type_absolute, type_diff)
+  names4leftside <- c(name4absolute, name4diff)
+  names(names4leftside) <- types
+  names4legend <- list(legend_title_absolute,legend_title_diff)
+  names(names4legend) <- types
+  cols <- list(palette_absolute, palette_diff)
+  names(cols) <- types
+  
   stopifnot(
-    length(subset) == 1 # this function can only work with one raster layer
+    c(types) %in% info$type)
+  
+  info <- info %>% 
+    mutate(type = factor(.data$type, levels = c(!!type_absolute, !!type_diff))) %>% 
+    arrange(type, RCP, years, graze) %>% 
+    mutate(tag_label = fig_letters[1:length(type)])
+  
+  
+  stopifnot(nrow(info) == 4*5,
+            is.factor(info$graze),
+            unique(info$graze) == levels(info$graze),
+            length(levels(info$graze)) == 4)
+  
+  graze_labs <- paste0(levels(info$graze), '\nGrazing')
+  
+  label_left <- info %>% 
+    filter(.data$graze == levels(.data$graze)[1]) %>% 
+    mutate(rcp_year = rcp_label(.data$RCP, .data$years,
+                                include_parenth = FALSE),
+           label_left = paste0(rcp_year, '\n', names4leftside[type])) %>% 
+    pull(label_left)
+  
+  stopifnot(length(label_left) == 5)
+  
+  lims <- range_raster(r[[info$id[info$type == type_absolute]]], 
+                       absolute = FALSE)
+  lims <- list(
+    range_raster(r[[info$id[info$type == type_absolute]]], absolute = FALSE),
+    range_raster(r[[info$id[info$type == type_diff]]], absolute = TRUE)
   )
+  names(lims) <- types
   
-  color <- rev(RColorBrewer::brewer.pal(9, "YlOrRd"))[c(1, 3, 5, 7)]
-  color <- c(color, "#abd9e9")
+  plots1 <- pmap(info[c('id', 'type', 'tag_label')], 
+                 function(id, type, tag_label) {
+                   plot_map_inset(r = r[[id]],
+                                  colors = cols[[type]],
+                                  tag_label = tag_label,
+                                  limits = lims[[type]],
+                                  scale_name = names4legend[[type]])
+                 })
   
-  # main figure
-  image(subset(rast, subset = subset), # the layer to be plotted
-        # if default used, maps are more pixelated looking
-        maxcell = 500000,
-        col = color,
-        breaks = seq(1:6) -0.5, 
-        ylim = c(30, 49),
-        xlim = c(-125, -102.7), useRaster = TRUE,
-        xlab = "", ylab ="",
-        bty = "n", xaxt = "n",yaxt="n")
-  mtext(title, side = 3, line = 0, adj = 0, cex=0.7)
-  maps::map("state", interior = T, add = T)
+  # labels for the top margin
+  plots_top <- map(graze_labs, function(x) {
+    ggplot() +
+      theme_void() +
+      annotate("text", x = 1, y = 1, label = x, size = 3) +
+      theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+  })
   
-  legend(
-    -125, 33.5,
-    legend = c("Light grazing", 
-               "Moderate grazing", 
-               "Heavy grazing", 
-               "Very Heavy Grazing",
-               "Didn't cross threshold"),
-    title = "Grazing required to cross threshold",
-    fill = color,
-    bg = "white",
-    box.col = "white",
-    ncol = 2,
-    cex = 0.7)
+  # labels for the left margin
+  plots_left <- map(label_left, function(x) {
+    ggplot() +
+      theme_void() +
+      annotate("text", x = 1, y = 1, label = x, angle = 90, size = 3) +
+      theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+  })
+  
+  plots2 <- c(list(plot_spacer()), plots_top)
+  
+  start <- 1
+  for (i in 1:length(plots_left)) {
+    end <- start + 3
+    plots2 <- c(plots2, plots_left[i], plots1[start:end])
+    start <- end + 1
+  }
+  
+  g <- patchwork::wrap_plots(plots2, nrow = 6,
+                             widths = c(0.15, rep(1,4)), 
+                             heights = c(0.18, rep(1, 5))) + 
+    plot_layout(guides = 'collect')
+  
+  g2 <- g&theme(legend.position = 'bottom')
+  
+  if(!is.null(title)) {
+    g2 <- g2 + plot_annotation(subtitle = title)
+  }
+  
+  g2
 }
+
 
 # crs -----------------------------------------------------------------------
 

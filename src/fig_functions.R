@@ -360,10 +360,13 @@ if (FALSE){
 rcp_label <- function(rcp, years, add_letters = FALSE,
                       include_parenth = TRUE) {
   years <- as.character(epoch2factor(years)) # convert 2070 to 2071 etc. so labels are correct
+  rcp <- update_rcp(rcp)
   if (include_parenth) {
-    x1 <- ifelse(rcp == "Current", "(Historical)", paste0("(",rcp,", ",years, ")"))
+    x1 <- ifelse(rcp == "Current" | rcp == "Historical", 
+                 "(Historical)", paste0("(",rcp,", ",years, ")"))
   } else {
-    x1 <- ifelse(rcp == "Current", "Historical", paste(rcp,years))
+    x1 <- ifelse(rcp == "Current" | rcp == "Historical", 
+                 "Historical", paste(rcp,years))
   }
   
   
@@ -439,3 +442,10 @@ values_about_midpoint <- function(colors, midpoint, limits) {
   values
 }
   
+
+
+# write functions ---------------------------------------------------------
+
+png20panel <- function(filename) {
+  png(filename, res = 600, height = 5*2 + 1.2, width = 4*2, units = 'in')
+}

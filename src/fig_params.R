@@ -49,6 +49,8 @@ cols_GCM1 <- c(inmcm4 = "#313695", `GISS-E2-R` = "#416AAE", `MRI-CGCM3` = "#649A
 
 cols_GCM2 <-  c('Historical' = 'black', cols_GCM1)
 
+
+
          
 # * for maps --------------------------------------------------------------
 
@@ -79,6 +81,13 @@ cols_pred <- list(
 # for maps showing primary driver of change
 cols_pred_vars <- c(MAP = "#1f78b4", MAT = "#e31a1c", PSP = "#a6cee3", 
                     Aherb = "#b2df8a", Pherb = "#33a02c")
+
+# panel letters -----------------------------------------------------------
+
+# so consistent letter theme is used throughout (for multiple
+# panel pub quality figs)
+fig_letters <- paste(letters, ")", sep = "")
+names(fig_letters) <- letters
 
 # axis labels -------------------------------------------------------------
 # meaning of endings: 0= raw value, 1 = raw change, 2 = % change
