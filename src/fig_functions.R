@@ -447,5 +447,5 @@ values_about_midpoint <- function(colors, midpoint, limits) {
 # write functions ---------------------------------------------------------
 
 png20panel <- function(filename) {
-  png(filename, res = 600, height = 5*2 + 1.2, width = 4*2, units = 'in')
+  png(filename, res = 600, height = 5*1.8 + 1, width = 4*1.8 - 0.3, units = 'in')
 }

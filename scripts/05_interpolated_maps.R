@@ -22,7 +22,7 @@ source('src/fig_functions.R')
 
 # params ------------------------------------------------------------------
 
-run <- 'fire1_eind1_c4grass1_co20_2502'
+run <- 'fire1_eind1_c4grass1_co20_2503'
 graze_levels <- c("grazL" = "Light")
 
 # PFTs for which to plot 
@@ -60,7 +60,7 @@ path_rdiff <- paste0(path_r, "/", run, "_bio-rdiff-cref_median.tif")
 
 rdiff1 <- rast(path_rdiff)
 
-info_rdiff1 <- create_rast_info(rdiff1, into = into)%>% 
+info_rdiff1 <- create_rast_info(rdiff1, into = into) %>% 
   filter(graze %in% graze_levels,
          PFT %in% PFTs2plot) %>% 
   # for exploratory reasons just looking at the most and least
@@ -70,7 +70,100 @@ info_rdiff1 <- create_rast_info(rdiff1, into = into)%>%
 rdiff2 <- rdiff1
 
 
-# Figures -----------------------------------------------------------------
+
+# 20 panel figures ---------------------------------------------------------
+
+# preparing args
+r <- c(r1, rdiff1)
+# r <- spatSample(r, 100, method = 'regular', as.raster = TRUE) # for testing
+
+info_20panel <- info0 %>% 
+  bind_rows(create_rast_info(rdiff1, into = into)) %>% 
+  filter(years != '2030-2060' & years != '2031-2060') 
+
+args <- list(
+  PFT = c('Aherb', 'Pherb', 'Sagebrush'),
+  titles = c(Aherb = 'Annual herbacious biomass',
+             Pherb = 'Perennial herbacious biomass',
+             Sagebrush = 'Sagebrush biomass')
+)
+
+type_diff =  'bio-rdiff-cref'
+# * absolute change in biomass --------------------------------------------
+
+
+for(pft in args$PFT){
+
+  info_tmp <- info_20panel %>% 
+    filter(PFT == pft)
+  title <- args$titles[[pft]]
+  
+  g <- plot_map_20panel(
+    r = r,
+    info = info_tmp,
+    type_absolute = 'biomass',
+    type_diff =  type_diff,
+    title = title,
+    name4absolute = "Biomass",
+    name4diff = NULL,
+    legend_title_absolute = lab_bio0,
+    legend_title_diff = lab_bio1,
+    palette_absolute = cols_map_bio(10),
+    palette_diff = cols_map_bio_d2
+  )
+  
+  filename <- paste0('figures/biomass_maps/20panel_', pft, '_', run, ".png")
+  png20panel(filename)
+  print(g)
+  dev.off()
+
+}
+
+
+# * % change --------------------------------------------------------------
+
+info_perc <- info_20panel %>% 
+  filter(RCP == 'Current', type == 'biomass') %>% 
+  select(-years, -RCP, -type) %>% 
+  right_join(info_20panel[info_20panel$type == type_diff, ], by = c('run', 'graze', 'run2', 'PFT'),
+             suffix = c('_Current', '_diff')) %>% 
+  filter(PFT %in% args$PFT)
+
+# percent change
+r_diff_perc <- r[[info_perc$id_diff]]/r[[info_perc$id_Current]]*100
+
+
+for(pft in args$PFT){
+  
+  info_tmp <- info_20panel %>% 
+    filter(PFT == pft)
+  title <- args$titles[[pft]]
+  
+  lims_diff <- range_raster(r_diff_perc[[info_tmp$id[info_tmp$type == type_diff]]])
+  g <- plot_map_20panel(
+    r = r,
+    info = info_tmp,
+    type_absolute = 'biomass',
+    type_diff =  'bio-rdiff-cref',
+    title = title,
+    name4absolute = "Biomass",
+    name4diff = "% Change",
+    legend_title_absolute = lab_bio0,
+    legend_title_diff = "% Change in biomass",
+    palette_absolute = cols_map_bio(10),
+    palette_diff = cols_map_bio_d2,
+    lims_diff = lims_diff,
+    midpoint_diff = 0
+  )
+  
+  filename <- paste0('figures/biomass_maps/20panel_', pft, '-perc_', run, ".png")
+  png20panel(filename)
+  print(g)
+  dev.off()
+  
+}
+
+# Figures-other -----------------------------------------------------------------
 
 # combining difference and absolute biomass
 info_c1 <- bind_rows(info1, info_rdiff1) %>% 

@@ -345,12 +345,26 @@ plot_map_20panel <- function(
     type_diff,
     title = NULL,
     name4absolute = "",
-    name4diff = paste("\u0394", name4absolute),
+    name4diff = NULL,
     legend_title_absolute = name4absolute,
     legend_title_diff = name4diff,
     palette_absolute = cols_map_bio(10),
     palette_diff = cols_map_bio_d2,
+    lims_diff = NULL,
+    midpoint_diff = NULL
 ) {
+  
+  if(is.null(name4diff)) {
+    name4diff <- paste("\u0394", name4absolute)
+  }
+  if(is.null(legend_title_absolute)) {
+    legend_title_absolute <-  name4absolute
+  }
+  
+  if(is.null(legend_title_diff)) {
+    legend_title_diff <-  name4diff
+  }
+  
   
   # setup lookups
   types <- c(type_absolute, type_diff)
@@ -360,6 +374,8 @@ plot_map_20panel <- function(
   names(names4legend) <- types
   cols <- list(palette_absolute, palette_diff)
   names(cols) <- types
+  midpoints <- list(NULL, midpoint_diff)
+  names(midpoints) <- types
   
   stopifnot(
     c(types) %in% info$type)
@@ -373,7 +389,8 @@ plot_map_20panel <- function(
   stopifnot(nrow(info) == 4*5,
             is.factor(info$graze),
             unique(info$graze) == levels(info$graze),
-            length(levels(info$graze)) == 4)
+            length(levels(info$graze)) == 4,
+            info$id %in% names(r))
   
   graze_labs <- paste0(levels(info$graze), '\nGrazing')
   
@@ -386,12 +403,13 @@ plot_map_20panel <- function(
   
   stopifnot(length(label_left) == 5)
   
-  lims <- range_raster(r[[info$id[info$type == type_absolute]]], 
+  lims_absolute <- range_raster(r[[info$id[info$type == type_absolute]]], 
                        absolute = FALSE)
-  lims <- list(
-    range_raster(r[[info$id[info$type == type_absolute]]], absolute = FALSE),
-    range_raster(r[[info$id[info$type == type_diff]]], absolute = TRUE)
-  )
+  
+  if(is.null(lims_diff)) {
+    lims_diff <- range_raster(r[[info$id[info$type == type_diff]]], absolute = TRUE)
+  }
+  lims <- list(lims_absolute, lims_diff)
   names(lims) <- types
   
   plots1 <- pmap(info[c('id', 'type', 'tag_label')], 
@@ -400,7 +418,8 @@ plot_map_20panel <- function(
                                   colors = cols[[type]],
                                   tag_label = tag_label,
                                   limits = lims[[type]],
-                                  scale_name = names4legend[[type]])
+                                  scale_name = names4legend[[type]],
+                                  midpoint = midpoints[[type]])
                  })
   
   # labels for the top margin
@@ -429,7 +448,7 @@ plot_map_20panel <- function(
   }
   
   g <- patchwork::wrap_plots(plots2, nrow = 6,
-                             widths = c(0.15, rep(1,4)), 
+                             widths = c(0.18, rep(1,4)), 
                              heights = c(0.18, rep(1, 5))) + 
     plot_layout(guides = 'collect')
   

@@ -45,16 +45,16 @@ into0 <- c("type", "RCP", "years",
 into <- into0[-length(into0)]
 info0 <- create_rast_info(r1, into = into0)
 
-info1 <- info0 %>% 
-  filter(graze %in% graze_levels,
-         summary == 'median') 
+info1a <- info0 %>% 
+  filter(summary == 'median') 
   
 
-r2 <- r1[[info1$id]]
+r2 <- r1[[info1a$id]]
 names(r2) <- str_replace(names(r2), "_median$", "")
 
-info1 <- info1 %>% 
-  mutate(id = str_replace(id, "_median$", ""))
+info1 <- info1a %>% 
+  mutate(id = str_replace(id, "_median$", "")) %>% 
+  filter(graze %in% graze_levels,)
 
 # *median delta fire-prob ---------------------------------------------------
 
@@ -81,6 +81,73 @@ paths_wgcm <- map(runs, function(run) {
 })
 
 wgcm_l1 <- map(paths_wgcm, rast)
+
+
+# figures--20 panel -------------------------------------------------------
+
+# 20 panel figures ---------------------------------------------------------
+
+# preparing args
+r <- c(r1, rdiff1)
+# r <- spatSample(r, 100, method = 'regular', as.raster = TRUE) # for testing
+
+info_20panel <- info1a %>% 
+  bind_rows(info_rdiff0) %>% 
+  filter(years != '2030-2060' & years != '2031-2060') 
+
+g <- plot_map_20panel(
+  r = r,
+  info = info_20panel,
+  type_absolute = 'fire-prob',
+  type_diff =  'fire-prob-rdiff-cref',
+  title = 'Fire probability',
+  name4absolute = lab_firep0,
+  name4diff = NULL,
+  legend_title_absolute = lab_firep0,
+  legend_title_diff = lab_firep1,
+  palette_absolute = cols_firep,
+  palette_diff = rev(cols_map_bio_d2)
+  )
+
+
+filename <- paste0('figures/fire/maps/20panel_fire-prob_', run, ".png")
+png20panel(filename)
+print(g)
+dev.off()
+  
+
+# * percent change --------------------------------------------------------
+
+info_perc <- info1a %>% 
+  filter(RCP == 'Current') %>% 
+  select(-years, -RCP, -type) %>% 
+  right_join(info_rdiff0, by = c('run', 'graze', 'run2'),
+             suffix = c('_Current', '_diff'))
+
+# percent change
+r_diff_perc <- r[[info_perc$id_diff]]/r[[info_perc$id_Current]]*100
+
+g <- plot_map_20panel(
+  r = c(r1, r_diff_perc),
+  info = info_20panel,
+  type_absolute = 'fire-prob',
+  type_diff =  'fire-prob-rdiff-cref',
+  title = 'Fire probability',
+  name4absolute = lab_firep0,
+  name4diff = '% Change',
+  legend_title_absolute = lab_firep0,
+  legend_title_diff = '% Change in # fires/century',
+  palette_absolute = cols_firep,
+  palette_diff = rev(cols_map_bio_d2),
+  lims_diff = c(-100, 400),
+  midpoint_diff = 0
+)
+
+
+filename <- paste0('figures/fire/maps/20panel_fire-prob-perc_', run, ".png")
+png20panel(filename)
+print(g)
+dev.off()
 
 # Figures -----------------------------------------------------------------
 
