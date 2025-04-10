@@ -50,7 +50,9 @@ cols_GCM1 <- c(inmcm4 = "#313695", `GISS-E2-R` = "#416AAE", `MRI-CGCM3` = "#649A
 cols_GCM2 <-  c('Historical' = 'black', cols_GCM1)
 
 
-
+cols_ecoregion <- c("Great Plains" = "#ECA130",
+                    "Intermountain West" = "#33A37A",
+                    "Southern Great Basin" = "#1673B2")
          
 # * for maps --------------------------------------------------------------
 

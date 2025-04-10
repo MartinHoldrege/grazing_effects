@@ -262,7 +262,11 @@ plot_map2 <- function(r, add_coords = TRUE,...)  {
                   add_coords = add_coords,
                   ...) +
     newRR3::ggplot2_map_theme() +
-    theme(plot.tag = element_text(face = 'plain'))
+    theme(plot.tag = element_text(face = 'plain')) +
+    theme(axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          axis.text.y = element_blank(),
+          plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
   
   map
   
@@ -480,6 +484,6 @@ load_wafwa_ecoregions <- function() {
   
   shp2 <- sf::st_transform(shp1, crs = crs_scd)
   
-  shp2$ecoregion <- c("Great Basin", "Intermountain", "Plains")
+  shp2$ecoregion <- c("Southern Great Basin", "Intermountain West", "Great Plains")
   shp2
 }
