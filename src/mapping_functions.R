@@ -476,8 +476,7 @@ crs_scd <- terra::crs("PROJCRS[\"Albers_Conical_Equal_Area\",\n    BASEGEOGCRS[\
 
 # polygons for basemaps ---------------------------------------------------
 
-states <- sf::st_as_sf(spData::us_states) %>% 
-  sf::st_transform(crs = crs_scd)
+states <- sf::st_transform(sf::st_as_sf(spData::us_states), crs = crs_scd)
 
 load_wafwa_ecoregions <- function() {
   shp1 <- sf::st_read("../SEI/data_raw/files_from_DaveT/WAFWAecoregionsFinal.shp")
@@ -485,5 +484,6 @@ load_wafwa_ecoregions <- function() {
   shp2 <- sf::st_transform(shp1, crs = crs_scd)
   
   shp2$ecoregion <- c("Southern Great Basin", "Intermountain West", "Great Plains")
+  shp2$ecoregion <- factor(shp2$ecoregion) # alphabetical sorting assumed by some later code
   shp2
 }

@@ -306,6 +306,13 @@ pft_total_factor <- function(x, return_levels = FALSE) {
   out
 }
 
+region_factor <- function(x) {
+  levels <- c("Entire study area", "Great Plains", "Intermountain West", 
+              "Southern Great Basin")
+  stopifnot(x %in% levels)
+  factor(x, levels = levels)
+}
+
 #' convert 4 letter spp code to PFT
 #'
 #' @param x character vector that includes 4 letter species codes
@@ -350,6 +357,8 @@ df_factor <- function(df) {
   if("RCP" %in% nms) df$RCP <- rcp2factor(df$RCP)
   
   if("PFT" %in% nms) df$PFT <- pft_all_factor(df$PFT)
+  
+  if("region" %in% nms) df$region <- region_factor(df$region)
   
   df
 }
@@ -711,6 +720,11 @@ calc_aherb <- function(df, col_names = c('biomass', "indivs", "utilization"),
   
   annuals <- c('Cheatgrass', 'Aforb')
   stopifnot(annuals %in% df$PFT)
+  
+  if('Aherb' %in% df$PFT) {
+    message('Aherb already present')
+    return(df)
+  }
   aherb <- df %>% 
     filter(.data$PFT %in% !!annuals) %>% 
     group_by(across(all_of(group_cols))) %>% 

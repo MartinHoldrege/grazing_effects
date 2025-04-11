@@ -67,7 +67,8 @@ stopifnot(isTRUE(same.crs(r_prob_gcm1, vect(eco1))))
 r_eco1 <- rasterize(
   vect(eco1),
   r_prob_gcm1[[1]],
-  field = 'ecoregion'
+  field = 'ecoregion',
+  touches = TRUE
 )
 
 # expected burned area ----------------------------------------------------
@@ -84,7 +85,8 @@ ba_eco1 <- terra::extract(
   r_area_exp,
   vect(eco1),           # convert sf to SpatVector
   fun = sum,
-  na.rm = TRUE
+  na.rm = TRUE,
+  touches = TRUE
 )
 
 ba_eco1$ecoregion <- eco1$ecoregion
@@ -116,7 +118,7 @@ area_by_age_group_l <- map(prob_by_age_group_l, \(x) x*area)
 
 area_age_group1 <- map(area_by_age_group_l, 
                        \(x) terra::extract(x, vect(eco1), fun = sum, 
-                                           na.rm = TRUE))
+                                           na.rm = TRUE, touches = TRUE))
 
 area_age_group2 <- map(area_age_group1, function(x) {
   x$ecoregion <- eco1$ecoregion[x$ID]
@@ -150,7 +152,8 @@ area_eco <- terra::extract(
   area_masked,
   vect(eco1),         
   fun = sum,
-  na.rm = TRUE
+  na.rm = TRUE, 
+  touches = TRUE
 )
 area_eco$ecoregion <- eco1$ecoregion
 area_eco$ID <- NULL

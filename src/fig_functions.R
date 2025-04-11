@@ -358,15 +358,20 @@ if (FALSE){
 #'
 #' @return character vector
 rcp_label <- function(rcp, years, add_letters = FALSE,
-                      include_parenth = TRUE) {
+                      include_parenth = TRUE, add_newline = FALSE) {
   years <- as.character(epoch2factor(years)) # convert 2070 to 2071 etc. so labels are correct
   rcp <- update_rcp(rcp)
+  if(add_newline) {
+    space <- '\n'
+  } else {
+    space <- " "
+  }
   if (include_parenth) {
     x1 <- ifelse(rcp == "Current" | rcp == "Historical", 
-                 "(Historical)", paste0("(",rcp,", ",years, ")"))
+                 "(Historical)", paste0("(",rcp,",", space, years, ")"))
   } else {
     x1 <- ifelse(rcp == "Current" | rcp == "Historical", 
-                 "Historical", paste(rcp,years))
+                 "Historical", paste0(rcp, space, years))
   }
   
   

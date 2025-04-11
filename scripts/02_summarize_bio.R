@@ -17,7 +17,7 @@
 library(tidyverse)
 library(dtplyr) # to speed up a couple slow chunks
 source("src/general_functions.R")
-
+source("src/mapping_functions.R") # for calc_low/high functions
 
 # params ------------------------------------------------------------------
 
@@ -147,7 +147,10 @@ pft5_bio1_tot <- bind_rows(pft5_bio0) %>%
 pft5_bio1 <- bind_rows(pft5_bio0) %>% 
   filter(PFT!= "Total") %>% 
   # order PFTs into a factor
-  mutate(PFT = pft_all_factor(PFT))
+  mutate(PFT = pft_all_factor(PFT)) %>% 
+  calc_aherb() %>% 
+  # for later summarizing
+  group_by(run, years, RCP, graze, id, site, PFT)
 
 # select runs that have for which complete set of grazing levels exist
 # (used for filter in this and other scripts)
@@ -165,8 +168,14 @@ stopifnot(runs_graze %in% runs_graze0)
 
 pft5_bio2 <- pft5_bio1 %>% 
   # median across GCMs
-  summarise(biomass = median(biomass),
+  summarise(biomass_low = calc_low(biomass),
+            biomass_high = calc_high(biomass),
+            biomass = median(biomass),
+            indivs_low = calc_low(indivs),
+            indivs_high = calc_high(indivs),
             indivs = median(indivs),
+            utilization_low = calc_low(utilization),
+            utilization_high = calc_high(utilization),
             utilization = median(utilization),
             .groups = "drop")%>% 
   left_join(clim1, by = "site") # adding current climate

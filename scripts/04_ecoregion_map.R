@@ -22,7 +22,6 @@ match1 <- rast(paste0("data_processed/interpolation_quality/",
 
 eco1 <-load_wafwa_ecoregions()
 
-
 # raster of ecoregions ----------------------------------------------------
 
 study_area <- match1
@@ -31,9 +30,6 @@ study_area[!is.na(study_area)] <- 1
 
 r_eco <- terra::rasterize(eco1, study_area, field = "ecoregion")
 r_eco[is.na(study_area)] <- NA
-plot(r_eco)
-
-
 
 # map ---------------------------------------------------------------------
 
@@ -45,6 +41,6 @@ g <- plot_map2(r_eco) +
   theme(legend.position = 'bottom')
 
 png(paste0("figures/ecoregions_", v, '.png'),
-    width = 6, height = 7, units = 'in', res = 600)
+    width = 6, height = 7, units = 'in', res = 900)
 g
 dev.off()
