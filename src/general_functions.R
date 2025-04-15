@@ -151,6 +151,13 @@ cut_depth <- function(x, two_depths = FALSE) {
   out
 }
 
+region_factor <- function(x) {
+  levels <- c("Entire study area", "Great Plains", "Intermountain West", 
+              "Southern Great Basin")
+  stopifnot(x %in% levels)
+  factor(x, levels = levels)
+}
+
 # * PFTs ------------------------------------------------------------------
 
 # Rename plant functional types into the 5 main categories used in M.E.'s 
@@ -306,12 +313,7 @@ pft_total_factor <- function(x, return_levels = FALSE) {
   out
 }
 
-region_factor <- function(x) {
-  levels <- c("Entire study area", "Great Plains", "Intermountain West", 
-              "Southern Great Basin")
-  stopifnot(x %in% levels)
-  factor(x, levels = levels)
-}
+
 
 #' convert 4 letter spp code to PFT
 #'

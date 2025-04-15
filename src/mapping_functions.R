@@ -10,7 +10,7 @@
 
 source("src/fig_params.R") # for cols_map_bio() color ramp function
 source("src/fig_functions.R")
-
+source("src/general_functions.R")
 # misc --------------------------------------------------------------------
 
 # the crs to be used for the sagebrush conservation design (this is the same
@@ -478,12 +478,21 @@ crs_scd <- terra::crs("PROJCRS[\"Albers_Conical_Equal_Area\",\n    BASEGEOGCRS[\
 
 states <- sf::st_transform(sf::st_as_sf(spData::us_states), crs = crs_scd)
 
-load_wafwa_ecoregions <- function() {
+load_wafwa_ecoregions <- function(total_region = FALSE) {
   shp1 <- sf::st_read("../SEI/data_raw/files_from_DaveT/WAFWAecoregionsFinal.shp")
   
   shp2 <- sf::st_transform(shp1, crs = crs_scd)
   
   shp2$ecoregion <- c("Southern Great Basin", "Intermountain West", "Great Plains")
   shp2$ecoregion <- factor(shp2$ecoregion) # alphabetical sorting assumed by some later code
+  
+  # also have a seperate row for the entire region
+  if(total_region) {
+    shp2 <- shp2 |> 
+      dplyr::summarize(geometry = sf::st_union(.data$geometry)) |> 
+      dplyr::mutate(ecoregion = "Entire study area") |> 
+      dplyr::bind_rows(shp2) |> 
+      dplyr::mutate(ecoregion = region_factor(as.character(.data$ecoregion)))
+  }
   shp2
 }

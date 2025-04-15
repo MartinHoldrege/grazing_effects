@@ -42,7 +42,11 @@ if(test_run) {
 into_gcm <- c("type", "RCP", "years",  "graze", "GCM")
 info_gcm1 <- create_rast_info(r_prob_gcm1, into = into_gcm)
 
-eco1 <- load_wafwa_ecoregions()
+# computing wise it would be faster to have total_region = FALSE
+# and then sum the summary stats for the individual
+# ecoregions, instead of then seperately computing for the total_region
+# (doing this for now, because it requires fewer lines of code)
+eco1 <- load_wafwa_ecoregions(total_region = TRUE)
 
 # vectors etc -------------------------------------------------------------
 
@@ -68,13 +72,14 @@ r_eco1 <- rasterize(
   vect(eco1),
   r_prob_gcm1[[1]],
   field = 'ecoregion',
-  touches = TRUE
+  touches = FALSE
 )
 
 # expected burned area ----------------------------------------------------
 
 area <- cellSize(r_prob_gcm1[[1]], unit = 'ha', transform = FALSE)
 varnames(area) <- 'cellSize'
+
 # amount of area expected to burn in each
 # first convert probability from % to proportion
 r_prob_gcm2 <- r_prob_gcm1/100 
@@ -86,7 +91,8 @@ ba_eco1 <- terra::extract(
   vect(eco1),           # convert sf to SpatVector
   fun = sum,
   na.rm = TRUE,
-  touches = TRUE
+  # using FALSE, otherwise summing indidividual ecoregions equals more area than total area
+  touches = FALSE 
 )
 
 ba_eco1$ecoregion <- eco1$ecoregion
@@ -118,7 +124,7 @@ area_by_age_group_l <- map(prob_by_age_group_l, \(x) x*area)
 
 area_age_group1 <- map(area_by_age_group_l, 
                        \(x) terra::extract(x, vect(eco1), fun = sum, 
-                                           na.rm = TRUE, touches = TRUE))
+                                           na.rm = TRUE, touches = FALSE))
 
 area_age_group2 <- map(area_age_group1, function(x) {
   x$ecoregion <- eco1$ecoregion[x$ID]
@@ -153,7 +159,7 @@ area_eco <- terra::extract(
   vect(eco1),         
   fun = sum,
   na.rm = TRUE, 
-  touches = TRUE
+  touches = FALSE
 )
 area_eco$ecoregion <- eco1$ecoregion
 area_eco$ID <- NULL
