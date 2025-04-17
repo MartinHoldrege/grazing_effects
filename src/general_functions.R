@@ -158,6 +158,10 @@ region_factor <- function(x) {
   factor(x, levels = levels)
 }
 
+summary2factor <- function(x) {
+  factor(x, levels = c('low', 'median', 'high'))
+}
+
 # * PFTs ------------------------------------------------------------------
 
 # Rename plant functional types into the 5 main categories used in M.E.'s 
@@ -677,7 +681,23 @@ pivot_wider_c4 <- function(df) {
 
 
 
-# summarize functions -----------------------------------------------------
+# summarize functions --------------------------------------------------
+
+#' summarize across gcms, and then pivot longer
+#'
+#' @param df grouped dataframe
+#' @param var string, name of the variable to summarize
+summarize_across_GCMs <- function(df, var) {
+  df %>% 
+    summarize(median = median(.data[[var]]),
+              low = calc_low(.data[[var]]),
+              high = calc_high(.data[[var]]), 
+              .groups = 'drop') %>% 
+    pivot_longer(cols = c('low', 'median', 'high'),
+                 names_to = 'summary',
+                 values_to = var) %>% 
+    mutate(summary = summary2factor(summary))
+}
 
 #' calculate median of biomass and indivs columns
 #'

@@ -26,12 +26,16 @@
 #' # testing
 #' all(qm_from_quantiles(from, from, to) == to)
 #' all((qm_from_quantiles(from + 0.001, from, to) - to) < 0.01)
-qm_from_quantiles <- function(x, from, to) {
+qm_from_quantiles <- function(x, from, to, ascending = TRUE) {
   
   stopifnot(length(from) == length(to),
             # make sure from/to are in ascending order
-            all(diff(from) >= 0),
-            all(diff(to) >= 0))
+            all(diff(from) >= 0))
+  
+  if (ascending) {
+    stopifnot(all(diff(to) >=0))
+  }
+  
   
   low <- which(x <= min(from))
   high <- which(x>= max(from))
@@ -62,13 +66,12 @@ qm_from_quantiles <- function(x, from, to) {
   # replace values lower and higher than any of the reference
   # breaks then replace with either the min or max
   if(length(low) > 0) {
-    out[low] <- min(to)
+    out[low] <- to[1]
   }
   
   if(length(high) > 0) {
-    out[high] <- max(to)
+    out[high] <- to[length(to)]
   }
-
   out
 }
 
@@ -79,4 +82,34 @@ qm_quant_factory <- function(from, to) {
   }
 }
 
+# these are the numbers from the
+# "data_processed/qm/quantiles_for_qm_0.5match_fire1_eind1_c4grass1_co20_2311_grazLMH.csv"
+# file, same values used for quantile mapping in stepwat2
+# that file was created in scripts/bio_matching/02_quantile_matching_simple.R
+qm_Aherb <- qm_quant_factory(
+  from = c(6.49, 14.48, 18.38, 23.77, 37.96, 45.45, 53.98, 63.03, 69.16, 
+           76.48, 83.03, 87.28),
+  to = c(0, 0.64, 2.9, 4.31, 6.11, 8.56, 12.21, 18.04, 29.35, 58.62, 
+         82.68, 172.44))
+
+qm_Pherb <- qm_quant_factory(
+  from = c(13.71, 21.8, 41.19, 46.63, 51.77, 57.89, 67.89, 81.59, 98.22, 
+           114.58, 123.15, 140.67),
+  to = c(0, 6.52, 18.93, 25.66, 33.57, 42.89, 54.42, 69.71, 88.57, 116.52, 
+         136.07, 309.82))
+
+# values from the "data_processed/qm/quantiles_for_qm_sagebrush_0.5match_fire1_eind1_c4grass1_co20_2503_LMH.csv"
+# calculated in the scripts/bio_matching/qm_sagebrush.R script
+# quantile mapping from stepwat biomass to rcmap cover
+qm_Sagebrush_bio2cov <- qm_quant_factory(
+  from = c(94.9, 99.8, 104, 130, 165, 171, 171, 183, 186, 196, 200, 202, 
+           244, 268, 286, 297, 306, 314, 320, 326, 330, 333, 337, 338, 344, 
+           349, 352, 356, 359, 364, 369, 371, 373, 375, 378, 382, 384, 386, 
+           392, 396, 398, 401, 406, 409, 413, 414, 421, 423, 433, 441, 449, 
+           463, 492, 515, 585, 641),
+  to = c(0, 0, 0, 0, 1, 1, 1.67, 2, 2, 2.67, 3, 3, 3.33, 3.67, 4, 4, 
+         4.33, 4.67, 5, 5, 5, 5.33, 5.67, 6, 6, 6.33, 6.33, 6.67, 7, 7, 
+         7.33, 7.67, 8, 8.33, 8.67, 9, 9.33, 9.67, 10, 10.3, 10.7, 11, 
+         11.7, 12, 12.3, 13, 13.3, 14, 14.7, 15.3, 16, 17.3, 20, 21.3, 
+         25.7, 33.7))
 

@@ -222,6 +222,47 @@ geom_boxplot_identity <- function(...) {
                ...)
 }
 
+weighted_box1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
+  ggplot(df, aes(graze, .data[[y_string]], fill = summary)) +
+    geom_boxplot(aes(weight = weight), position = position_dodge2(preserve = 'single'),
+                 outlier.size = 0.25, outlier.alpha = 0.5) + 
+    facet_grid(region~rcp_year) +
+    theme(panel.spacing.x = unit(0, "lines"),
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          strip.text.x.top = element_text(size = rel(0.7))) +
+    labs(x = lab_graze,
+         y = ylab,
+         subtitle = subtitle,
+         fill = 'Summary across GCMs')
+}
+
+# combine side by side groups of facet_grid plots
+combine_grid_panels1 <- function(l, remove_y_axis_labels = TRUE) {
+  n <- length(l)
+  stopifnot(length(l) > 1)
+  # remove duplicated y axis labels (b/ putting figures side by side)
+  for (i in 2:n) {
+    l[[i]] <- l[[i]] + theme(axis.title.y = element_blank())
+  }
+  
+  # only the right most figure will have strip text (to avoid repeat's)
+  for (i in 1:(n-1)) {
+    l[[i]] <- l[[i]] + theme(strip.text.y = element_blank())
+  }
+  
+  if(remove_y_axis_labels) {
+    # this is useful if y axis limits are identical across panels
+    for (i in 2:n) {
+      l[[i]] <- l[[i]] + theme(axis.text.y = element_blank())
+    }
+  }
+  g <- wrap_plots(l, nrow = 1) +
+    plot_layout(guides = 'collect', axis_titles = 'collect')
+  g2 <- g&theme(legend.position = 'bottom')
+  g2
+  
+}
+
 
 # funs for scatterplots ---------------------------------------------------
 
