@@ -48,6 +48,8 @@ info_gcm1 <- create_rast_info(r_prob_gcm1, into = into_gcm)
 # (doing this for now, because it requires fewer lines of code)
 eco1 <- load_wafwa_ecoregions(total_region = TRUE)
 
+r_eco1 <- load_wafwa_ecoregions_raster() # raster of ecoregions
+
 # vectors etc -------------------------------------------------------------
 
 # for area by age class group
@@ -68,12 +70,7 @@ stopifnot(all.equal(sum(test), 1))
 
 stopifnot(isTRUE(same.crs(r_prob_gcm1, vect(eco1))))
 
-r_eco1 <- rasterize(
-  vect(eco1),
-  r_prob_gcm1[[1]],
-  field = 'ecoregion',
-  touches = FALSE
-)
+
 
 # expected burned area ----------------------------------------------------
 

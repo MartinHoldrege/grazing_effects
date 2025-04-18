@@ -68,7 +68,11 @@ bio2q <- function(x, pft, region) {
   tab <- q_curves_cover2[[pft]]
   
   cover <- bio2cov(x, pft)/100 # convert from % to proportion
-  stopifnot(region %in% names(tab))
+  stopifnot(region %in% names(tab),
+            is.character(pft),
+            is.character(region),
+            length(pft) == 1,
+            length(region) == 1)
   tab$cover
   # calculate q values via linear interpolation
   q <- qm_from_quantiles(cover, 
@@ -79,10 +83,84 @@ bio2q <- function(x, pft, region) {
   q
 }
 
+#' calculate Q and SEI from rasters of biomass
+#'
+#' @param r raster with 3 layers (biomass of sage, annuals and perennials)
+#' @param eco_raster raster providing the 3 ecoregions
+#' @param type_string part of layer name giving the data category
+#'
+#' @returns
+#' 4 layer raster (3 Qs and SEI)
+bio2qsei_raster <- function(r, eco_raster, type_string = 'biomass') {
+  stopifnot(isTRUE(terra::compareGeom(r, eco_raster)))
+  
+  pfts <- c('Sagebrush', 'Pherb', 'Aherb')
+  
+  regex <- paste(pfts, collapse = '|')
+  
+  nms <- names(r)
+  stopifnot(str_detect(nms, regex),
+            str_detect(nms, type_string),
+            nlyr(r) == 3,
+            nlyr(ecor_raster) == 1)
+  
+  regions <- levels(eco_raster)[[1]]$ecoregion
+  stopifnot(length(regions) == 3)
+  
+  comb <- tidyr::expand_grid(
+    PFT = pfts,
+    region = regions
+    
+  )
+  
+  r_q <-  r
+  r_q[] <- NA
+  
+  for (i in 1:nrow(comb)) {
+    pft <- comb$PFT[i]
+    region <- comb$region[i]
+    lyr <- str_subset(nms, pattern = pft)
+    
+    biomass <- as.vector(r[[lyr]][eco_raster == region])
+    
+    r_q[[lyr]][eco_raster == region] <- bio2q(biomass, pft = pft, 
+                                              region = region)
+    
+  }
+  
+  stopifnot(
+    nlyr(r_q) == 3,
+    names(r_q) == nms
+  )
+  r_sei <- app(r_q, fun = prod) # multiply 3 q's together
+  
+  # renaming file name components
+  names(r_q) <- str_replace(nms, type_string, 'Q')
+  
+  # the PFT part of the layer name becomes NA for SEI
+  names(r_sei) <- str_replace(nms[1], regex, 'NA') %>% 
+    str_replace(type_string, "SEI")
+  
+  c(r_q, r_sei)
+}
 
 
-
-
+# continuous sei to three categories of SEI
+sei2c3 <- function(x) {
+  stopifnot(
+    x>=0,
+    x<=1
+  )
+  
+  c3 <- dplyr::case_when(
+    x > 0.431 ~ 'CSA',
+    x <= 0.431 & x > 0.173 ~ 'GOA',
+    x <= 0.173 ~ 'ORA'
+  )
+  
+  factor(c3, levels = c('CSA', "GOA", "ORA"))
+  
+}
 
 
 

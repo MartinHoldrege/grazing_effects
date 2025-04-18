@@ -37,6 +37,8 @@ v <- 'v1' # for appending to output file names
 # interpolated rasters of stepwat data
 path_r <- "data_processed/interpolated_rasters"
 
+eco1 <- load_wafwa_ecoregions(total_region = FALSE)
+
 # * median biomass (across GCMs) --------------------------------------------
 list.files(path_r, "bio_future_median_across_GCMs")
 path <- paste0(path_r, "/", run, "_bio_future_median_across_GCMs.tif")
@@ -71,7 +73,8 @@ rdiff2 <- rdiff1
 
 
 
-# 20 panel figures ---------------------------------------------------------
+# prepare rasters ---------------------------------------------------------
+
 
 # preparing args
 r <- c(r1, rdiff1)
@@ -89,8 +92,25 @@ args <- list(
 )
 
 type_diff =  'bio-rdiff-cref'
-# * absolute change in biomass --------------------------------------------
 
+
+# * calculate Q's and SEI -------------------------------------------------
+
+
+r_eco1 <- rasterize(
+  vect(eco1),
+  r[[1]],
+  field = 'ecoregion',
+  touches = FALSE
+)
+names(r_eco1) <- 'region'
+
+r_eco1[is.na(r[[1]])] <- NA
+
+r <- mask(r, r_eco1)# trimming small area that doesn't fall in ecoregion polyons
+
+# 20 panel figures ---------------------------------------------------------
+# * absolute change in biomass --------------------------------------------
 
 for(pft in args$PFT){
 

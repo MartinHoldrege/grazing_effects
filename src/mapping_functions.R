@@ -474,7 +474,7 @@ crs_scd <- terra::crs("PROJCRS[\"Albers_Conical_Equal_Area\",\n    BASEGEOGCRS[\
 
 
 
-# polygons for basemaps ---------------------------------------------------
+# polygons for basemaps etc---------------------------------------------------
 
 states <- sf::st_transform(sf::st_as_sf(spData::us_states), crs = crs_scd)
 
@@ -495,4 +495,21 @@ load_wafwa_ecoregions <- function(total_region = FALSE) {
       dplyr::mutate(ecoregion = region_factor(as.character(.data$ecoregion)))
   }
   shp2
+}
+
+load_wafwa_ecoregions_raster <- function(
+    template_path = file.path("data_processed", "interpolated_rasters",
+                              "fire1_eind1_c4grass0_co20_2503_fire-prob_future_summary_across_GCMs.tif")) {
+  
+  r_template <- terra::rast(template_path)[[1]]
+  eco1 <- load_wafwa_ecoregions()
+  r_eco <- terra::rasterize(
+    terra::vect(eco1),
+    r_template,
+    field = 'ecoregion',
+    touches = FALSE
+  )
+  
+  r_eco[is.na(r_template)] <- NA
+  r_eco
 }
