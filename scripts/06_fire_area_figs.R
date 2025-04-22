@@ -59,7 +59,8 @@ drivers1 <- read_csv(paste0('data_processed/raster_means/', run,
 
 # vectors -----------------------------------------------------------------
 
-ecoregions <- area_eco$ecoregion
+ecoregions <- region_factor(area_eco$ecoregion) %>% 
+  levels()
 age_groups <- create_age_groups()
 
 # fig params --------------------------------------------------------------
@@ -74,7 +75,8 @@ width_3p <- 7# height for 3 panel figures
 ba3 <- df_factor(ba3a) %>% 
   arrange(graze, RCP, years)  %>% 
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
-         id2 = factor(id2, levels = unique(id2)))
+         id2 = factor(id2, levels = unique(id2)),
+         rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
 
 area_age_group3 <- df_factor(area_age_group3) %>% 
   arrange(graze, RCP, years)  %>% 
@@ -90,23 +92,19 @@ plots <- map(ecoregions, function(region) {
   total_area <- area_eco$area[area_eco$ecoregion == region]
   ba3 %>% 
     filter(ecoregion == region) %>% 
-    ggplot(aes(x = id2, y = area_median)) +
-    geom_errorbar(aes(ymin = area_low, ymax = area_high), width = 0) +
-    geom_point(aes(color = RCP)) + # not showing outliers as points
-    scale_x_discrete(labels = id2year) +
+    ggplot(aes(x = rcp_year, y = area_median)) +
+    geom_errorbar(aes(ymin = area_low, ymax = area_high, group = graze), 
+                  position = position_dodge(width = 0.5), width = 0) +
+    geom_point(aes(y = area_median, color = graze), 
+               position = position_dodge(width = 0.5)) +
     scale_y_continuous(sec.axis = sec_axis(transform = \(x) x/total_area*100,
                                            name = '% of ecoregion')) +
-    scale_color_manual(values = cols_rcp, name = "Scenario") +
-    geom_text(data = ~box_anno(.,var = 'area_high',
-                               id = "id2",
-                               mult = 0.1,
-                               group_by = c('graze')),
-              aes(x, y, label = graze, fill = NULL),
-              size = 2.5) +
-    geom_vline(xintercept = line_loc, linetype = 2) +
-    theme(legend.position = legend_pos_box1,
-          axis.text = element_text(size = 7)) +
-    labs(x = lab_yrs,
+    scale_color_manual(values = cols_graze, name = 'Grazing') +
+    geom_vline(xintercept = line_loc2, linetype = 2) +
+    theme(legend.position = 'bottom',
+          axis.text = element_text(size = 7),
+          axis.text.x = element_text(angle = 25, hjust = 1, size = rel(0.8))) +
+    labs(x = NULL,
          y = lab_ba0,
          subtitle = region)
 })

@@ -102,7 +102,7 @@ bio2qsei_raster <- function(r, eco_raster, type_string = 'biomass') {
   stopifnot(str_detect(nms, regex),
             str_detect(nms, type_string),
             nlyr(r) == 3,
-            nlyr(ecor_raster) == 1)
+            nlyr(eco_raster) == 1)
   
   regions <- levels(eco_raster)[[1]]$ecoregion
   stopifnot(length(regions) == 3)

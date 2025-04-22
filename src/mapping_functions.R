@@ -466,6 +466,66 @@ plot_map_20panel <- function(
 }
 
 
+# calculated percent change for 20panel maps (or any other)
+calc_rast_perc_change <- function(r, info, type_absolute, type_diff) {
+  info <- info %>% 
+    mutate(type = factor(.data$type, levels = c(!!type_absolute, !!type_diff))) %>% 
+    arrange(type, RCP, years, graze) 
+  
+  # make sure don't have multipe PFTs etc in this info/r
+  stopifnot(sum(duplicated(info[c('type', 'RCP', 'years', 'graze')])) == 0)
+  
+  r_current <- r[[info$id[info$type == type_absolute & info$RCP == 'Current']]]
+  r_future_diff <- r[[info$id[info$type == type_diff]]]
+  r_perc <- r_future_diff/r_current*100
+  c(r[[info$id[info$type == type_absolute]]], r_perc)
+}
+
+# same as plot_map_20panel but first convert difference
+# layers into percent change
+plot_map_20panel_perc <- function(
+    r,
+    info,
+    type_absolute,
+    type_diff,
+    title = NULL,
+    name4absolute = "",
+    name4diff = NULL,
+    legend_title_absolute = name4absolute,
+    legend_title_diff = name4diff,
+    palette_absolute = cols_map_bio(10),
+    palette_diff = cols_map_bio_d2,
+    lims_diff = NULL,
+    midpoint_diff = 0
+) {
+  
+  r_perc <- calc_rast_perc_change(r = r, info = info, 
+                                  type_absolute = type_absolute, 
+                                  type_diff = type_diff)
+  
+  if(is.null(name4diff)) {
+    name4diff <- paste("\u0394", name4absolute, '(%)')
+  }
+  
+  plot_map_20panel_perc(
+    r = r_perc,
+    info = info,
+    type_absolute = type_absolute,
+    type_diff = type_diff,
+    title = title,
+    name4absolute = name4absolute,
+    name4diff = name4diff,
+    legend_title_absolute = legend_title_absolute,
+    legend_title_diff = legend_title_diff,
+    palette_absolute = palette_absolute,
+    palette_diff = palette_diff,
+    lims_diff = lims_diff,
+    midpoint_diff = midpoint_diff
+  )
+}
+
+
+
 # crs -----------------------------------------------------------------------
 
 # the crs to be used for the sagebrush conservation design (this is the same

@@ -30,6 +30,7 @@ PFTs2plot <- c("Sagebrush", "Aherb", "Pherb", 'C4Pgrass', "C3Pgrass", "Pforb",
                "Cheatgrass", "Aforb")
 
 v <- 'v1' # for appending to output file names
+run_20panelonly <- TRUE # only create the 20 panel figures
 
 # Read in data ------------------------------------------------------------
 
@@ -184,7 +185,7 @@ for(pft in args$PFT){
 }
 
 # Figures-other -----------------------------------------------------------------
-
+if(!run_20panelonly) {
 # combining difference and absolute biomass
 info_c1 <- bind_rows(info1, info_rdiff1) %>% 
   filter_clim_extremes() %>% 
@@ -305,3 +306,4 @@ for(df in info_c_l){
 }
 
 dev.off()
+}

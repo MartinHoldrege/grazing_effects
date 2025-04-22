@@ -128,7 +128,7 @@ plots <- map(pfts, function(pft) {
     expand_limits(y = 0)
 })
 
-g2 <- combine_grid_panels1(plots)
+g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
 
 png(paste0("figures/biomass/bio_weighted_by-region_3pft_boxplot_", run, ".png"),
     width = 8, height = 8, units = 'in', res = 600)
