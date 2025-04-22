@@ -151,7 +151,7 @@ info_perc <- info_20panel %>%
 
 # percent change
 r_diff_perc <- r[[info_perc$id_diff]]/r[[info_perc$id_Current]]*100
-
+r_diff_perc2 <- mask(c(r1, r_diff_perc), r_eco1)
 
 for(pft in args$PFT){
   
@@ -161,7 +161,7 @@ for(pft in args$PFT){
   
   lims_diff <- range_raster(r_diff_perc[[info_tmp$id[info_tmp$type == type_diff]]])
   g <- plot_map_20panel(
-    r = r,
+    r = r_diff_perc2,
     info = info_tmp,
     type_absolute = 'biomass',
     type_diff =  'bio-rdiff-cref',
