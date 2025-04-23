@@ -26,10 +26,13 @@ run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
 run_fire <- TRUE
 # interpolate data showing which vars caused changes in fire?
 run_fire_attribution <- TRUE 
+run_util <- TRUE # utilization
 
 # for filtering output, put NULL if don't want to filter that variable
 PFT2run =c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 
            'Pherb', 'Aherb', 'Aforb','Pgrass')
+
+PFT2run_util <- c('Sagebrush', 'Pherb', 'Aherb') # for utilization
 
 run2run = 'fire1_eind1_c4grass1_co20_2503' # NULL # 
 years2run =  NULL #'Current'
@@ -168,7 +171,6 @@ if(nrow(sc1) != 200 | any(duplicated(sc1$site_id))) {
 # therefore %change of biomass no longer up-scaled
 
 pft5_bio_w1 <- bio$pft5_bio1 %>% 
-  calc_aherb() %>% # add a total annual herbacious category
   filter_scenarios(PFT = PFT2run, run = run2run, years = years2run) %>% 
   ungroup() %>% 
   mutate(
@@ -182,6 +184,33 @@ pft5_bio_w1 <- bio$pft5_bio1 %>%
 # joining in cell numbers
 pft5_bio_w2 <- join_subsetcells(step_dat = pft5_bio_w1, sc_dat = sc1,
                                 subset_in_target = subset_in_target)
+
+
+# * utilization -----------------------------------------------------------
+# just interpolating the across GCM summaries
+if(run_util) {
+  tmp <- bio$pft5_bio2 %>% 
+    filter(PFT %in% PFT2run_util) %>% 
+    dplyr::select(run, years, RCP, graze, id, site, PFT, matches('utilization')) %>% 
+    pivot_longer(cols = matches('utilization')) %>% 
+    mutate(summary = str_extract(name, "(?<=_).+"),
+           summary = ifelse(is.na(summary), "median", summary),
+           run2 = paste0(run, v2paste),
+           id = paste(run2, PFT, "util", id, summary, sep = "_"))
+  
+  s <- c('median', 'low', 'high')
+  stopifnot(tmp$summary %in% s,
+            s %in% tmp$summary)
+  
+  util_w1 <- tmp %>% 
+    dplyr::select(site, id, value) %>% 
+    pivot_wider(id_cols = "site",
+                names_from = "id",
+                values_from = "value") %>% 
+    join_subsetcells(step_dat = ., sc_dat = sc1,
+                     subset_in_target = subset_in_target)
+    
+}
 
 # * wildfire --------------------------------------------------------------
 
@@ -394,6 +423,23 @@ run_interpolatePoints(df = pft5_bio_w2,
                       min_size = min_size,
                       rerun = rerun,
                       exclude_poor_matches = exclude_poor_matches)
+
+# * utilization ------------------------------------------------------------------
+if(run_util) {
+  
+  path_util <- file.path("data_processed/interpolated_rasters/util", version)
+  
+  # separately running interpolation on different sets of columns
+  run_interpolatePoints(df = util_w1,
+                        match = match1,
+                        template = template,
+                        path = path_util,
+                        min_size = min_size,
+                        rerun = rerun,
+                        exclude_poor_matches = exclude_poor_matches)
+  
+}
+
 
 # * fire ------------------------------------------------------------------
 if(run_fire) {

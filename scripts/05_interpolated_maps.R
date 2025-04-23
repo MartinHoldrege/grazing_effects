@@ -38,7 +38,7 @@ run_20panelonly <- TRUE # only create the 20 panel figures
 # interpolated rasters of stepwat data
 path_r <- "data_processed/interpolated_rasters"
 
-eco1 <- load_wafwa_ecoregions(total_region = FALSE)
+r_eco1 <- load_wafwa_ecoregions_raster()
 
 # * median biomass (across GCMs) --------------------------------------------
 list.files(path_r, "bio_future_median_across_GCMs")
@@ -95,20 +95,11 @@ args <- list(
 type_diff =  'bio-rdiff-cref'
 
 
-# * calculate Q's and SEI -------------------------------------------------
-
-
-r_eco1 <- rasterize(
-  vect(eco1),
-  r[[1]],
-  field = 'ecoregion',
-  touches = FALSE
-)
-names(r_eco1) <- 'region'
+# * mask  -------------------------------------------------
 
 r_eco1[is.na(r[[1]])] <- NA
 
-r <- mask(r, r_eco1)# trimming small area that doesn't fall in ecoregion polyons
+r <- mask(r, r_eco1)# trimming small area that doesn't fall in ecoregion polygons
 
 # 20 panel figures ---------------------------------------------------------
 # * absolute change in biomass --------------------------------------------
@@ -185,6 +176,7 @@ for(pft in args$PFT){
 }
 
 # Figures-other -----------------------------------------------------------------
+
 if(!run_20panelonly) {
 # combining difference and absolute biomass
 info_c1 <- bind_rows(info1, info_rdiff1) %>% 

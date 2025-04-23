@@ -150,7 +150,7 @@ calc_high <- function(x) {
 #'
 #' @return SpatRast object (with as many layers as the length of the
 #' target_layer vector)
-rast_diff <- function(rast, ref_layer, target_layer) {
+rast_diff_scaled <- function(rast, ref_layer, target_layer) {
   
   # maximum value in the reference layer(s)
   max <- global(rast[[ref_layer]], max, na.rm = TRUE)$max
@@ -164,6 +164,54 @@ rast_diff <- function(rast, ref_layer, target_layer) {
   out <- (rast[[target_layer]] - rast[[ref_layer]])/max*100 
   out
 }
+
+
+#' calculate difference between historical and future scenarios
+#'
+#' @param r raster with  layers for current and future scenarios
+#' @param info dataframe from create_rast_info()
+#' @param type_absolute string--type part of the band names
+#' @param type_diff new string to use to describe the 'difference' type
+#' @param match_vars variables to match by when matching historical and future
+#' layers
+#' @param include_percent also included layers of % change in the output raster
+rast_diff <- function(r, info, type_absolute, type_diff, 
+         match_vars = c('run', 'PFT', 'type', 'graze', 'summary'), 
+         include_percent = FALSE) {
+  
+  stopifnot(
+    'Current' %in% info$RCP,
+    length(unique(info$type)) == 1
+  )
+  
+  info_cur <- info[info$RCP == 'Current', ]
+  
+  stopifnot(
+    # duplicates mean a matching variable is likely missing
+    sum(duplicated(info_cur[match_vars])) == 0
+  )
+  
+  info_fut <- info[info$RCP != 'Current', ]
+  
+  info_comb <- left_join(info_fut, info_cur, by = match_vars,
+                         suffix = c("_fut", "_cur"))
+  
+  diff <- r[[info_comb$id_fut]] - r[[info_comb$id_cur]]
+  names(diff) <- stringr::str_replace(names(diff), type_absolute, type_diff)
+  
+  if(include_percent) {
+    perc_diff <- diff/r[[info_comb$id_cur]]*100
+    names(perc_diff) <- stringr::str_replace(names(perc_diff), 
+                                             type_diff, 
+                                             paste0(type_diff, '-perc'))
+    out <- c(diff, perc_diff)
+  } else {
+    out <- diff
+  }
+  out
+}
+
+
 
 #' fill a template with values
 #' 

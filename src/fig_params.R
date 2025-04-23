@@ -110,6 +110,7 @@ lab_perc_bio0 <- "% of total biomass"
 
 # utilization
 lab_util0 <- expression("Utilization ("*gm^-2*")")
+lab_util1 <- expression(~Delta*" Utilization ("*gm^-2*")")
 lab_util2 <- expression(~Delta*" Utilization (scaled %)")
 
 # cover
