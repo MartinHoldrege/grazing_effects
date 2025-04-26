@@ -15,6 +15,7 @@ library(patchwork)
 source("src/general_functions.R")
 source("src/mapping_functions.R")
 source("src/fig_params.R")
+source("src/fig_functions.R")
 
 # read in data ------------------------------------------------------------
 
@@ -101,7 +102,7 @@ for (pft in args$PFT) {
     title = title,
     name4absolute = "Utilization",
     legend_title_absolute = lab_util0,
-    legend_title_diff = lab_util1,
+    legend_title_diff = expression(~Delta * " Utilization (%)"),
     lims_diff = lims_diff,
     midpoint_diff = 0
   )

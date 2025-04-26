@@ -34,6 +34,11 @@ cols_pft5_other <- c("Other" = "darkgrey",
 
 cols_herb <- cols_pft5_other[c("Cheatgrass","Pforb", "C4Pgrass", "C3Pgrass")]
 
+cols_pft3 <- c("Aherb" = "#f6e8c3",
+               "Pherb" = "#c7eae5",
+               "Sagebrush" = "#01665e")
+
+
 # fire probability
 cols_firep <- RColorBrewer::brewer.pal(11, "RdYlBu")[9:2]
 
@@ -110,6 +115,7 @@ lab_perc_bio0 <- "% of total biomass"
 
 # utilization
 lab_util0 <- expression("Utilization ("*gm^-2*")")
+lab_util0b <- "Utilization (%)"
 lab_util1 <- expression(~Delta*" Utilization ("*gm^-2*")")
 lab_util2 <- expression(~Delta*" Utilization (scaled %)")
 

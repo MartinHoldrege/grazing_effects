@@ -54,12 +54,12 @@ bio3 <- bio2 %>%
 
 # longer format
 bio4 <- bio3 %>% 
-  select(-matches('utilization'), -matches('indivs')) %>% 
-  pivot_longer(matches('biomass'),
-               names_to = 'summary',
-               values_to = 'biomass') %>% 
-  mutate(summary = str_extract(summary, '(?<=_).*'),
-         summary = ifelse(is.na(summary), "median", summary),
+  pivot_longer(
+    cols = matches("^(utilization|biomass|indivs)"),
+    names_to = c(".value", "summary"),
+    names_pattern = "^(utilization|biomass|indivs)_?(.*)$"
+  ) %>% 
+  mutate(summary = ifelse(summary == "", "median", summary),
          summary = summary2factor(summary),
          rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
                               add_newline = TRUE))
@@ -71,6 +71,17 @@ bio_gcm2 <- bio_gcm1 %>%
   df_factor() %>% 
   filter(region != levels(region)[1])
 
+
+# other summaries ---------------------------------------------------------
+
+# % of total utilization
+bio_pcent1 <- bio4 %>% 
+  filter(summary == 'median',
+         PFT %in% pfts) %>% 
+  group_by(region, run, years, RCP, rcp_year, graze, PFT) %>% 
+  summarize(util_median = spatstat.univar::weighted.median(utilization, w = weight),
+            .groups = 'drop_last') %>% 
+  mutate(util_pcent = util_median/sum(util_median)*100)
 
 # calculate Q's and SEI ---------------------------------------------------
 
@@ -160,6 +171,63 @@ png(paste0("figures/sei/q-sei_weighted_by-region_3pft_boxplot_", run, ".png"),
     width = 11, height = 8, units = 'in', res = 600)
 g3&theme(legend.position = 'bottom')
 dev.off()
+
+# *utilization ----------------------------------------------------------------
+
+plots <- map(pfts, function(pft) {
+  weighted_box1(df = filter(bio4, PFT == pft),
+                y_string = 'utilization',
+                ylab = lab_util0,
+                subtitle = pft) +
+    expand_limits(y = 0)
+})
+
+g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
+
+png(paste0("figures/util/util_weighted_by-region_3pft_boxplot_", run, ".png"),
+    width = 8, height = 8, units = 'in', res = 600)
+g2
+dev.off()
+
+
+# *individuals ----------------------------------------------------------------
+
+plots <- map(pfts, function(pft) {
+  weighted_box1(df = filter(bio4, PFT == pft),
+                y_string = 'indivs',
+                ylab = lab_indivs0,
+                subtitle = pft) +
+    expand_limits(y = 0)
+})
+
+g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
+
+png(paste0("figures/indivs/indivs_weighted_by-region_3pft_boxplot_", run, ".png"),
+    width = 8, height = 8, units = 'in', res = 600)
+g2
+dev.off()
+
+
+# stacked bar charts ------------------------------------------------------
+
+# * utilization -----------------------------------------------------------
+
+g <- ggplot(bio_pcent1, aes(graze, util_pcent, fill = PFT)) +
+  geom_col(position = 'stack') +
+  facet_grid(region~rcp_year) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.title = element_blank(),
+        legend.position = 'bottom') +
+  scale_fill_manual(values = cols_pft3) +
+  labs(x = lab_graze,
+       y = lab_util0b)
+
+
+ggsave(
+  paste0('figures/util/util-perc_bar_pft3_', run, '.png'),
+  g, width = 4, height = 7
+)
 
 
 # q-curve -----------------------------------------------------------------
