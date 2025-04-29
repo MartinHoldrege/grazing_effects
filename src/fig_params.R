@@ -58,6 +58,11 @@ cols_GCM2 <-  c('Historical' = 'black', cols_GCM1)
 cols_ecoregion <- c("Great Plains" = "#ECA130",
                     "Intermountain West" = "#33A37A",
                     "Southern Great Basin" = "#1673B2")
+
+# continuous SEI
+cols_seicont = c("#eee1ba", "#a6611a", "#78c679", "#006837", "#2166ac", "#053061")
+# these are the SEI category break points
+vals_seicont = c(0, 0.173, 0.174, 0.431, 0.432, 1)
          
 # * for maps --------------------------------------------------------------
 

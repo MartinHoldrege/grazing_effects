@@ -402,6 +402,7 @@ plot_map_20panel <- function(
     legend_title_diff = name4diff,
     palette_absolute = cols_map_bio(10),
     palette_diff = cols_map_bio_d2,
+    values_absolute = NULL,
     lims_diff = NULL,
     midpoint_diff = NULL
 ) {
@@ -428,6 +429,8 @@ plot_map_20panel <- function(
   names(cols) <- types
   midpoints <- list(NULL, midpoint_diff)
   names(midpoints) <- types
+  values <- list(values_absolute, NULL)
+  names(values)
   
   stopifnot(
     c(types) %in% info$type)
@@ -468,6 +471,7 @@ plot_map_20panel <- function(
                  function(id, type, tag_label) {
                    plot_map_inset(r = r[[id]],
                                   colors = cols[[type]],
+                                  values = values[[type]],
                                   tag_label = tag_label,
                                   limits = lims[[type]],
                                   scale_name = names4legend[[type]],

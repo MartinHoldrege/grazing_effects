@@ -60,7 +60,7 @@ args <- list(
   titles = c(Aherb = 'Annual herbacious quality score',
              Pherb = 'Perennial herbacious quality score',
              Sagebrush = 'Sagebrush quality score',
-             SEI = 'Sagebrush Ecological Integrity'),
+             SEI = 'Climatic Potential Sagebrush Ecological Integrity'),
   type_absolute = c(Aherb = 'Q',
                     Pherb = 'Q',
                     Sagebrush = 'Q',
@@ -77,6 +77,14 @@ for(group in args$groups){
   info_tmp <- info1 %>% 
     filter(.data$group == !!group)
   
+  if(group == 'SEI') {
+    palette_absolute = cols_seicont
+    values_absolute = vals_seicont
+  } else {
+    palette_absolute = cols_map_bio(10)
+    values_absolute = NULL
+  }
+  
   g <- plot_map_20panel(
     r = r_comb1,
     info = info_tmp,
@@ -84,7 +92,8 @@ for(group in args$groups){
     type_diff =  args$type_diff[[group]],
     title = args$titles[[group]],
     name4absolute = args$type_absolute[[group]],
-    palette_absolute = cols_map_bio(10),
+    palette_absolute =  palette_absolute,
+    values_absolute =  values_absolute,
     palette_diff = cols_map_bio_d2
   )
 
