@@ -10,8 +10,8 @@ v_interp <- 'v4' # interpolation version
 run <- "fire1_eind1_c4grass1_co20_2503"
 q_curve_fig <- TRUE # create figure showing the 'biomass' q curves
 
-
-
+suffix <- paste0(run, '_v2') # for figures
+pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -114,7 +114,11 @@ sei2 <- sei1 %>%
   # 'total' region
   mutate(region = levels(region)[1]) %>% 
   # individual regions
-  bind_rows(sei1) 
+  bind_rows(sei1) %>% 
+  df_factor()
+
+# for use in the 06_fire_area_figs.R script
+saveRDS(sei2, 'data_processed/temp_rds/sei_df.rds')
 
 q1 <- q_gcm1 %>% 
   group_by(run, years, RCP, rcp_year, graze, site, weight, region, PFT) %>% 
@@ -125,7 +129,8 @@ q2 <- q1 %>%
   # but note that q's are calculated seperately for each ecoregion
   # so a given site may appear multiple times for the 'total'
   mutate(region = levels(region)[1]) %>% 
-  bind_rows(q1)
+  bind_rows(q1) %>% 
+  df_factor()
 
 # boxplots ----------------------------------------------------------------
 
@@ -141,8 +146,8 @@ plots <- map(pfts, function(pft) {
 
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
 
-png(paste0("figures/biomass/bio_weighted_by-region_3pft_boxplot_", run, ".png"),
-    width = 8, height = 8, units = 'in', res = 600)
+png(paste0("figures/biomass/bio_weighted_by-region_3pft_boxplot_", suffix, ".png"),
+    width = 8, height = 11, units = 'in', res = 600)
 g2
 dev.off()
 
@@ -167,8 +172,8 @@ g_sei <- weighted_box1(df = sei2,
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = TRUE)
 g3 <- g2 + g_sei + plot_layout(guides = 'collect')
 
-png(paste0("figures/sei/q-sei_weighted_by-region_3pft_boxplot_", run, ".png"),
-    width = 11, height = 8, units = 'in', res = 600)
+png(paste0("figures/sei/q-sei_weighted_by-region_3pft_boxplot_", suffix, ".png"),
+    width = 11, height = 10, units = 'in', res = 600)
 g3&theme(legend.position = 'bottom')
 dev.off()
 
@@ -184,8 +189,8 @@ plots <- map(pfts, function(pft) {
 
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
 
-png(paste0("figures/util/util_weighted_by-region_3pft_boxplot_", run, ".png"),
-    width = 8, height = 8, units = 'in', res = 600)
+png(paste0("figures/util/util_weighted_by-region_3pft_boxplot_", suffix, ".png"),
+    width = 8, height = 10, units = 'in', res = 600)
 g2
 dev.off()
 
@@ -202,8 +207,8 @@ plots <- map(pfts, function(pft) {
 
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
 
-png(paste0("figures/indivs/indivs_weighted_by-region_3pft_boxplot_", run, ".png"),
-    width = 8, height = 8, units = 'in', res = 600)
+png(paste0("figures/indivs/indivs_weighted_by-region_3pft_boxplot_", suffix, ".png"),
+    width = 8, height = 11, units = 'in', res = 600)
 g2
 dev.off()
 
@@ -225,8 +230,8 @@ g <- ggplot(bio_pcent1, aes(graze, util_pcent, fill = PFT)) +
 
 
 ggsave(
-  paste0('figures/util/util-perc_bar_pft3_', run, '.png'),
-  g, width = 4, height = 7
+  paste0('figures/util/util-perc_bar_pft3_', suffix, '.png'),
+  g, width = 4, height = 9
 )
 
 
@@ -251,11 +256,12 @@ if(q_curve_fig) {
     right_join(expand_grid(region = unique(q1$region),row = 1:n), 
                by = 'row', 
                relationship = 'many-to-many') %>% 
+    df_factor() %>% 
+    mutate(region = region2wafwa(region)) %>% 
     group_by(PFT, region) %>% 
     mutate(Q = bio2q(biomass, pft = unique(as.character(PFT)), 
                      region = unique(as.character(region)))) %>% 
-    select(-row) %>% 
-    df_factor()
+    select(-row)
   
   g <- ggplot(q_range, aes(biomass, Q, color = region, linetype = region)) +
     geom_line() + 
@@ -314,21 +320,21 @@ base_fire_bins <- function() {
 g <- ggplot(df_fire_bins1, aes(x = graze, y = fire_bin, fill = SEI)) +
   base_fire_bins() +
   scale_fill_gradientn(
-    colors = c("#eee1ba", "#a6611a", "#78c679", "#006837", "#2166ac", "#053061"),
-    values = scales::rescale(c(0, 0.173, 0.174, 0.431, 0.432, 1)),
+    colors = cols_seicont,
+    values = vals_seicont,
     guide = "colorbar",
     name = "SEI"
   ) 
 
-ggsave(paste0("figures/sei/sei_by-fire-graze_", run, ".png"), 
+ggsave(paste0("figures/sei/sei_by-fire-graze_", suffix, ".png"), 
        plot = g, dpi = 600,
-       width = 8, height = 9)
+       width = 8, height = 10)
 
 g <- ggplot(df_fire_bins1, aes(x = graze, y = fire_bin, fill = percent_area)) +
   base_fire_bins() +
   scale_fill_viridis_c(option = "C", name = "% of area", trans = 'sqrt')
   
 
-ggsave(paste0("figures/sei/area-perc_by-fire-graze_", run, ".png"), 
+ggsave(paste0("figures/sei/area-perc_by-fire-graze_", suffix, ".png"), 
        plot = g, dpi = 600,
-       width = 8, height = 9)
+       width = 8, height = 10)

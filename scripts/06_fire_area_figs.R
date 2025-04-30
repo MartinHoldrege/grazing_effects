@@ -13,7 +13,7 @@
 
 run <- 'fire1_eind1_c4grass1_co20_2503'
 
-v <- 'v1' # version of input files (and for now also used in output file names)
+v <- 'v2' # version of input files (and for now also used in output file names)
 
 # create additional figures to explore how age groups/fire probability relate
 # (not using actual data)
@@ -57,6 +57,8 @@ area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v,".csv"),
 drivers1 <- read_csv(paste0('data_processed/raster_means/', run, 
                             '_fire-driver-means_by-ecoregion.csv'))
 
+sei2 <- readRDS('data_processed/temp_rds/sei_df.rds')
+
 # vectors -----------------------------------------------------------------
 
 ecoregions <- region_factor(area_eco$ecoregion) %>% 
@@ -66,19 +68,21 @@ age_groups <- create_age_groups()
 # fig params --------------------------------------------------------------
 
 line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
-line_loc2 <- 1:4 + 0.5
+line_loc2 <- 1:2 + 0.5
 height_3p <- 6 # width for 3 panel figures
-width_3p <- 7# height for 3 panel figures
+width_3p <- 5# height for 3 panel figures
 
 # prepare dataframes ------------------------------------------------------
 
 ba3 <- df_factor(ba3a) %>% 
+  filter_clim_extremes() %>% 
   arrange(graze, RCP, years)  %>% 
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
          id2 = factor(id2, levels = unique(id2)),
          rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
 
 area_age_group3 <- df_factor(area_age_group3) %>% 
+  filter_clim_extremes() %>% 
   arrange(graze, RCP, years)  %>% 
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
          id2 = factor(id2, levels = unique(id2)),
@@ -98,7 +102,7 @@ plots <- map(ecoregions, function(region) {
     geom_point(aes(y = area_median, color = graze), 
                position = position_dodge(width = 0.5)) +
     scale_y_continuous(sec.axis = sec_axis(transform = \(x) x/total_area*100,
-                                           name = '% of ecoregion')) +
+                                           name = '% of region')) +
     scale_color_manual(values = cols_graze, name = 'Grazing') +
     geom_vline(xintercept = line_loc2, linetype = 2) +
     theme(legend.position = 'bottom',
@@ -108,6 +112,9 @@ plots <- map(ecoregions, function(region) {
          y = lab_ba0,
          subtitle = region)
 })
+
+plots <- remove_y_titles(plots, index_keep_y = 3, 
+                         index_keep_y_sec = 4)
 
 g <- patchwork::wrap_plots(plots) +
   plot_layout(guides = 'collect', ncol = 2)
@@ -121,50 +128,6 @@ dev.off()
 
 
 # age_group figs -----------------------------------------------------
-
-
-# *grouped by grazing level -----------------------------------------------
-
-plots <- map(ecoregions, function(region) {
-  total_area <- area_eco$area[area_eco$ecoregion == region]
-  
-  df <- area_age_group3  %>% 
-    filter(ecoregion == region) 
-  anno_data <- box_anno(
-    df = df,
-    var = 'area_high',
-    id = "id2",
-    mult = 0.1,
-    group_by = c('graze', 'age_group'),
-    anno_same_across_panels = TRUE
-  )
-  ggplot(df, aes(x = id2, y = area_median)) +
-    geom_errorbar(aes(ymin = area_low, ymax = area_high), width = 0) +
-    geom_point(aes(color = RCP)) + # not showing outliers as points
-    scale_x_discrete(labels = id2year) +
-    scale_y_continuous(sec.axis = sec_axis(transform = \(x) x/total_area*100,
-                                           name = '% of ecoregion')) +
-    scale_color_manual(values = cols_rcp, name = "Scenario") +
-    geom_text(data = anno_data,
-              aes(x, y, label = graze, fill = NULL),
-              size = 2.5) +
-    geom_vline(xintercept = line_loc, linetype = 2) +
-    facet_wrap(~age_group, nrow = 1) +
-    labs(y = 'Expected area in age class (ha/yr)',
-         subtitle = region,
-         x = lab_yrs)
-})
-
-g <- patchwork::wrap_plots(plots) +
-  plot_layout(guides = 'collect', ncol = 1, axis_titles = 'collect')
-
-g2 <- g&theme(legend.position = 'bottom')
-
-
-jpeg(paste0("figures/fire/area/area_age_group_", v, "_", run, '.jpg'),
-     units = 'in', width = 14, height = 12, res = 600)
-g2
-dev.off()
 
 
 # * grouped by climate scenario -------------------------------------------
@@ -221,9 +184,43 @@ g2 <- g&theme(legend.position = 'bottom',
 )
 
 jpeg(paste0("figures/fire/area/area_age_group_scen-grouping_", v, "_", run, '.jpg'),
-     units = 'in', width = 10, height = 7, res = 600)
+     units = 'in', width = 6, height = 12, res = 600)
 g2
 dev.off()
+
+
+# trade-offs ba vs core ---------------------------------------------------
+# showing area of core vs expected burned area to illustrate the grazing
+# trade-off
+c3_area1 <- sei2 %>% 
+  mutate(c3 = sei2c3(SEI),
+         area = pixel2area(weight)) %>% 
+  group_by(run, years, RCP, graze, region, rcp_year, summary, c3) %>% 
+  summarise(area = sum(area), .groups= 'drop') %>% 
+  # NA area for low/high current climate
+  mutate(area = ifelse(is.na(c3), NA, area)) %>% 
+  pivot_wider(values_from = "area", names_from = 'summary',
+              names_prefix = 'sei_area_') %>% 
+  filter(!is.na(c3))
+
+c3_area2 <- ba3 %>% 
+  select(-rcp_year) %>% 
+  rename_with(.fn = \(x) paste0('ba_', x), .cols = matches('^area')) %>% 
+  right_join(c3_area1, by = c('run', 'years', 'RCP', 'graze', 
+                              'ecoregion' = 'region' )) %>% 
+  rename(region = ecoregion) %>% 
+  mutate(region = region_factor(region))
+
+c3_area2 %>% 
+  filter(c3 == 'CSA') %>% 
+  ggplot() +
+  geom_point(aes(sei_area_median, ba_area_median, color = graze, shape = rcp_year)) +
+  facet_wrap(~region, scales = 'free') +
+  scale_color_manual(values = cols_graze)
+
+# CONTINUE here
+
+# *dotplot ----------------------------------------------------------------
 
 
 # burned area--attribution ------------------------------------------------
