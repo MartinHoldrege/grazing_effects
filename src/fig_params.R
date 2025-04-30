@@ -57,7 +57,9 @@ cols_GCM2 <-  c('Historical' = 'black', cols_GCM1)
 
 cols_ecoregion <- c("Great Plains" = "#ECA130",
                     "Intermountain West" = "#33A37A",
-                    "Southern Great Basin" = "#1673B2")
+                    "Southern Great Basin" = "#1673B2",
+                    'Western Intermountain' = "#41ae76",
+                    "Eastern Intermountain" = "#005824")
 
 # continuous SEI
 cols_seicont = c("#eee1ba", "#a6611a", "#78c679", "#006837", "#2166ac", "#053061")

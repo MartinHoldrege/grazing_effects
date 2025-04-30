@@ -5,7 +5,7 @@
 # params ------------------------------------------------------------------
 
 v <- 'v4' # interpolation version
-
+wafwa_only <- FALSE # only plot the wafwa ecoregions
 
 # dependencies ------------------------------------------------------------
 
@@ -17,20 +17,11 @@ source('src/fig_params.R')
 
 # read in data ------------------------------------------------------------
 
-match1 <- rast(paste0("data_processed/interpolation_quality/",
-                      "matching_quality", v, '.tif'))
+r_eco <- load_wafwa_ecoregions_raster(wafwa_only = wafwa_only)
+eco1 <- load_wafwa_ecoregions()
+levels(eco1$ecoregion)
 
-eco1 <-load_wafwa_ecoregions()
-
-# raster of ecoregions ----------------------------------------------------
-
-study_area <- match1
-study_area[study_area > 1.5] <- NA
-study_area[!is.na(study_area)] <- 1
-
-r_eco <- terra::rasterize(eco1, study_area, field = "ecoregion")
-r_eco[is.na(study_area)] <- NA
-
+levels(r_eco)
 # map ---------------------------------------------------------------------
 
 g <- plot_map2(r_eco) +
@@ -38,9 +29,16 @@ g <- plot_map2(r_eco) +
                     na.value = 'transparent',
                     na.translate = FALSE,
                     name = NULL) +
-  theme(legend.position = 'bottom')
+  theme(legend.position = 'bottom')+
+  guides(fill = guide_legend(nrow = 2))
 
-png(paste0("figures/ecoregions_", v, '.png'),
+suffix <- if(wafwa_only) {
+  ""
+} else {
+  '_all'
+}
+
+png(paste0("figures/ecoregions_", v, suffix, '.png'),
     width = 6, height = 7, units = 'in', res = 900)
 g
 dev.off()

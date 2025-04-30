@@ -236,6 +236,11 @@ weighted_box1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
          fill = 'Summary across GCMs')
 }
 
+
+# modify/combine groups of plots ------------------------------------------
+
+
+
 # combine side by side groups of facet_grid plots
 combine_grid_panels1 <- function(l, remove_y_axis_labels = TRUE) {
   n <- length(l)
@@ -263,6 +268,38 @@ combine_grid_panels1 <- function(l, remove_y_axis_labels = TRUE) {
   
 }
 
+#' remove axis labels from list of ggplots
+#'
+#' @param plot_list list of ggplot object
+#' @param index_keep_y indices (of the list) of ggplot objects to keep the y axis title for
+#' @param index_keep_y_sec indices to keep the secondary y axis for
+remove_y_titles <- function(plot_list, 
+                            index_keep_y = NULL, 
+                            index_keep_y_sec = NULL){
+  ind <- 1:length(plot_list)
+  stopifnot(is.list(plot_list))
+  if(!is.null(index_keep_y)) {
+    stopifnot(index_keep_y <= max(ind) & index_keep_y >= 1)
+    ind_y <- ind[ind != index_keep_y]
+  } else {
+    ind_y <- ind
+  }
+  plot_list[ind_y] <- purrr::map(plot_list[ind_y], function(x) {
+    x + labs(y = NULL)
+  })
+  
+  if(!is.null(index_keep_y_sec)) {
+    stopifnot(index_keep_y_sec <= max(ind) & index_keep_y_sec >= 1)
+    ind_sec <- ind[ind != index_keep_y_sec]
+  } else {
+    ind_sec <- ind
+  }
+  plot_list[ind_sec] <- purrr::map(plot_list[ind_sec], function(x) {
+    x + theme(axis.title.y.right = element_blank())
+  })
+  
+  plot_list
+}
 
 # funs for scatterplots ---------------------------------------------------
 

@@ -590,31 +590,45 @@ crs_scd <- terra::crs("PROJCRS[\"Albers_Conical_Equal_Area\",\n    BASEGEOGCRS[\
 
 states <- sf::st_transform(sf::st_as_sf(spData::us_states), crs = crs_scd)
 
-load_wafwa_ecoregions <- function(total_region = FALSE) {
-  shp1 <- sf::st_read("../SEI/data_raw/files_from_DaveT/WAFWAecoregionsFinal.shp")
+load_wafwa_ecoregions <- function(total_region = FALSE, wafwa_only = FALSE) {
+  # file created by the 01_ecoregions.R script
+  shp1 <- sf::st_read('data_processed/ecoregions/four_regions_v1.gpkg')
+  shp2 <- shp1|> 
+    dplyr::rename(geometry = geom)
   
-  shp2 <- sf::st_transform(shp1, crs = crs_scd)
-  
-  shp2$ecoregion <- c("Southern Great Basin", "Intermountain West", "Great Plains")
-  shp2$ecoregion <- factor(shp2$ecoregion) # alphabetical sorting assumed by some later code
-  
-  # also have a seperate row for the entire region
+  if(wafwa_only) {
+    shp2$ecoregion <- shp2$wafwa_NAME
+    shp2 <- shp2 |> 
+      dplyr::group_by(ecoregion) |> 
+      dplyr::summarize(geometry = sf::st_union(.data$geometry),
+                       .groups = 'drop')
+  } else {
+    shp2$ecoregion <- shp2$region
+  }
+
+
+    # also have a seperate row for the entire region
   if(total_region) {
     shp2 <- shp2 |> 
       dplyr::summarize(geometry = sf::st_union(.data$geometry)) |> 
       dplyr::mutate(ecoregion = "Entire study area") |> 
       dplyr::bind_rows(shp2) |> 
       dplyr::mutate(ecoregion = region_factor(as.character(.data$ecoregion)))
+  } else {
+    # these factor levels not being alphabetical could cause problems
+    # in some code
+    shp2$ecoregion <- region_factor(shp2$ecoregion, include_entire = FALSE) 
   }
   shp2
 }
 
 load_wafwa_ecoregions_raster <- function(
+    wafwa_only = FALSE,
     template_path = file.path("data_processed", "interpolated_rasters",
                               "fire1_eind1_c4grass0_co20_2503_fire-prob_future_summary_across_GCMs.tif")) {
   
   r_template <- terra::rast(template_path)[[1]]
-  eco1 <- load_wafwa_ecoregions()
+  eco1 <- load_wafwa_ecoregions(wafwa_only = wafwa_only)
   r_eco <- terra::rasterize(
     terra::vect(eco1),
     r_template,
@@ -623,5 +637,27 @@ load_wafwa_ecoregions_raster <- function(
   )
   
   r_eco[is.na(r_template)] <- NA
-  r_eco
+  
+  # reordering so that levels
+  # in the raster are the same order as the factor
+  # from region_factor
+  lvls_old <- as.data.frame(levels(r_eco)[[1]])
+  desired_levs <- levels(eco1$ecoregion)
+  order <- 0:(length(desired_levs) -1)
+  names(order) <- desired_levs
+ 
+  lvls_old$ID_to <- order[lvls_old$ecoregion]
+  lvls_old$ecoregion_to <- desired_levs[lvls_old$ID_to + 1]
+
+  r_eco2 <- terra::classify(r_eco,
+                            as.matrix(lvls_old[c('ID', 'ID_to')]))
+  
+  lvls <- lvls_old[c('ID_to', 'ecoregion_to')]
+  names(lvls) <- stringr::str_replace(names(lvls), "_to", "")
+  lvls <- dplyr::arrange(lvls, .data$ID)
+
+  levels(r_eco2) <- lvls
+  r_eco2
 }
+
+

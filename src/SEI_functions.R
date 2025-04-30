@@ -67,6 +67,8 @@ bio2q <- function(x, pft, region) {
   
   tab <- q_curves_cover2[[pft]]
   
+  region <- region2wafwa(region)
+  
   cover <- bio2cov(x, pft)/100 # convert from % to proportion
   stopifnot(region %in% names(tab),
             is.character(pft),
@@ -148,14 +150,14 @@ bio2qsei_raster <- function(r, eco_raster, type_string = 'biomass') {
 # continuous sei to three categories of SEI
 sei2c3 <- function(x) {
   stopifnot(
-    x>=0,
-    x<=1
+    (x>=0 & x<=1) | is.na(x)
   )
   
   c3 <- dplyr::case_when(
     x > 0.431 ~ 'CSA',
     x <= 0.431 & x > 0.173 ~ 'GOA',
-    x <= 0.173 ~ 'ORA'
+    x <= 0.173 ~ 'ORA',
+    TRUE ~ NA
   )
   
   factor(c3, levels = c('CSA', "GOA", "ORA"))

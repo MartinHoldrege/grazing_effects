@@ -57,7 +57,7 @@ r_comb1 <- c(r_clim1, r_bio1)
 
 # *ecoregions -------------------------------------------------------------
 
-eco1 <- load_wafwa_ecoregions()
+eco1 <- load_wafwa_ecoregions(total_region = TRUE)
 eco2 <- vect(eco1)
 
 # names of layers --------------------------------------------------

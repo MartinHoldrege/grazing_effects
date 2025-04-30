@@ -19,7 +19,7 @@ source("src/mapping_functions.R")
 
 # load data ---------------------------------------------------------------
 
-eco1 <- load_wafwa_ecoregions()
+r_eco <- load_wafwa_ecoregions_raster()
 
 locs1 <- rast(paste0("data_processed/interpolation_data/interp_locations_200sites_",
                      v, ".tif"))
@@ -36,9 +36,7 @@ locs2[match1 > 1.5] <-NA
 # weights are the number of pixels a given site is interpolated to
 
 area_wide0 <- as.data.frame(locs2)
-r_eco <- terra::rasterize(vect(eco1), locs2, field = "ecoregion", touches = TRUE)
 
-r_eco[is.na(locs2)] <- NA
 
 area <- cellSize(locs2, unit = 'ha', transform = FALSE)
 pixel_size <- unique(as.vector(values(area)))
@@ -54,13 +52,13 @@ df1 <- tibble(ecoregion = as.vector(values(r_eco)) + 1, # for some reason conver
 # of pixels from 30 m to 1km when creating the study area map
 # or some other projection change causing slight shifts at the margins
 check <- sum(is.na(df1$ecoregion) & !is.na(df1$site))
-stopifnot(check < 400)
+stopifnot(check < 600)
 
+lvls <- levels(r_eco)[[1]]
+stopifnot(lvls$ID == sort(lvls$ID)) # below code only words if lvls is ordered
 df2 <- df1 %>% 
   drop_na() %>% 
-  # currently this code is fragile, and won't work if the levels 
-  # arren't alphabetical (b/ factor levels not retained in rasterize)
-  mutate(region = levels(eco1$ecoregion)[ecoregion])
+  mutate(region = lvls$ecoregion[ecoregion])
 
 weights1 <- df2 %>% 
   group_by(region, site) %>% 

@@ -10,7 +10,7 @@
 run <- 'fire1_eind1_c4grass1_co20_2503'
 test_run <- FALSE
 
-v <- 'v1' # version for output files
+v <- 'v2' # version for output files
 
 v_interp <- 'v4' # interpolation version (input files)
 

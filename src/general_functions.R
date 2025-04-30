@@ -151,11 +151,36 @@ cut_depth <- function(x, two_depths = FALSE) {
   out
 }
 
-region_factor <- function(x) {
-  levels <- c("Entire study area", "Great Plains", "Intermountain West", 
-              "Southern Great Basin")
+region_factor <- function(x, wafwa_only = FALSE, include_entire = TRUE) {
+  
+  if (wafwa_only) {
+    levels <- c("Great Plains", "Intermountain West", 
+                "Southern Great Basin")
+  } else {
+    levels <- c("Western Intermountain",
+                "Southern Great Basin",
+                'Eastern Intermountain',
+                "Great Plains")
+  }
+  if(include_entire) {
+    levels <- c("Entire study area", levels)
+  }
+
   stopifnot(x %in% levels)
   factor(x, levels = levels)
+}
+
+# convert 'our' regions to the wafwa regions
+region2wafwa <- function(x) {
+
+  x2 <- as.character(x)
+  x2[str_detect(x2, 'Intermountain')] <- 'Intermountain West'
+    
+  if(is.factor(x)) {
+    include_entire <- any(str_detect(x, 'Entire'))
+    x2 <- region_factor(x2, wafwa_only = TRUE, include_entire = include_entire)
+  } 
+  x2
 }
 
 summary2factor <- function(x) {
@@ -1159,4 +1184,11 @@ mode_rand <- function(x, random = TRUE) {
     out <- out[i]
   }
   out
+}
+
+# multiplies the number of pixels
+# by the area per pixel--at the moment all are 1km2 pixels (100ha)
+# (using equal area projection)
+pixel2area <- function(x) {
+  x*100
 }
