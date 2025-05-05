@@ -236,6 +236,20 @@ weighted_box1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
          fill = 'Summary across GCMs')
 }
 
+weighted_violin1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
+  ggplot(df, aes(graze, .data[[y_string]], fill = summary)) +
+    geom_violin(aes(weight = weight), position = position_dodge2(preserve = 'single'),
+                 outlier.size = 0.25, outlier.alpha = 0.5) + 
+    facet_grid(region~rcp_year) +
+    theme(panel.spacing.x = unit(0, "lines"),
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          strip.text.x.top = element_text(size = rel(0.7))) +
+    labs(x = lab_graze,
+         y = ylab,
+         subtitle = subtitle,
+         fill = 'Summary across GCMs')
+}
+
 
 # modify/combine groups of plots ------------------------------------------
 

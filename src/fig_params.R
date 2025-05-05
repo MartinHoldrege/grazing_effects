@@ -96,6 +96,14 @@ cols_pred <- list(
 cols_pred_vars <- c(MAP = "#1f78b4", MAT = "#e31a1c", PSP = "#a6cee3", 
                     Aherb = "#b2df8a", Pherb = "#33a02c")
 
+
+# shapes ------------------------------------------------------------------
+
+shapes_scen <- c("Historical" = 21, 
+                 "RCP4.5\n2071-2100" = 17, "RCP4.5 2071-2100" = 17,
+                 "RCP8.5\n2071-2100" = 15, "RCP8.5 2071-2100" = 15)
+
+
 # panel letters -----------------------------------------------------------
 
 # so consistent letter theme is used throughout (for multiple

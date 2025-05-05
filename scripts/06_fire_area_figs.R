@@ -14,6 +14,7 @@
 run <- 'fire1_eind1_c4grass1_co20_2503'
 
 v <- 'v2' # version of input files (and for now also used in output file names)
+suffix <- paste0(v, "_", run)
 
 # create additional figures to explore how age groups/fire probability relate
 # (not using actual data)
@@ -25,6 +26,7 @@ library(terra)
 library(tidyverse)
 library(patchwork)
 source("src/general_functions.R")
+source("src/SEI_functions.R")
 source("src/fig_functions.R")
 source("src/fig_params.R")
 source("src/probability_functions.R")
@@ -35,17 +37,17 @@ theme_set(theme_custom1())
 # created in the 05_fire_area.R script
 # expected burned area
 ba3a <- read_csv(
-  paste0("data_processed/area/expected-burn-area_", v, "_", run,".csv"),
+  paste0("data_processed/area/expected-burn-area_", suffix,".csv"),
   show_col_types = FALSE)
 
 # expected burned area by gcm
 ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
-                            v, "_", run, ".csv"),
+                            suffix, ".csv"),
                     show_col_types = FALSE)
 
 # expected area in different years since fire age groups
 area_age_group3 <- read_csv(
-  paste0("data_processed/area/area-by-age-group_", v, "_", run, ".csv"),
+  paste0("data_processed/area/area-by-age-group_", suffix, ".csv"),
   show_col_types = FALSE)
 
 # area of our study region in each of 3 ecoregions
@@ -90,6 +92,44 @@ area_age_group3 <- df_factor(area_age_group3) %>%
          age_group = factor(age_group, levels = names(age_groups)),
          rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
 
+
+# *trade-offs ba vs core --------------------------------------------------
+
+# showing area of core vs expected burned area to illustrate the grazing
+# trade-off
+c3_area1 <- sei2 %>% 
+  mutate(c3 = sei2c3(SEI),
+         area = pixel2area(weight)) %>% 
+  group_by(run, years, RCP, graze, region, rcp_year, summary, c3) %>% 
+  summarise(area = sum(area), .groups= 'drop') %>% 
+  # NA area for low/high current climate
+  mutate(area = ifelse(is.na(c3), NA, area)) %>% 
+  pivot_wider(values_from = "area", names_from = 'summary',
+              names_prefix = 'sei_area_') %>% 
+  filter(!is.na(c3))
+
+c3_area2 <- ba3 %>% 
+  select(-rcp_year) %>% 
+  rename_with(.fn = \(x) paste0('ba_', x), .cols = matches('^area')) %>% 
+  right_join(c3_area1, by = c('run', 'years', 'RCP', 'graze', 
+                              'ecoregion' = 'region' )) %>% 
+
+  left_join(rename(area_eco, total_area = area), by = 'ecoregion') %>% 
+  # adding percent of total area
+  mutate(across(matches('area_'), .fns = \(x) x/total_area*100, 
+                .names = '{.col}_perc'),
+         region = region_factor(ecoregion)) %>% 
+  select(-ecoregion)
+
+# check that percents correctly sum ~~~
+test <- c3_area2 %>% 
+  group_by(region, rcp_year, graze) %>% 
+  summarise(test = sum(sei_area_median_perc, na.rm = TRUE)) %>% 
+  pull(test)
+
+stopifnot(abs(test - 100) < 0.01)
+#  ~~~
+
 # expected burned area figs --------------------------------------------------
 
 plots <- map(ecoregions, function(region) {
@@ -121,7 +161,7 @@ g <- patchwork::wrap_plots(plots) +
 
 g2 <- g&theme(legend.position = 'bottom')
 
-jpeg(paste0("figures/fire/area/expected_ba_dotplot_", v, "_", run, '.jpg'),
+jpeg(paste0("figures/fire/area/expected_ba_dotplot_", suffix, '.jpg'),
      units = 'in', width = width_3p, height = height_3p, res = 600)
 g2
 dev.off()
@@ -183,44 +223,37 @@ g2 <- g&theme(legend.position = 'bottom',
               axis.title.y.right = element_text()
 )
 
-jpeg(paste0("figures/fire/area/area_age_group_scen-grouping_", v, "_", run, '.jpg'),
+jpeg(paste0("figures/fire/area/area_age_group_scen-grouping_", suffix, '.jpg'),
      units = 'in', width = 6, height = 12, res = 600)
 g2
 dev.off()
 
 
 # trade-offs ba vs core ---------------------------------------------------
-# showing area of core vs expected burned area to illustrate the grazing
-# trade-off
-c3_area1 <- sei2 %>% 
-  mutate(c3 = sei2c3(SEI),
-         area = pixel2area(weight)) %>% 
-  group_by(run, years, RCP, graze, region, rcp_year, summary, c3) %>% 
-  summarise(area = sum(area), .groups= 'drop') %>% 
-  # NA area for low/high current climate
-  mutate(area = ifelse(is.na(c3), NA, area)) %>% 
-  pivot_wider(values_from = "area", names_from = 'summary',
-              names_prefix = 'sei_area_') %>% 
-  filter(!is.na(c3))
 
-c3_area2 <- ba3 %>% 
-  select(-rcp_year) %>% 
-  rename_with(.fn = \(x) paste0('ba_', x), .cols = matches('^area')) %>% 
-  right_join(c3_area1, by = c('run', 'years', 'RCP', 'graze', 
-                              'ecoregion' = 'region' )) %>% 
-  rename(region = ecoregion) %>% 
-  mutate(region = region_factor(region))
-
-c3_area2 %>% 
-  filter(c3 == 'CSA') %>% 
-  ggplot() +
-  geom_point(aes(sei_area_median, ba_area_median, color = graze, shape = rcp_year)) +
-  facet_wrap(~region, scales = 'free') +
-  scale_color_manual(values = cols_graze)
-
-# CONTINUE here
 
 # *dotplot ----------------------------------------------------------------
+
+g <- c3_area2 %>% 
+  filter(c3 == 'CSA') %>% 
+  ggplot(aes(sei_area_median_perc, ba_area_median_perc)) +
+  geom_errorbar(aes(ymin = ba_area_low_perc, ymax = ba_area_high_perc, group = rcp_year),
+                alpha = 0.2) +
+  geom_errorbarh(aes(xmin = sei_area_low_perc, xmax = sei_area_high_perc, group = rcp_year),
+                 alpha = 0.2) +
+  geom_path(aes(group = rcp_year), color = "blue", linewidth = 0.5, alpha = 0.5) +
+  #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5) +
+  geom_point(aes(color = graze, shape = rcp_year)) +
+  facet_wrap(~region, scales = 'free') +
+  scale_color_manual(values = cols_graze, name = lab_graze) +
+  scale_shape_manual(values = shapes_scen, name = 'Scenario') +
+  labs(x = '% Core Sagebrush Area',
+       y = 'Expected area burned (%/year)') +
+  expand_limits(x = 0)
+
+ggsave(paste0("figures/sei/csa-vs-ba_perc_dotplot_", suffix, ".png"), 
+       plot = g, dpi = 600,
+       width = 7, height = 4.5)
 
 
 # burned area--attribution ------------------------------------------------
@@ -250,7 +283,7 @@ ba_gcm4 <- drivers2 %>%
 
 driver_vars <- c("MAP", "MAT", "PSP", "Aherb", "Pherb")
 ba_gcm5 <- ba_gcm4 %>% 
-  pivot_longer(cols = driver_vars,
+  pivot_longer(cols = all_of(driver_vars),
                values_to = 'mean_driver',
                names_to = 'driver') %>% 
   mutate(GCM = factor(GCM, levels = c('Current', names(cols_GCM1))),
@@ -286,8 +319,8 @@ plots <- map(rcp_year, function(x) {
   
 })
 
-pdf(paste0("figures/fire/area/expected_ba_vs_driver_by-GCM_", v, "_", run, '.pdf'),
-    width = 12, height = 7)
+pdf(paste0("figures/fire/area/expected_ba_vs_driver_by-GCM_", suffix, '.pdf'),
+    width = 12, height = 10)
 plots
 dev.off()
 

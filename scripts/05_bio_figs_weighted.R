@@ -151,6 +151,26 @@ png(paste0("figures/biomass/bio_weighted_by-region_3pft_boxplot_", suffix, ".png
 g2
 dev.off()
 
+
+# testing -----------------------------------------------------------------
+
+# this code can be deleted (used to confirm that these
+# numbers correspond to the Core area figure)
+# df <- sei2 %>% 
+#   filter(region == 'Southern Great Basin',
+#          years == 'Current', summary == 'median')
+# 
+# ggplot(df, aes(x = graze, y = SEI, weight = weight, fill = graze)) +
+#   geom_violin() +
+#   scale_fill_manual(values = cols_graze) +
+#   geom_hline(yintercept = 0.431)
+# 
+# 
+# l <- split(df, df$graze)[c(1, 3)]
+# map(l, \(df) Hmisc::wtd.quantile(df$SEI, weights = df$weight,
+#                                  probs = seq(0.5, 0.75, by = 0.05)))
+
+
 # * Q and SEI -------------------------------------------------------------
 
 plots <- map(pfts, function(pft) {

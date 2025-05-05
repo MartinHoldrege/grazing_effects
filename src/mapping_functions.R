@@ -590,6 +590,15 @@ crs_scd <- terra::crs("PROJCRS[\"Albers_Conical_Equal_Area\",\n    BASEGEOGCRS[\
 
 states <- sf::st_transform(sf::st_as_sf(spData::us_states), crs = crs_scd)
 
+load_template <- function(template_path = file.path(
+  "data_processed",  "interpolated_rasters",
+  "fire1_eind1_c4grass0_co20_2503_fire-prob_future_summary_across_GCMs.tif")) {
+  
+  r <- terra::rast(template_path)[[1]]
+  r[!is.na(r)] <- 1
+  r
+}
+
 load_wafwa_ecoregions <- function(total_region = FALSE, wafwa_only = FALSE) {
   # file created by the 01_ecoregions.R script
   shp1 <- sf::st_read('data_processed/ecoregions/four_regions_v1.gpkg')
@@ -623,11 +632,9 @@ load_wafwa_ecoregions <- function(total_region = FALSE, wafwa_only = FALSE) {
 }
 
 load_wafwa_ecoregions_raster <- function(
-    wafwa_only = FALSE,
-    template_path = file.path("data_processed", "interpolated_rasters",
-                              "fire1_eind1_c4grass0_co20_2503_fire-prob_future_summary_across_GCMs.tif")) {
+    wafwa_only = FALSE) {
   
-  r_template <- terra::rast(template_path)[[1]]
+  r_template <- load_template()
   eco1 <- load_wafwa_ecoregions(wafwa_only = wafwa_only)
   r_eco <- terra::rasterize(
     terra::vect(eco1),
