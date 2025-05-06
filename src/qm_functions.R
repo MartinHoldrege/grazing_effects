@@ -75,6 +75,66 @@ qm_from_quantiles <- function(x, from, to, ascending = TRUE) {
   out
 }
 
+# same arguments as qm_from_quantiles, but ~20x faster
+# this was written by chat GPT and tested and checked by me
+qm_from_quantiles_fast <- function(x, from, to, ascending = TRUE) {
+  stopifnot(length(from) == length(to),
+            all(diff(from) >= 0))
+  if (ascending) stopifnot(all(diff(to) >= 0))
+  
+  # Index of the lower bin
+  idx <- findInterval(x, from, rightmost.closed = TRUE)
+  
+  # Clamp out-of-bounds
+  idx[idx < 1] <- 1
+  idx[idx >= length(from)] <- length(from) - 1
+  
+  x0 <- from[idx]
+  x1 <- from[idx + 1]
+  y0 <- to[idx]
+  y1 <- to[idx + 1]
+  
+  # Linear interpolation
+  frac <- (x - x0) / (x1 - x0)
+  frac[!is.finite(frac)] <- 0  # handle divide-by-zero
+  y <- y0 + frac * (y1 - y0)
+  
+  # Cap extremes
+  y[x <= min(from)] <- to[1]
+  y[x >= max(from)] <- to[length(to)]
+  
+  y
+}
+if(FALSE) {
+  set.seed(123)
+  x <- sort(runif(100, min = -1, max = 11))
+  from <- c(0, 2, 4, 6, 8, 10)
+  to <- c(0, 1, 2, 4, 8, 10)
+  
+  old_y <- qm_from_quantiles(x, from, to)
+  new_y <- qm_from_quantiles_fast(x, from, to)
+  
+  all.equal(old_y, new_y, tolerance = 1e-8)
+  
+  library(microbenchmark)
+  
+  set.seed(123)
+  x <- sort(runif(1e5, min = 0, max = 10))
+  from <- c(0, 2, 4, 6, 8, 10)
+  to <- c(0, 1, 2, 4, 8, 10)
+  
+  microbenchmark::microbenchmark(
+    original = qm_from_quantiles(x, from, to),
+    fast     = qm_from_quantiles_fast(x, from, to),
+    times = 10
+  )
+}
+
+
+
+
+
+
 
 qm_quant_factory <- function(from, to) {
   function(x) {
@@ -112,4 +172,17 @@ qm_Sagebrush_bio2cov <- qm_quant_factory(
          7.33, 7.67, 8, 8.33, 8.67, 9, 9.33, 9.67, 10, 10.3, 10.7, 11, 
          11.7, 12, 12.3, 13, 13.3, 14, 14.7, 15.3, 16, 17.3, 20, 21.3, 
          25.7, 33.7))
+
+
+
+
+
+
+
+
+
+
+
+
+
 

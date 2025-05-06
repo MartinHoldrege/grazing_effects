@@ -41,6 +41,19 @@ bio2cov_Pherb <- function(x) {
   cover
 }
 
+# biomass to cover from Holdrege et al 2024 REM (appendix C)
+bio2cov_hold <- function(x, pft) {
+  betas <- list(
+    'Aherb' = c('B0' = 2.457, 'B1' = 0.6319),
+    'Pherb' = c('B0' = 4.833, 'B1' = 0.5073),
+    'Sagebrush' = c('B0' = 0.1078, 'B1' = 0.03451)
+  )
+  stopifnot(pft %in% names(betas))
+  b <- betas[[pft]]
+  b['B0'] + b['B1']*x
+}
+
+
 # convert biomass to cover, including quantile mapping of the
 # biomass to the RAP/RCMAP scale (not for sagebrush
 # it's a straight quantile mapping to cover, with the others
@@ -78,6 +91,31 @@ bio2q <- function(x, pft, region) {
   tab$cover
   # calculate q values via linear interpolation
   q <- qm_from_quantiles(cover, 
+                         from = tab$cover, # cover values
+                         to = tab[[region]],  # q values in table
+                         ascending = FALSE)
+  
+  q
+}
+
+#' convert cover to Q (quality) score
+#'
+#' @param x cover
+#' @param region ecoregion
+#' @param pft string
+cov2q <- function(x, pft, region) {
+  
+  tab <- q_curves_cover2[[pft]]
+  
+  region <- region2wafwa(region)
+  
+  stopifnot(region %in% names(tab),
+            is.character(pft),
+            is.character(region),
+            length(pft) == 1,
+            length(region) == 1)
+  # calculate q values via linear interpolation
+  q <- qm_from_quantiles_fast(x, 
                          from = tab$cover, # cover values
                          to = tab[[region]],  # q values in table
                          ascending = FALSE)
@@ -147,6 +185,38 @@ bio2qsei_raster <- function(r, eco_raster, type_string = 'biomass') {
 }
 
 
+#' convert cover to quality score
+#'
+#' @param r raster of cover (can be multiple bands, but all must be for one pft) 
+#' @param pft the plant functional group that the cover is for
+#' @param eco_raster raster providing ecoregions
+cov2q_raster <- function(r, eco_raster, pft) {
+  stopifnot(isTRUE(terra::compareGeom(r, eco_raster)))
+  
+  regions <- levels(eco_raster)[[1]]$ecoregion
+  stopifnot(length(regions) == 3)
+  
+  ids <- names(r)
+  result_matrix <- matrix(NA, nrow = ncell(r), ncol = nlyr(r))
+  colnames(result_matrix) <- ids
+  
+  for (region in regions) {
+    mask <- as.vector(eco_raster == region)
+    mask[is.na(mask)] <- FALSE
+    tmp <- r
+    tmp[!mask] <- NA
+    result <- app(tmp, cov2q, pft = pft, region = region)
+    result_matrix[mask, ] <- as.matrix(result)[mask, ]
+  }
+  
+  # Fill raster all at once
+  r_q <- r
+  r_q[] <- NA
+  values(r_q) <- result_matrix
+  r_q
+}
+
+
 # continuous sei to three categories of SEI
 sei2c3 <- function(x) {
   stopifnot(
@@ -165,6 +235,21 @@ sei2c3 <- function(x) {
 }
 
 
+load_scd_cover <- function() {
+  # file created in 04_scd_aggregate.R
+  terra::rast('data_processed/scd/SEIv11_2017_2020_1000_20211228_cover560.tif')
+}
 
+load_scd_q <- function() {
+  # file created in 04_scd_aggregate.R
+  # bands:
+  # SEI
+  # Q1 --sage
+  # Q2 --perennials
+  # Q3 --annuals
+  # Q4 --human mod
+  # Q5 --trees
+  terra::rast('data_processed/scd/SEI-Q_v11_2017-2020_1000.tif')
+}
 
 

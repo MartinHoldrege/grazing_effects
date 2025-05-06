@@ -591,9 +591,10 @@ crs_scd <- terra::crs("PROJCRS[\"Albers_Conical_Equal_Area\",\n    BASEGEOGCRS[\
 states <- sf::st_transform(sf::st_as_sf(spData::us_states), crs = crs_scd)
 
 load_template <- function(template_path = file.path(
-  "data_processed",  "interpolated_rasters",
-  "fire1_eind1_c4grass0_co20_2503_fire-prob_future_summary_across_GCMs.tif")) {
-  
+  "data_processed",  "interpolated_rasters","biomass", "v4",
+  "fire1_eind1_c4grass1_co20_2503v4_Sagebrush_biomass_Current_Current_Light_Current.tif")) {
+  # any of the correct version of biomass interpolated layers works
+  # as a template
   r <- terra::rast(template_path)[[1]]
   r[!is.na(r)] <- 1
   r
@@ -626,7 +627,8 @@ load_wafwa_ecoregions <- function(total_region = FALSE, wafwa_only = FALSE) {
   } else {
     # these factor levels not being alphabetical could cause problems
     # in some code
-    shp2$ecoregion <- region_factor(shp2$ecoregion, include_entire = FALSE) 
+    shp2$ecoregion <- region_factor(shp2$ecoregion, include_entire = FALSE,
+                                    wafwa_only = wafwa_only) 
   }
   shp2
 }
