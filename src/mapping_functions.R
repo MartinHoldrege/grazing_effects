@@ -286,6 +286,92 @@ range_raster <- function(x, absolute = FALSE) {
   out
 }
 
+#' calculate median (and low/high) summaries across GCMs
+#'
+#' @param r spatraster with GCM level results
+#' @param info create_rast_info() output pdf, including id_noGCM column
+#' @param include_low_high logical, also include low/high estimates
+summarize_gcms_raster <- function(r, info, include_low_high) {
+  
+  stopifnot(c('id_noGCM', 'id') %in% names(info),
+            names(r) %in% info$id,
+            info$id %in% names(r))
+  
+  info <- arrange(info, .data$id)
+  r <- r[[info$id]]# sort (makes later check easier)
+  
+  # list of rasters, each element is a SpatRaster including all GCMs
+  # for a given treatment/scenario combination
+  rast_gcm_l <- split(r, f = info$id_noGCM)
+  
+  names(rast_gcm_l) <- unique(info$id_noGCM)
+
+  # check that the number of layers in each dataset is correct
+  stopifnot(map_dbl(rast_gcm_l, nlyr) == info %>%
+              group_by(id_noGCM) %>%
+              summarise(n = n()) %>%
+              pull(n)
+  )
+  
+  # note these median rasters now inlcude the median under current
+  # conditions (i.e. medians of one value). 
+  med1 <- map(rast_gcm_l, app, fun = "median")
+  
+  med2 <- rast(med1)
+  names(med2) <- paste0(names(med2), '_median')
+  
+  if(include_low_high) {
+    # exclude current time-period
+    rast_gcm_l_fut <- discard(rast_gcm_l, \(x) nlyr(x) == 1)
+    # calculate low (2nd lowest) and high (2nd highest)
+    # estimates across GCMs
+    low <- map(rast_gcm_l_fut, calc_low)
+    names(low) <- paste0(names(low), "_low")
+    
+    high <- map(rast_gcm_l_fut, calc_high)
+    names(high) <- paste0(names(high), "_high")
+    comb1 <- c(med2, rast(low), rast(high))
+    comb1 <- comb1[[sort(names(comb1))]]
+  } else {
+    comb1 <- med2
+  }
+  
+  comb1
+}
+
+#' calculate difference from current conditions
+#'
+#' @param r spatraster
+#' @param info info dataframe from create_rast_info()
+#' @param type_from regex for portion of file name to change (e.g. '_biomass')
+#' @param type_to what to change it to (e.g. 'bio-rdiff-cref')
+#' @param by vector of column names to join by (i.e. these are for matching
+#' the right layers from current vs future)
+calc_rast_cref <- function(r, info, type_from, type_to = NULL,
+                            by = c('run', 'PFT', 'type', 'graze')) {
+  
+  if(is.null(type_to)) {
+    type_to <- paste0(type_from, "-rdiff-cref")
+  }
+  
+  stopifnot(
+    c('id', 'RCP', by) %in% names(info),
+    info$id %in% names(r)
+  )
+  info_cur <- info %>% 
+    filter(.data$RCP == 'Current') 
+  
+  info_fut <- info %>% 
+    filter(.data$RCP != 'Current')
+  
+  info_comb <- info_fut[c('id', by)] %>% 
+    left_join(info_cur, suffix = c("_fut", "_cur"), by = by)
+  
+  diff <- r[[info_comb$id_fut]] - r[[info_comb$id_cur]]
+  names(diff) <- str_replace(names(diff), type_from, type_to)
+  diff
+}
+
 # maps --------------------------------------------------------------------
 
 

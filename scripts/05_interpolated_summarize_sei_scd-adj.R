@@ -16,7 +16,7 @@
 
 source("src/params.R") # run and version
 test_run <- FALSE
-print(Sys.time())
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse) 
@@ -145,10 +145,91 @@ sei_scd_adj1 <- q_scd_adj1[[info_pft_l[[1]]$id]]*
   scd_q1[['Q4']]*
   scd_q1[['Q5']]
 
+# leaving same number of name components as the Q layers, so can combine
 names(sei_scd_adj1) <- str_replace(names(sei_scd_adj1), regex_pft, 'SEI') %>% 
-  str_replace('biomass', 'scd-adj')
+  str_replace('biomass', 'SEI')
   
 
 # Calculate summaries and differences -------------------------------------
 
-print(Sys.time())
+
+# *median/low/high --------------------------------------------------------
+# summaries across GCMs
+
+cov_scd_adj_smry <- summarize_gcms_raster(r = cov_scd_adj1, info = rast_info,
+                                          include_low_high = FALSE)
+
+into_smry <- c("group", "type", "RCP", "years", "graze", "summary")
+info_smry <- create_rast_info(cov_scd_adj_smry, into = into_smry)
+
+q_scd_adj_smry <- summarize_gcms_raster(q_scd_adj1, info = rast_info,
+                                          include_low_high = TRUE)
+
+info_sei <- create_rast_info(sei_scd_adj1, 
+                             into = c("group", "type", "RCP", "years", 
+                                      "graze", "GCM"), 
+                             id_noGCM = TRUE)
+
+sei_scd_adj_smry <- summarize_gcms_raster(sei_scd_adj1, info = info_sei,
+                                          include_low_high = TRUE)
+
+# * differences (within grazing level) relative to current climate -----------
+
+by <- c('run', 'group', 'type', 'graze') 
+cov_scd_adj_diff <- calc_rast_cref(cov_scd_adj_smry, info_smry,
+                                   by = by,
+                                   type_from = '_biomass',
+                                   type_to = '_cov-rdiff-cref')
+
+q_scd_adj_diff <- calc_rast_cref(q_scd_adj_smry, info_smry,
+                                   by = by,
+                                   type_from = '_biomass',
+                                   type_to = '_Q-rdiff-cref')
+
+sei_scd_adj_diff <- calc_rast_cref(
+  sei_scd_adj_smry, 
+  info = create_rast_info(sei_scd_adj_smry, 
+                          into = c("group", "type", "RCP", "years",  "graze", "summary")),
+  by = by,
+  type_from = '_SEI_SEI',
+  type_to = '_SEI_SEI-rdiff-cref')
+
+
+# Output -------------------------------------------------------------
+
+# * prep files --------------------------------------------------------------
+names(cov_scd_adj_smry) <- str_replace(names(cov_scd_adj_smry), '_biomass', 
+                                       '_cover')
+
+names(q_scd_adj_smry) <- str_replace(names(q_scd_adj_smry), '_biomass', 
+                                     '_Q')
+
+q_sei_smry <- c(q_scd_adj_smry, sei_scd_adj_smry)
+q_sei_diff <- c(q_scd_adj_diff, sei_scd_adj_diff)
+
+
+# * write files -----------------------------------------------------------
+
+# summaries across GCMs
+
+writeRaster(cov_scd_adj_smry, 
+            file.path("data_processed/interpolated_rasters/", v_interp,
+                      paste0(runv, "_cover_scd-adj_summary.tif")),
+            overwrite = TRUE)
+
+writeRaster(q_sei_smry, 
+            file.path("data_processed/interpolated_rasters/", v_interp,
+                      paste0(runv, "_q-sei_scd-adj_summary.tif")),
+            overwrite = TRUE)
+
+# differences relative to current climate (comparison within grazing level)
+writeRaster(cov_scd_adj_diff, 
+            file.path("data_processed/interpolated_rasters/", v_interp,
+                      paste0(runv, "_cover-rdiff-cref_scd-adj_summary.tif")),
+            overwrite = TRUE)
+
+writeRaster(q_sei_diff, 
+            file.path("data_processed/interpolated_rasters/", v_interp,
+                      paste0(runv, "_q-sei-rdiff-cref_scd-adj_summary.tif")),
+            overwrite = TRUE)
+
