@@ -16,7 +16,8 @@
 
 source("src/params.R") # run and version
 test_run <- FALSE
-
+# intermediate rasters saved, usually want true b/ of disc storage, except when testing/debugging
+remove_tmp_files = FALSE
 # dependencies ------------------------------------------------------------
 
 library(tidyverse) 
@@ -105,17 +106,25 @@ sw_cov_prop1 <- map(info_pft_l, .f = function(df, cover = sw_cov1) {
     (r - r_ref)/r_ref
   }) %>% 
   rast()
-
+rm('sw_cov1')
+gc()
 # scd cover adjusted by prop change ---------------------------------------
 
 cov_scd_adj1 <- map(info_pft_l, .f = function(df) {
   pft <- get_pft(df)
   prop <- sw_cov_prop1[[df$id]]
-  out <- scd_cov1[[pft]] + scd_cov1*prop
+  out <- scd_cov1[[pft]] + scd_cov1[[pft]]*prop
   names(out) <- names(prop)
   out
 }) %>% 
   rast()
+
+# writing to disk so not stored in memory
+dir.create('tmp/', showWarnings = FALSE)
+rm('sw_cov_prop1', 'scd_cov1')
+gc()
+cov_scd_adj1 <- writeReadRast(cov_scd_adj1, 'cov_scd_adj1')
+
 
 # Q scores of 'adjusted' cover -------------------------------------------------
 
@@ -124,6 +133,7 @@ q_scd_adj1 <- map(info_pft_l, .f = function(df, cover = cov_scd_adj1) {
   cov2q_raster(r, eco_raster = r_eco1, pft = get_pft(df))
 }) %>% 
   rast()
+q_scd_adj1 <- writeReadRast(q_scd_adj1, 'q_scd_adj1')
 
 # Calculate SEI -----------------------------------------------------------
 
@@ -149,6 +159,7 @@ sei_scd_adj1 <- q_scd_adj1[[info_pft_l[[1]]$id]]*
 names(sei_scd_adj1) <- str_replace(names(sei_scd_adj1), regex_pft, 'SEI') %>% 
   str_replace('biomass', 'SEI')
   
+sei_scd_adj1 <- writeReadRast(sei_scd_adj1, 'sei_scd_adj1')
 
 # Calculate summaries and differences -------------------------------------
 
@@ -158,13 +169,14 @@ names(sei_scd_adj1) <- str_replace(names(sei_scd_adj1), regex_pft, 'SEI') %>%
 
 cov_scd_adj_smry <- summarize_gcms_raster(r = cov_scd_adj1, info = rast_info,
                                           include_low_high = FALSE)
+rm('cov_scd_adj1')
 
 into_smry <- c("group", "type", "RCP", "years", "graze", "summary")
 info_smry <- create_rast_info(cov_scd_adj_smry, into = into_smry)
 
 q_scd_adj_smry <- summarize_gcms_raster(q_scd_adj1, info = rast_info,
                                           include_low_high = TRUE)
-
+rm('q_scd_adj1'); gc()
 info_sei <- create_rast_info(sei_scd_adj1, 
                              into = c("group", "type", "RCP", "years", 
                                       "graze", "GCM"), 
@@ -174,6 +186,7 @@ sei_scd_adj_smry <- summarize_gcms_raster(sei_scd_adj1, info = info_sei,
                                           include_low_high = TRUE)
 
 # * differences (within grazing level) relative to current climate -----------
+rm('sei_scd_adj1') # make more memory available
 
 by <- c('run', 'group', 'type', 'graze') 
 cov_scd_adj_diff <- calc_rast_cref(cov_scd_adj_smry, info_smry,
@@ -211,7 +224,7 @@ q_sei_diff <- c(q_scd_adj_diff, sei_scd_adj_diff)
 # * write files -----------------------------------------------------------
 
 # summaries across GCMs
-
+if(!test_run){
 writeRaster(cov_scd_adj_smry, 
             file.path("data_processed/interpolated_rasters/", v_interp,
                       paste0(runv, "_cover_scd-adj_summary.tif")),
@@ -232,4 +245,14 @@ writeRaster(q_sei_diff,
             file.path("data_processed/interpolated_rasters/", v_interp,
                       paste0(runv, "_q-sei-rdiff-cref_scd-adj_summary.tif")),
             overwrite = TRUE)
+
+}
+
+
+# remove temporary files --------------------------------------------------
+
+if(remove_tmp_files) {
+  paths <- list.files('tmp/', pattern = '.tif', full.names = TRUE)
+  file.remove(paths)
+}
 

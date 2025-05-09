@@ -1192,3 +1192,12 @@ mode_rand <- function(x, random = TRUE) {
 pixel2area <- function(x) {
   x*100
 }
+
+# for saving intermediate rasters to disk to save memory
+writeReadRast <- function(object, objectName, dir = 'tmp') {
+  path <- file.path(dir, paste0(objectName, '.tif'))
+  terra::writeRaster(object, path, overwrite = TRUE)
+  rm(list = objectName, envir = .GlobalEnv)
+  gc()
+  terra::rast(path)
+}
