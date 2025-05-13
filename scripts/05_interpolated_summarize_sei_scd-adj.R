@@ -54,6 +54,9 @@ scd_cov1 <- load_scd_cover() # cover's used for the SCD
 scd_q1 <- load_scd_q()
 
 r_eco1 <- load_wafwa_ecoregions_raster(wafwa_only = TRUE)
+# summary stats calculated for these regions:
+eco1 <- load_wafwa_ecoregions(total_region = TRUE, wafwa_only = FALSE)
+
 # info --------------------------------------------------
 
 rast_info <- create_rast_info(rast1, id_noGCM = TRUE) %>% 
@@ -158,8 +161,40 @@ sei_scd_adj1 <- q_scd_adj1[[info_pft_l[[1]]$id]]*
 # leaving same number of name components as the Q layers, so can combine
 names(sei_scd_adj1) <- str_replace(names(sei_scd_adj1), regex_pft, 'SEI') %>% 
   str_replace('biomass', 'SEI')
-  
+
 sei_scd_adj1 <- writeReadRast(sei_scd_adj1, 'sei_scd_adj1')
+
+# * calculate gcm level summaries -----------------------------------------
+
+info_sei <- create_rast_info(sei_scd_adj1, 
+                             into = c("group", "type", "RCP", "years", 
+                                      "graze", "GCM"), 
+                             id_noGCM = TRUE)  
+
+
+pivot_longer_extracted <- function(df, regions, values_to) {
+  stopifnot(length(regions) == length(df$ID))
+  df %>% 
+    mutate(region = regions) %>% 
+    select(-ID) %>% 
+    pivot_longer(-region, names_to = 'id',
+                 values_to = values_to)
+      
+}
+
+# mean SEI for each region and GCM
+sei_mean1 <- terra::extract(sei_scd_adj1, eco1, mean,  na.rm = TRUE)
+sei_core1 <- terra::extract(sei_scd_adj1, eco1, percent_csa,  na.rm = TRUE)
+
+sei_mean2 <- pivot_longer_extracted(sei_mean1, as.character(eco1$ecoregion), 
+                                    values_to = 'SEI_mean')
+
+sei_core2 <- pivot_longer_extracted(sei_core1, as.character(eco1$ecoregion), 
+                                    values_to = 'percent_csa')
+
+sei_mean_core1 <- left_join(sei_mean2, sei_core2, by = c("id", "region")) %>% 
+  left_join(info_sei, by = 'id') %>% 
+  select(-run2, -id_noGCM)
 
 # Calculate summaries and differences -------------------------------------
 
@@ -177,10 +212,7 @@ info_smry <- create_rast_info(cov_scd_adj_smry, into = into_smry)
 q_scd_adj_smry <- summarize_gcms_raster(q_scd_adj1, info = rast_info,
                                           include_low_high = TRUE)
 rm('q_scd_adj1'); gc()
-info_sei <- create_rast_info(sei_scd_adj1, 
-                             into = c("group", "type", "RCP", "years", 
-                                      "graze", "GCM"), 
-                             id_noGCM = TRUE)
+
 
 sei_scd_adj_smry <- summarize_gcms_raster(sei_scd_adj1, info = info_sei,
                                           include_low_high = TRUE)
@@ -245,6 +277,9 @@ writeRaster(q_sei_diff,
             file.path("data_processed/interpolated_rasters/", v_interp,
                       paste0(runv, "_q-sei-rdiff-cref_scd-adj_summary.tif")),
             overwrite = TRUE)
+
+ write_csv(sei_mean_core1, paste0('data_processed/raster_means/', runv, 
+                                  '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
 
 }
 
