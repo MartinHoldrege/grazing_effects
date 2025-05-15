@@ -391,6 +391,8 @@ df_factor <- function(df) {
   
   if("region" %in% nms) df$region <- region_factor(df$region)
   
+  if('summary' %in% nms) df$summary <- summary2factor(df$summary)
+  
   df
 }
 

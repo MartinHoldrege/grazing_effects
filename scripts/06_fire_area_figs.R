@@ -281,7 +281,7 @@ ba_gcm4 <- drivers2 %>%
   df_factor() %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
 
-driver_vars <- c("MAP", "MAT", "PSP", "Aherb", "Pherb")
+driver_vars <- c("MAP", "MAT", "PSP", "Aherb", "Pherb", "Sagebrush")
 ba_gcm5 <- ba_gcm4 %>% 
   pivot_longer(cols = all_of(driver_vars),
                values_to = 'mean_driver',

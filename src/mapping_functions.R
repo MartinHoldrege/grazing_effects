@@ -372,6 +372,10 @@ calc_rast_cref <- function(r, info, type_from, type_to = NULL,
   diff
 }
 
+downsample <- function(r, n = 100) {
+  spatSample(r, size = n, method = 'regular',as.raster = TRUE)
+}
+
 # maps --------------------------------------------------------------------
 
 

@@ -6,7 +6,7 @@
 
 # params ------------------------------------------------------------------
 
-pfts <- c('Aherb', 'Pherb')
+pfts <- c('Sagebrush', 'Aherb', 'Pherb')
 run <- 'fire1_eind1_c4grass1_co20_2503'
 v_interp <- 'v4' # interpolation version (input files)
 
@@ -36,20 +36,18 @@ length(clim_files)
 # it's not actually loaded into memory
 r_clim1 <- terra::rast(clim_files) # class SpatRast
 
-
-
 # * biomass -----------------------------------------------------------------
-
+regex <- paste0(run, ".*(", paste(pfts, collapse = "|"), ').*.tif')
 bio_files <- list.files(
   file.path("data_processed/interpolated_rasters/biomass", v_interp),
-  pattern = paste0(run, ".*", "(Pherb|Aherb)", '.*.tif'),
+  pattern = regex,
   full.names = TRUE)
 
 r_bio1 <- rast(bio_files)
 
 if (test_run) {
-  r_clim1 <- r_clim1[[1:2]]
-  r_bio1 <- r_bio1[[1:2]]
+  r_clim1 <- downsample(r_clim1)
+  r_bio1 <- downsample(r_bio1)
 }
 
 r_comb1 <- c(r_clim1, r_bio1)
