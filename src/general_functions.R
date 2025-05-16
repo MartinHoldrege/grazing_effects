@@ -706,7 +706,16 @@ pivot_wider_c4 <- function(df) {
   out
 }
 
-
+# where df is a dataframe results from terra::extract
+pivot_longer_extracted <- function(df, regions, values_to) {
+  stopifnot(length(regions) == length(df$ID))
+  df %>% 
+    mutate(region = regions) %>% 
+    select(-ID) %>% 
+    pivot_longer(-region, names_to = 'id',
+                 values_to = values_to)
+  
+}
 
 # summarize functions --------------------------------------------------
 

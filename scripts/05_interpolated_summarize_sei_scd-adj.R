@@ -54,6 +54,7 @@ scd_cov1 <- load_scd_cover() # cover's used for the SCD
 scd_q1 <- load_scd_q()
 
 r_eco1 <- load_wafwa_ecoregions_raster(wafwa_only = TRUE)
+
 # summary stats calculated for these regions:
 eco1 <- load_wafwa_ecoregions(total_region = TRUE, wafwa_only = FALSE)
 
@@ -171,16 +172,6 @@ info_sei <- create_rast_info(sei_scd_adj1,
                                       "graze", "GCM"), 
                              id_noGCM = TRUE)  
 
-
-pivot_longer_extracted <- function(df, regions, values_to) {
-  stopifnot(length(regions) == length(df$ID))
-  df %>% 
-    mutate(region = regions) %>% 
-    select(-ID) %>% 
-    pivot_longer(-region, names_to = 'id',
-                 values_to = values_to)
-      
-}
 
 # mean SEI for each region and GCM
 sei_mean1 <- terra::extract(sei_scd_adj1, eco1, mean,  na.rm = TRUE)

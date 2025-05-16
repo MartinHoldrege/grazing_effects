@@ -238,6 +238,10 @@ percent_csa <- function(x, na.rm = TRUE) {
   mean(x > 0.431, na.rm = na.rm)*100
 }
 
+percent_goa <- function(x, na.rm = TRUE) {
+  mean(x > 0.173 & x <= 0.431, na.rm = na.rm)*100
+}
+
 
 load_scd_cover <- function() {
   # file created in 04_scd_aggregate.R

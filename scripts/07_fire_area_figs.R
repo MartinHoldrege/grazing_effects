@@ -5,17 +5,14 @@
 
 # Started: March 25, 2025
 
-# params
-
-# dependencies
 
 # params ------------------------------------------------------------------
 
-run <- 'fire1_eind1_c4grass1_co20_2503'
+source("src/params.R")
 
 v <- 'v2' # version of input files (and for now also used in output file names)
 suffix <- paste0(v, "_", run)
-
+runv <- paste0(run, v_interp)
 # create additional figures to explore how age groups/fire probability relate
 # (not using actual data)
 explanatory_figures <- TRUE 
@@ -61,6 +58,14 @@ drivers1 <- read_csv(paste0('data_processed/raster_means/', run,
 
 sei2 <- readRDS('data_processed/temp_rds/sei_df.rds')
 
+# created in "scripts/06_summarize_sei_scd-adj.R"
+sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, 
+                     '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
+
+# created in "scripts/05_interpolated_summarize_sei_scd-adj.R"
+sei_pcent_gcm1 <- read_csv(paste0('data_processed/raster_means/', runv, 
+                        '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
+
 # vectors -----------------------------------------------------------------
 
 ecoregions <- region_factor(area_eco$ecoregion) %>% 
@@ -97,39 +102,35 @@ area_age_group3 <- df_factor(area_age_group3) %>%
 
 # showing area of core vs expected burned area to illustrate the grazing
 # trade-off
-c3_area1 <- sei2 %>% 
-  mutate(c3 = sei2c3(SEI),
-         area = pixel2area(weight)) %>% 
-  group_by(run, years, RCP, graze, region, rcp_year, summary, c3) %>% 
-  summarise(area = sum(area), .groups= 'drop') %>% 
-  # NA area for low/high current climate
-  mutate(area = ifelse(is.na(c3), NA, area)) %>% 
-  pivot_wider(values_from = "area", names_from = 'summary',
-              names_prefix = 'sei_area_') %>% 
-  filter(!is.na(c3))
+sei_pcent2 <- sei_pcent1 %>% 
+  select(-id, -group, -type) %>% 
+  pivot_wider(values_from = c('percent_csa', 'percent_goa'),
+              names_from = 'summary') %>% 
+  df_factor() %>% 
+  # correct run is in file name when read in
+  # but run column is truncated (not including the yr month,
+  # potentially b/ of a renaming issue in "05_interpolated_summarize_sei_scd-adj.R)
+  # for that reason not using run to join
+  select(-run)
 
-c3_area2 <- ba3 %>% 
+sei_pcent3 <- ba3 %>% 
   select(-rcp_year) %>% 
   rename_with(.fn = \(x) paste0('ba_', x), .cols = matches('^area')) %>% 
-  right_join(c3_area1, by = c('run', 'years', 'RCP', 'graze', 
-                              'ecoregion' = 'region' )) %>% 
-
   left_join(rename(area_eco, total_area = area), by = 'ecoregion') %>% 
   # adding percent of total area
   mutate(across(matches('area_'), .fns = \(x) x/total_area*100, 
                 .names = '{.col}_perc'),
          region = region_factor(ecoregion)) %>% 
-  select(-ecoregion)
+  select(-ecoregion) %>% 
+  left_join(sei_pcent2, by = join_by(RCP, years, graze, region)) %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
+  
 
-# check that percents correctly sum ~~~
-test <- c3_area2 %>% 
-  group_by(region, rcp_year, graze) %>% 
-  summarise(test = sum(sei_area_median_perc, na.rm = TRUE)) %>% 
-  pull(test)
+# ** gcm level ------------------------------------------------------------
 
-stopifnot(abs(test - 100) < 0.01)
-#  ~~~
-
+# continue here
+sei_pcent_gcm1 %>% 
+  mutate(run = str_replace(run, !!runv, !!run)) 
 # expected burned area figs --------------------------------------------------
 
 plots <- map(ecoregions, function(region) {
@@ -234,26 +235,62 @@ dev.off()
 
 # *dotplot ----------------------------------------------------------------
 
-g <- c3_area2 %>% 
-  filter(c3 == 'CSA') %>% 
-  ggplot(aes(sei_area_median_perc, ba_area_median_perc)) +
+base_tradeoff <- function() {
+  list(
+    geom_path(aes(group = rcp_year), color = "blue", linewidth = 0.5, alpha = 0.5),
+    #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5)
+    geom_point(aes(color = graze, shape = rcp_year)),
+    scale_color_manual(values = cols_graze, name = lab_graze),
+    scale_shape_manual(values = shapes_scen, name = 'Scenario'),
+    labs(x = '% Core Sagebrush Area',
+         y = 'Expected area burned (%/year)'),
+    expand_limits(x = 0)
+  )
+}
+
+g1 <- ggplot(sei_pcent3, aes(percent_csa_median, ba_area_median_perc))
+
+g2_error <- g1 +
   geom_errorbar(aes(ymin = ba_area_low_perc, ymax = ba_area_high_perc, group = rcp_year),
                 alpha = 0.2) +
-  geom_errorbarh(aes(xmin = sei_area_low_perc, xmax = sei_area_high_perc, group = rcp_year),
+  geom_errorbarh(aes(xmin = percent_csa_low, xmax = percent_csa_high, group = rcp_year),
                  alpha = 0.2) +
-  geom_path(aes(group = rcp_year), color = "blue", linewidth = 0.5, alpha = 0.5) +
-  #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5) +
-  geom_point(aes(color = graze, shape = rcp_year)) +
-  facet_wrap(~region, scales = 'free') +
-  scale_color_manual(values = cols_graze, name = lab_graze) +
-  scale_shape_manual(values = shapes_scen, name = 'Scenario') +
-  labs(x = '% Core Sagebrush Area',
-       y = 'Expected area burned (%/year)') +
-  expand_limits(x = 0)
+  base_tradeoff()
 
-ggsave(paste0("figures/sei/csa-vs-ba_perc_dotplot_", suffix, ".png"), 
-       plot = g, dpi = 600,
-       width = 7, height = 4.5)
+g2_noerror <- g1 + base_tradeoff()
+g2_error <- g1 + base_tradeoff()
+
+
+ggsave_tradeoff <- function(g, prefix) {
+  ggsave(paste0("figures/sei/tradeoff/csa-scd-adj-vs-ba_perc_dotplot_", prefix, '_',
+                suffix, ".png"), 
+         plot = g, dpi = 600,
+         width = 7, height = 4.5)
+}
+
+ggsave_tradeoff(
+  g = g2_noerror + facet_wrap(~region, scales = 'fixed'),
+  prefix = 'noerr-fix' # no error, fixed scales
+)
+
+ggsave_tradeoff(
+  g = g2_noerror + facet_wrap(~region, scales = 'free'),
+  prefix = 'noerr-free' # no error, fixed scales
+)
+
+ggsave_tradeoff(
+  g = g2_error + facet_wrap(~region, scales = 'fixed'),
+  prefix = 'err-fix' # no error, fixed scales
+)
+
+ggsave_tradeoff(
+  g = g2_error + facet_wrap(~region, scales = 'free'),
+  prefix = 'err-free' # no error, fixed scales
+)
+
+
+# ** gcm level ------------------------------------------------------------
+
 
 
 # burned area--attribution ------------------------------------------------
@@ -287,14 +324,14 @@ ba_gcm5 <- ba_gcm4 %>%
                values_to = 'mean_driver',
                names_to = 'driver') %>% 
   mutate(GCM = factor(GCM, levels = c('Current', names(cols_GCM1))),
-         driver = factor(driver, levels = driver_vars))
+         driver = factor(driver, levels = driver_vars)) %>% 
+  df_factor()
 
 ba_current <- ba_gcm5 %>% 
   filter(GCM == 'Current')
 
 rcp_year <- unique(ba_gcm4$rcp_year) %>% 
-  str_subset('RCP') %>% 
-  rev()
+  str_subset('RCP')
 
 
 plots <- map(rcp_year, function(x) {
@@ -320,8 +357,8 @@ plots <- map(rcp_year, function(x) {
 })
 
 pdf(paste0("figures/fire/area/expected_ba_vs_driver_by-GCM_", suffix, '.pdf'),
-    width = 12, height = 10)
-plots
+    width = 13, height = 10)
+print(plots)
 dev.off()
 
 

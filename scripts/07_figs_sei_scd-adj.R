@@ -10,6 +10,7 @@
 source("src/params.R")
 runv <- paste0(run, v_interp)
 suffix <- paste0(runv, '_v1') # for figures
+v_input <- 'v2' # version for some input files
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -22,24 +23,34 @@ theme_set(theme_custom1())
 
 # Read in data ------------------------------------------------------------
 
+options(readr.show_col_types = FALSE)
+
 # fivenumber summaries (for boxplots) across regions of Q and SEI
 # (SCD adjusted) rasters (i.e. these are area weighted summaries)
 # created in 06_summarize_sei_scd-adj
 qsei1 <- read_csv(paste0('data_processed/raster_means/', runv,  
-                         '_q-sei_scd-adj_summaries_by-ecoregion.csv'),
-                  show_col_types = FALSE)
+                         '_q-sei_scd-adj_summaries_by-ecoregion.csv'))
 
 # file created in 05_interpolated_summarize_sei_scd-adj.R
 # mean SEI and % core by ecoregion and GCM
 sei_byGCM1 <- read_csv(paste0('data_processed/raster_means/', runv, 
-                             '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'),
-                      show_col_types = FALSE)
+                             '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
 
 # average of climatic drivers, per gcm and region
 # file output by 04_summarize_fire_drivers.R
 drivers1 <- read_csv(paste0('data_processed/raster_means/', run, 
-                  '_fire-driver-means_by-ecoregion.csv'),
-                  show_col_types = FALSE)
+                  '_fire-driver-means_by-ecoregion.csv'))
+
+# expected burned area by gcm
+# created in 05_fire_area.R
+ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
+                           v_input, "_", run, ".csv"))
+
+# create in "scripts/06_summarize_sei_scd-adj.R"
+# percent core and grow areas by region for low, median, and high SEI (across GCMs)
+sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, 
+                             '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
+
 
 # prepare dataframes ------------------------------------------------------
 
@@ -179,7 +190,7 @@ plots2 <- map(rcp_year, function(x) {
 })
 
 pdf(paste0("figures/sei/sei_scd-adj_vs_driver_by-GCM_", suffix, '.pdf'),
-    width = 12, height = 10)
+    width = 14, height = 10)
 plots1
 plots2
 dev.off()
