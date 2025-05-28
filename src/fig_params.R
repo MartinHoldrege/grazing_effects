@@ -104,6 +104,12 @@ shapes_scen <- c("Historical" = 21,
                  "RCP8.5\n2071-2100" = 15, "RCP8.5 2071-2100" = 15)
 
 
+# linetypes ---------------------------------------------------------------
+
+linetypes_scen <- c("Historical" = 4, 
+                 "RCP4.5\n2071-2100" = 1, "RCP4.5 2071-2100" = 1,
+                 "RCP8.5\n2071-2100" = 41, "RCP8.5 2071-2100" = 41)
+
 # panel letters -----------------------------------------------------------
 
 # so consistent letter theme is used throughout (for multiple

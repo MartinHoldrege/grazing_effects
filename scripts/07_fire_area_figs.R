@@ -28,28 +28,24 @@ source("src/fig_functions.R")
 source("src/fig_params.R")
 source("src/probability_functions.R")
 theme_set(theme_custom1())
-
+options(readr.show_col_types = FALSE)
 # read in data ------------------------------------------------------------
 
 # created in the 05_fire_area.R script
 # expected burned area
 ba3a <- read_csv(
-  paste0("data_processed/area/expected-burn-area_", suffix,".csv"),
-  show_col_types = FALSE)
+  paste0("data_processed/area/expected-burn-area_", suffix,".csv"))
 
 # expected burned area by gcm
 ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
-                            suffix, ".csv"),
-                    show_col_types = FALSE)
+                            suffix, ".csv"))
 
 # expected area in different years since fire age groups
 area_age_group3 <- read_csv(
-  paste0("data_processed/area/area-by-age-group_", suffix, ".csv"),
-  show_col_types = FALSE)
+  paste0("data_processed/area/area-by-age-group_", suffix, ".csv"))
 
 # area of our study region in each of 3 ecoregions
-area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v,".csv"),
-                     show_col_types = FALSE)
+area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v,".csv"))
 
 # created in the 04_summarize_fire_drivers.R script
 # means, by ecoregion, of the drivers of fire probability
@@ -77,7 +73,7 @@ age_groups <- create_age_groups()
 line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
 line_loc2 <- 1:2 + 0.5
 height_3p <- 6 # width for 3 panel figures
-width_3p <- 5# height for 3 panel figures
+width_3p <- 5 # height for 3 panel figures
 
 # prepare dataframes ------------------------------------------------------
 
@@ -140,9 +136,11 @@ sei_pcent_gcm3 <- ba_gcm1 %>%
   rename(region = ecoregion) %>% 
   left_join(sei_pcent_gcm2, 
             by = join_by(region, run, RCP, years, graze, GCM)) %>% 
-  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
-  df_factor()
-  
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
+         rcp_year_GCM = paste(rcp_year, GCM)) %>% 
+  df_factor() %>% 
+  arrange(rcp_year, GCM, graze) # arranging for geom_path
+
 # expected burned area figs --------------------------------------------------
 
 plots <- map(ecoregions, function(region) {
@@ -247,13 +245,15 @@ dev.off()
 
 # *dotplot ----------------------------------------------------------------
 
-base_tradeoff <- function(group = 'rcp_year') {
+base_tradeoff <- function(group = 'rcp_year', linetypes_scen = c(1, 1, 1)) {
   list(
-    geom_path(aes(group = .data[[group]]), color = "blue", linewidth = 0.5, alpha = 0.5),
+    geom_path(aes(group = .data[[group]], linetype = rcp_year), color = "blue", 
+              linewidth = 0.5, alpha = 0.5),
     #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5)
     geom_point(aes(color = graze, shape = rcp_year)),
     scale_color_manual(values = cols_graze, name = lab_graze),
     scale_shape_manual(values = shapes_scen, name = 'Scenario'),
+    scale_linetype_manual(name = 'Scenario', values = linetypes_scen),
     labs(x = '% Core Sagebrush Area',
          y = 'Expected area burned (%/year)'),
     expand_limits(x = 0)
@@ -306,7 +306,6 @@ ggsave_tradeoff(
 g <- sei_pcent_gcm3 %>% 
   filter(graze %in% c('Moderate', 'Very Heavy'),
          RCP != 'RCP85') %>% 
-  mutate(rcp_year_GCM = paste(rcp_year, GCM)) %>% 
   ggplot(aes(percent_csa, ba_area_perc, group = GCM, color = graze)) +
   base_tradeoff(group = "rcp_year_GCM") +
   labs(caption = 'Results plotted seperately for individual GCMs')
@@ -320,6 +319,29 @@ ggsave_tradeoff(
 ggsave_tradeoff(
   g = g + facet_wrap(~region, scales = 'free'),
   prefix = 'by-GCM-free' # no error, fixed scales
+)
+
+
+# ** median and GCM level --------------------------------------------------
+# figure that shows the median results, and then faint GCM lines
+# b/ the low/high error bars in the x and y diretions are misleading
+# (they're correlated so direction of effect isn't actually as uncertain
+# as they suggest)
+
+
+g <- ggplot(sei_pcent3, aes(percent_csa_median, ba_area_median_perc)) +
+  geom_path(data = sei_pcent_gcm3, aes(percent_csa, ba_area_perc, 
+                                       group = rcp_year_GCM, linetype = rcp_year,
+                                       color = rcp_year),
+            alpha = 0.5,
+            linewidth = 0.2, 
+            show.legend = FALSE) + # b/ different linewidth get's double plotted on legend +
+  base_tradeoff(linetypes_scen = linetypes_scen) +
+  facet_wrap(~region, scales = 'fixed') 
+
+ggsave_tradeoff(
+  g = g,
+  prefix = 'med-GCM-fix'
 )
 
 # burned area--attribution ------------------------------------------------
