@@ -6,8 +6,8 @@
 
 # params ------------------------------------------------------------------
 
-v_interp <- 'v4' # interpolation version
-run <- "fire1_eind1_c4grass1_co20_2503"
+source('src/params.R')
+runv <- paste0(run, v_interp)
 q_curve_fig <- TRUE # create figure showing the 'biomass' q curves
 
 suffix <- paste0(run, '_v2') # for figures
@@ -42,6 +42,11 @@ w1 <- read_csv(paste0('data_processed/interpolation_data/interpolation_weights_'
 bio_gcm1 <- l$pft5_bio1 # 
 bio2 <- l$pft5_bio2# summarized across GCMs
 fire_med1 <- l$fire_med1
+
+# create in "scripts/06_summarize_sei_scd-adj.R"
+seifire1 <- read_csv(paste0('data_processed/raster_means/', runv,
+                           '_sei-by-fire-bin_scd-adj_summaries_by-ecoregion.csv'),
+                    show_col_types = FALSE)
 
 # combine site level and weights ------------------------------------------
 
@@ -306,24 +311,13 @@ if(q_curve_fig) {
 
 # * prepare dataframes ----------------------------------------------------
 
+seifire2 <- seifire1 %>% 
+  df_factor() %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE, 
+                              add_newline = TRUE)) %>% 
+  group_by(RCP, years, graze, summary, region) %>% 
+  mutate(percent_area = n_pixels/sum(n_pixels))
 
-fire_breaks <- c(seq(0, 2.5, by = 0.25), 3, 4)
-
-stopifnot(max(fire_breaks) > max(fire_med1$fire_prob))
-
-sei3 <- sei2 %>% 
-  filter(summary == 'median') %>% 
-  left_join(fire_med1, by = join_by(run, years, RCP, graze, site))
-
-df_fire_bins1 <- sei3 %>% 
-  mutate(fire_bin = cut(fire_prob, breaks = fire_breaks, right = FALSE)) %>% 
-  group_by(run, years, RCP, graze, region, rcp_year, fire_bin) %>% 
-  summarize(n = n(),
-            SEI = weighted.mean(SEI, w = weight),
-            weight = sum(weight),
-            .groups = 'drop_last') %>% 
-  mutate(percent_area = weight/sum(weight) *100)
-  
 
 # * create figures ----------------------------------------------------------
 
@@ -337,7 +331,7 @@ base_fire_bins <- function() {
 }
 
 
-g <- ggplot(df_fire_bins1, aes(x = graze, y = fire_bin, fill = SEI)) +
+g <- ggplot(seifire2, aes(x = graze, y = fire_bin, fill = SEI)) +
   base_fire_bins() +
   scale_fill_gradientn(
     colors = cols_seicont,
@@ -346,15 +340,15 @@ g <- ggplot(df_fire_bins1, aes(x = graze, y = fire_bin, fill = SEI)) +
     name = "SEI"
   ) 
 
-ggsave(paste0("figures/sei/sei_by-fire-graze_", suffix, ".png"), 
+ggsave(paste0("figures/sei/sei_by-fire-graze_scd-adj_", suffix, ".png"), 
        plot = g, dpi = 600,
        width = 8, height = 10)
 
-g <- ggplot(df_fire_bins1, aes(x = graze, y = fire_bin, fill = percent_area)) +
+g <- ggplot(seifire2, aes(x = graze, y = fire_bin, fill = percent_area)) +
   base_fire_bins() +
   scale_fill_viridis_c(option = "C", name = "% of area", trans = 'sqrt')
   
 
-ggsave(paste0("figures/sei/area-perc_by-fire-graze_", suffix, ".png"), 
+ggsave(paste0("figures/sei/area-perc_by-fire-graze_scd-adj_", suffix, ".png"), 
        plot = g, dpi = 600,
        width = 8, height = 10)

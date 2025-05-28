@@ -10,6 +10,7 @@
 source("src/params.R")
 test_run <- FALSE
 runv <- paste0(run, v_interp)
+fire_breaks <- c(seq(0, 2.5, by = 0.25), 3, 4) # intervals to cut fire probability into
 
 # dependencies ------------------------------------------------------------
 
@@ -28,8 +29,18 @@ r_qsei1 <- rast(file.path("data_processed/interpolated_rasters/", v_interp,
 eco1 <- load_wafwa_ecoregions(wafwa_only = FALSE, total_region = TRUE)
 eco2 <- vect(eco1['ecoregion'])
 
+r_eco1 <- load_wafwa_ecoregions_raster(wafwa_only = FALSE)
+
+# * fire ------------------------------------------------------------------
+# this is for summarizing SEI at different bins of fire probability
+# created in "scripts/05_interpolated_maps_fire.R"
+r_fire1 <- rast(file.path("data_processed/interpolated_rasters", 
+          paste0(run, "_fire-prob_future_summary_across_GCMs.tif")))
+
 if(test_run) {
   r_qsei1 <- downsample(r_qsei1)
+  r_fire1 <- downsample(r_fire1)
+  r_eco1 <- downsample(r_eco1)
 }
 
 # names of layers --------------------------------------------------
@@ -77,6 +88,65 @@ sei_pcent <- left_join(sei_core2, sei_goa2, by = c('region', 'id')) %>%
   left_join(info1, by = 'id') %>% 
   select(-run2)
 
+
+# mean SEI by fire probability bin ----------------------------------------
+
+summary4bins <- 'median' # summary across GCMs (pixelwise) used
+info_sei <- info1 %>% 
+  filter(summary == summary4bins, group == 'SEI') %>% 
+  select(-run, -run2, -group, -type)
+
+info_fire1 <- create_rast_info(r_fire1,
+                               into = c("type", "RCP", "years", "graze", 'summary'))
+info_seifire <- info_fire1 %>% 
+  select(-type) %>% 
+  right_join(info_sei, by = c('RCP', 'years', 'graze', 'summary'),
+             suffix = c('_fire', '_sei'))
+
+r_fire2 <- r_fire1[[info_seifire$id_fire]]
+r_sei1 <- r_qsei1[[info_seifire$id_sei]]
+
+# * binning fire ----------------------------------------------------------
+r_comb <- c(r_eco1, r_sei1, r_fire2)
+
+df_seifire1 <- as.data.frame(r_comb)
+
+stopifnot(max(fire_breaks) > max(unlist(minmax(r_fire2))))
+
+df_seifire2 <- df_seifire1 %>% 
+  rename(region = ecoregion) %>% 
+  mutate(cell_num = 1:n()) %>% 
+  pivot_longer(- c(region, cell_num), names_to = 'id') %>% 
+  left_join(bind_rows(info_sei, info_fire1[names(info_sei)]), by = 'id') %>% 
+  mutate(group = str_extract(id, 'SEI|fire-prob')) %>% 
+  select(-id) %>% 
+  pivot_wider(values_from = 'value',names_from = "group") %>% 
+  mutate(fire_bin = cut(`fire-prob`, fire_breaks, right = FALSE)) %>% 
+  # some pixels outside of the regions (from the fire raster)
+  # discarding these
+  filter(!is.na(region))
+
+summarize_sei <- function(df) {
+  summarize(df,
+            n_pixels = n(),
+            percent_csa = percent_csa(SEI),
+            percent_goa = percent_goa(SEI),
+            SEI = mean(SEI),
+            .groups = 'drop')
+}
+
+df_seifire_regions <- df_seifire2 %>% 
+  group_by(region, RCP, years, graze, summary, fire_bin) %>% 
+  summarize_sei()
+
+df_seifire_entire <- df_seifire2 %>% 
+  select(-region) %>% 
+  group_by(RCP, years, graze, summary, fire_bin) %>% 
+  summarize_sei() %>% 
+  mutate(region = eco1$ecoregion[1]) # entire study area
+
+df_seifire3 <- bind_rows(df_seifire_entire, df_seifire_regions)
+
 # save output -------------------------------------------------------------
 
 prefix <- if(test_run) 'test' else runv
@@ -86,3 +156,8 @@ write_csv(eco_smry1, paste0('data_processed/raster_means/', prefix,
 
 write_csv(sei_pcent , paste0('data_processed/raster_means/', prefix, 
                             '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
+
+write_csv(df_seifire3, paste0('data_processed/raster_means/', prefix, 
+                              '_sei-by-fire-bin_scd-adj_summaries_by-ecoregion.csv'))
+
+

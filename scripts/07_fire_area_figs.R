@@ -125,12 +125,24 @@ sei_pcent3 <- ba3 %>%
   left_join(sei_pcent2, by = join_by(RCP, years, graze, region)) %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
   
-
 # ** gcm level ------------------------------------------------------------
 
-# continue here
-sei_pcent_gcm1 %>% 
-  mutate(run = str_replace(run, !!runv, !!run)) 
+sei_pcent_gcm2 <- sei_pcent_gcm1 %>% 
+  mutate(run = str_replace(run, !!runv, !!run)) %>% 
+  select(-type, -id, -group)
+
+sei_pcent_gcm3 <- ba_gcm1 %>% 
+  rename(ba_area = area) %>% 
+  select(-type, -run2) %>% 
+  filter_clim_extremes() %>% 
+  left_join(rename(area_eco, total_area = area), by = 'ecoregion') %>% 
+  mutate(ba_area_perc = ba_area/total_area*100) %>% 
+  rename(region = ecoregion) %>% 
+  left_join(sei_pcent_gcm2, 
+            by = join_by(region, run, RCP, years, graze, GCM)) %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
+  df_factor()
+  
 # expected burned area figs --------------------------------------------------
 
 plots <- map(ecoregions, function(region) {
@@ -235,9 +247,9 @@ dev.off()
 
 # *dotplot ----------------------------------------------------------------
 
-base_tradeoff <- function() {
+base_tradeoff <- function(group = 'rcp_year') {
   list(
-    geom_path(aes(group = rcp_year), color = "blue", linewidth = 0.5, alpha = 0.5),
+    geom_path(aes(group = .data[[group]]), color = "blue", linewidth = 0.5, alpha = 0.5),
     #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5)
     geom_point(aes(color = graze, shape = rcp_year)),
     scale_color_manual(values = cols_graze, name = lab_graze),
@@ -291,7 +303,24 @@ ggsave_tradeoff(
 
 # ** gcm level ------------------------------------------------------------
 
+g <- sei_pcent_gcm3 %>% 
+  filter(graze %in% c('Moderate', 'Very Heavy'),
+         RCP != 'RCP85') %>% 
+  mutate(rcp_year_GCM = paste(rcp_year, GCM)) %>% 
+  ggplot(aes(percent_csa, ba_area_perc, group = GCM, color = graze)) +
+  base_tradeoff(group = "rcp_year_GCM") +
+  labs(caption = 'Results plotted seperately for individual GCMs')
 
+
+ggsave_tradeoff(
+  g = g + facet_wrap(~region, scales = 'fixed'),
+  prefix = 'by-GCM-fix' # no error, fixed scales
+)
+
+ggsave_tradeoff(
+  g = g + facet_wrap(~region, scales = 'free'),
+  prefix = 'by-GCM-free' # no error, fixed scales
+)
 
 # burned area--attribution ------------------------------------------------
 
