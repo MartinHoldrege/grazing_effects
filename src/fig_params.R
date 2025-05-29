@@ -129,7 +129,7 @@ lab_change0 <- "% Change relative to light grazing"
 lab_bio0 <- expression("Biomass ("*gm^-2*")")
 lab_bio1 <- expression(~Delta*" Biomass ("*gm^-2*")")
 lab_bio1b <- "\u0394 Biomass" # delta biomass
-lab_bio2 <- expression(~Delta*" Biomass (scaled %)")
+lab_bio2 <- expression(~Delta*" Biomass (%)")
 lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
 lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
 lab_perc_bio0 <- "% of total biomass"

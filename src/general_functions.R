@@ -461,6 +461,7 @@ id_remove_c4 <- function(x){
 #' @param ref_graze character string of the value of graze column to compare
 #' to (if NULL then differences are made within grazing levels)
 #' @param percent logical, if TRUE, calculates the scaled percent change,
+#' (or if divid_by_max is false, regulare % change)
 #' otherwise calculates the actual change (raw difference)
 #' @param effect_size logical, whether the response variable calculated
 #' is effect size instead of change (or percent change), currently calculated as 

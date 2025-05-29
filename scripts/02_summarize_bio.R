@@ -210,13 +210,15 @@ C3_Pgrass_ratio <- pft5_bio1 %>%
 
 # d stands for 'difference'
 # % change in biomass and num individuals from current conditions ,
-# scaled by maximum biomass under current conditions(for a given grazing trmt)
 
 # this throws a warning (which is ok) because utilization is 0 for some groups
 pft5_bio_d2 <-  pft5_bio1 %>% 
   # calculating % scaled change for biomass and individuals
   scaled_change_2var(by = c("run", "PFT", "graze"),
-                     vars = c("biomass", "indivs", "utilization")) %>% 
+                     vars = c("biomass", "indivs", "utilization"),
+                     # regular % change
+                     percent = TRUE,
+                     divide_by_max = FALSE) %>% 
   # median across GCMs
   group_by(run, site, years, RCP, PFT, graze, id) %>% 
   summarise_bio_indivs(suffix = "_diff") %>% 

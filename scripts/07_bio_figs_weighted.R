@@ -42,6 +42,7 @@ w1 <- read_csv(paste0('data_processed/interpolation_data/interpolation_weights_'
 bio_gcm1 <- l$pft5_bio1 # 
 bio2 <- l$pft5_bio2# summarized across GCMs
 fire_med1 <- l$fire_med1
+pft5_bio_d2 <- l$pft5_bio_d2
 
 # create in "scripts/06_summarize_sei_scd-adj.R"
 seifire1 <- read_csv(paste0('data_processed/raster_means/', runv,
@@ -49,7 +50,8 @@ seifire1 <- read_csv(paste0('data_processed/raster_means/', runv,
                     show_col_types = FALSE)
 
 # combine site level and weights ------------------------------------------
-
+w1 <- df_factor(w1)
+entire <- levels(w1$region)[1] # entire study region
 bio3 <- bio2 %>% 
   left_join(w1, by = 'site',relationship = "many-to-many") %>% 
   filter_clim_extremes() %>% 
@@ -76,7 +78,16 @@ bio_gcm2 <- bio_gcm1 %>%
   df_factor() %>% 
   filter(region != levels(region)[1])
 
-
+# % change
+pft5_bio_d3 <- pft5_bio_d2 %>% 
+  filter_clim_extremes() %>% 
+  filter(run == !!run) %>% 
+  left_join(w1[w1$region == entire, ], 
+            by = 'site') %>% 
+  df_factor() %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
+                              add_newline = TRUE))
+  
 # other summaries ---------------------------------------------------------
 
 # % of total utilization
@@ -155,6 +166,41 @@ png(paste0("figures/biomass/bio_weighted_by-region_3pft_boxplot_", suffix, ".png
     width = 8, height = 11, units = 'in', res = 600)
 g2
 dev.off()
+
+# absolute biomass for current and %change for future
+
+df_abs <- bio4 %>% 
+  filter(RCP == 'Current', region == entire, PFT %in% pfts)
+
+df_diff <- pft5_bio_d3 %>% 
+  filter(RCP == 'RCP45', PFT %in% pfts)
+
+g1 <- box_abs_diff(df_abs = df_abs,
+             df_diff = df_diff,
+             y_abs = 'biomass',
+             y_diff = 'bio_diff',
+             ylab_abs = lab_bio0,
+             ylab_diff = lab_bio2)
+
+# Pub qual for the main manuscript
+png(paste0("figures/biomass/bio-abs-diff_weighted_entire_3pft_boxplot_RCP45_", suffix, ".png"),
+    width = 3, height = 5, units = 'in', res = 600)
+g1
+dev.off()
+
+g2 <- box_abs_diff(df_abs = df_abs,
+             df_diff = filter(pft5_bio_d3, PFT %in% pfts),
+             y_abs = 'biomass',
+             y_diff = 'bio_diff',
+             ylab_abs = lab_bio0,
+             ylab_diff = lab_bio2)
+
+# pub qual for the appendix
+png(paste0("figures/biomass/bio-abs-diff_weighted_entire_3pft_boxplot_", suffix, ".png"),
+    width = 3.7, height = 5, units = 'in', res = 600)
+g2
+dev.off()
+
 
 
 # testing -----------------------------------------------------------------

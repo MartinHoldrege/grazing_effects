@@ -268,6 +268,75 @@ weighted_violin1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
 }
 
 
+#' side-by side boxplots of absolute and change values by PFT, by grazing intensity
+#'
+#' @param df_abs dataframe of historical conditions
+#' @param df_diff dataframe change relative to historical conditions
+#' @param y_abs name of y variable in df_abs
+#' @param y_diff y variable in df_diff
+#' @param ylab_abs label for abs panels
+#' @param ylab_diff label for diff panels
+box_abs_diff <- function(df_abs, 
+                         df_diff,
+                         y_abs = 'biomass',
+                         y_diff = 'bio_diff',
+                         ylab_abs = y_abs,
+                         ylab_diff = y_diff
+) {
+  
+  stopifnot(unique(sort(df_abs$PFT)) == unique(sort(df_diff$PFT)))
+  
+  base <- function() {
+    list(
+      geom_boxplot(aes(weight = weight), coef = 10),
+      facet_grid(PFT~rcp_year, scales = 'free_y'),
+      scale_fill_graze(),
+      theme(legend.position = 'none',
+            axis.text.x = element_text(angle = 45, hjust = 1)),
+      # add space on the left (for tags)
+      scale_x_discrete(expand = expansion(add = c(1, 0.5))) 
+    )
+  }
+  
+  g1 <- ggplot(df_abs, aes(graze, .data[[y_abs]], fill = graze)) +
+    base() +
+    theme(strip.background.y = element_blank(), strip.text.y = element_blank()) +
+    labs(x = lab_graze,
+         y = ylab_abs) 
+  
+  g2  <- ggplot(df_diff, aes(graze, .data[[y_diff]], fill = graze))+
+    geom_hline(yintercept = 0, alpha = 0.5, linetype = 2)+
+    base() +
+    labs(x = lab_graze,
+         y = ylab_diff) 
+  
+  n_scen <- lu(df_diff$rcp_year)
+  n_pft <- lu(df_abs$PFT)
+  
+  index_abs <- seq(from = 1, length.out = n_pft,
+                   by = n_scen + 1)
+  
+  n_panels = n_pft*n_scen + n_pft
+  index_diff <- seq(from = 1, to = n_panels)
+  index_diff <- index_diff[!index_diff %in% index_abs]
+  
+  # adding letters to panels
+  g1b <- egg::tag_facet(g1, tag_pool = fig_letters[index_abs],
+                        open = "",
+                        close = "",
+                        hjust = -0.25) + 
+    theme(strip.text = element_text())
+  
+  g2b <- egg::tag_facet(g2, tag_pool = fig_letters[index_diff],
+                        open = "",
+                        close = "",
+                        hjust = -0.25)+ 
+    theme(strip.text = element_text())
+
+  g1b + g2b + plot_layout(widths = c(1, n_scen))
+}
+
+
 # modify/combine groups of plots ------------------------------------------
 
 
