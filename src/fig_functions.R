@@ -340,6 +340,36 @@ box_abs_diff <- function(df_abs,
 }
 
 
+# bar charts --------------------------------------------------------------
+
+base_c9_area <- function(pattern_var = 'graze', legend_title = 'Grazing') {
+  out <- list(
+    bar_pattern = ggpattern::geom_bar_pattern(aes(pattern = .data[[pattern_var]],
+                                       pattern_density = .data[[pattern_var]],
+                                       pattern_angle = .data[[pattern_var]],
+                                       fill = c9),
+                                   stat = 'identity',
+                                   position = position_dodge(),
+                                   pattern_fill = '#636363',
+                                   pattern_color = '#636363',
+                                   pattern_spacing = 0.02,
+                                   color = 'white',
+                                   pattern_key_scale_factor = 0.5# relative density in the legend
+    ),
+    scale_fill_manual(values = c9Palette, guide = 'none'),
+    ggpattern::scale_pattern_manual(values = c("stripe", "none", "stripe", "stripe"),
+                                    name = legend_title),
+    ggpattern::scale_pattern_density_manual(values = rep(0.01, 4),
+                                            name = legend_title),
+    ggpattern::scale_pattern_angle_manual(values = c(45, 0, 0, -45),
+                                          name = legend_title),
+    theme(axis.text.x = element_text(angle = 75, hjust = 1),
+          legend.position = 'right')
+  )
+
+  out
+}
+
 # modify/combine groups of plots ------------------------------------------
 
 

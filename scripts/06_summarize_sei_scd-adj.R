@@ -73,7 +73,8 @@ eco_smry1 <- eco_smry_l1 %>%
 
 # calculating % CSA & GOA ------------------------------------------------------
 
-r_sei <- r_qsei1[[info1$id[info1$type == 'SEI']]]
+info_sei1 <- info1[info1$type == 'SEI', ]
+r_sei <- r_qsei1[[info_sei1$id]]
 
 # % core
 sei_core1 <- terra::extract(r_sei, eco1, percent_csa,  na.rm = TRUE)
@@ -88,6 +89,62 @@ sei_pcent <- left_join(sei_core2, sei_goa2, by = c('region', 'id')) %>%
   left_join(info1, by = 'id') %>% 
   select(-run2)
 
+
+# calculating C9 transition -----------------------------------------------
+# within a grazing level, and for a given scenario the area falling into
+# each of 9 possible SEI class changes
+
+size <- cellSize(r_sei[[1]], unit = 'ha', 
+                 transform = FALSE, mask = TRUE)
+
+r_c3 <- sei2c3(r_sei)
+
+info_sei2 <- info_sei1 %>% 
+  filter(RCP == 'Current') %>% 
+  select(-RCP, -years, -run2, -summary, -type) %>% 
+  right_join(filter(info_sei1, RCP != 'Current'),
+             by = join_by(run, group, graze),
+             suffix = c('_cur', '_fut')) 
+
+r_c9a <- c3toc9(current = r_c3[[info_sei2$id_cur]],
+                future = r_c3[[info_sei2$id_fut]])
+
+r_c9b <- c(r_eco1, size, r_c9a)
+
+# * area of c9 transition -------------------------------------------------
+
+c9_area1 <- as.data.frame(r_c9b) %>% 
+  rename(region = ecoregion) %>% 
+  mutate(cell_num = 1:n()) %>% 
+  pivot_longer(matches('^fire.*eind'),
+               values_to = 'c9',
+               names_to = "id") %>% 
+  mutate(c9 = c9_factor(c9)) %>% 
+  group_by(id, region, c9) %>% 
+  summarise(area = sum(area),
+            .groups = 'drop_last') %>% 
+  mutate(area_perc = area/sum(area)*100)
+
+
+# adding in entire study region
+c9_area2 <- c9_area1 %>% 
+  group_by(id, c9) %>% 
+  summarise(area = sum(area), .groups = 'drop_last') %>% 
+  mutate(area_perc = area/sum(area)*100,
+           region = levels(eco1$ecoregion)[1]) %>% 
+  bind_rows(c9_area1) %>% 
+  ungroup() %>% 
+  left_join(info1, by = 'id') %>% 
+  mutate(type = 'c9') %>% 
+  select(-run2)
+
+# check
+test <- c9_area2 %>% 
+  group_by(id, region) %>% 
+  summarize(total = sum(area_perc)) %>% 
+  pull(total)
+
+stopifnot(abs(test - 100) < 0.0001)
 
 # mean SEI by fire probability bin ----------------------------------------
 
@@ -160,4 +217,5 @@ write_csv(sei_pcent , paste0('data_processed/raster_means/', prefix,
 write_csv(df_seifire3, paste0('data_processed/raster_means/', prefix, 
                               '_sei-by-fire-bin_scd-adj_summaries_by-ecoregion.csv'))
 
-
+write_csv(c9_area2, paste0('data_processed/raster_means/', prefix, 
+                              '_c9-area_scd-adj_summaries_by-ecoregion.csv'))

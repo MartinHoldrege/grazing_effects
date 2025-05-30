@@ -288,6 +288,31 @@ c3toc9 <- function(current, future) {
   c9b
 }
 
+c9_factor <- function(x) {
+  c9Names <-  c(
+    'Stable CSA',
+    'CSA becomes GOA',
+    'CSA becomes ORA',
+    'GOA becomes CSA',
+    'Stable GOA',
+    'GOA becomes ORA',
+    'ORA becomes CSA',
+    'ORA becomes GOA',
+    'Stable ORA'
+  )
+  
+  if(all(x %in% c9Names)) {
+    levels = c9Names
+  } else if (all(x %in% 1:9)) {
+    levels <- 1:9
+  } else {
+    stop('x does not have the right values')
+  }
+  
+  factor(x, levels = levels,
+         labels = c9Names)
+}
+
 percent_csa <- function(x, na.rm = TRUE) {
   mean(x > 0.431, na.rm = na.rm)*100
 }

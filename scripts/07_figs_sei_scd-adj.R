@@ -11,6 +11,9 @@ source("src/params.R")
 runv <- paste0(run, v_interp)
 suffix <- paste0(runv, '_v1') # for figures
 v_input <- 'v2' # version for some input files
+
+scen_l <- list(RCP = c('RCP45', 'RCP85'),
+               years = c('2070-2100', '2070-2100'))
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -51,7 +54,10 @@ ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_",
 sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, 
                              '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
 
-
+# create in "scripts/06_summarize_sei_scd-adj.R"
+# area in each of 9 climate caused SEI class change categories
+c9_area2 <- read_csv(paste0('data_processed/raster_means/', runv, 
+                            '_c9-area_scd-adj_summaries_by-ecoregion.csv'))
 # prepare dataframes ------------------------------------------------------
 
 qsei2 <- qsei1 %>% 
@@ -89,6 +95,42 @@ png(paste0("figures/sei/q-sei_scd-adj_weighted_by-region_3pft_boxplot_", suffix,
 g3&theme(legend.position = 'bottom')
 dev.off()
 
+
+# c9 area barcharts -------------------------------------------------------
+
+c9_area3 <- c9_area2 %>% 
+  select(-id) %>% 
+  pivot_wider(values_from = c('area', 'area_perc'),
+              names_from = summary) %>% 
+  mutate(across(matches('area'), .fns = \(x) ifelse(is.na(x), 0, x)),
+         c9 = c9_factor(c9)) %>% 
+  df_factor()
+
+pmap(scen_l, function(RCP, years) {
+  
+  df <- c9_area3 %>% 
+    filter(RCP == !!RCP, 
+           years == !! years)
+  g <- ggplot(df, aes(c9, y = area_perc_median,fill = c9)) +
+    base_c9_area() +
+    geom_errorbar(aes(ymin = area_perc_low, ymax = area_perc_high, group = graze),
+                  stat = 'identity',
+                  width=.3,
+                  position=position_dodge(0.9)) +
+    guides(pattern = guide_legend(ncol = 1,
+                                  override.aes = list(fill = "white", color = 'black',
+                                                      size = 0.1))) + 
+    labs(x = 'Projected change in SEI class',
+         y = '% of region') +
+    facet_wrap(~region) +
+    theme(legend.position = 'right')
+  
+  path <- paste0(
+    "figures/sei/c9-bar_scd-adj_by-region_", RCP, "_", years, "_", suffix, ".png"
+  )
+  ggsave(path, g, dpi = 600, width = 9, height = 7)
+  
+})
 
 
 # GCM level results vs drivers --------------------------------------------

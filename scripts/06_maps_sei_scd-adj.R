@@ -8,6 +8,7 @@
 # parameters --------------------------------------------------------------
 
 source('src/params.R')
+v <- v_interp
 runv <- paste0(run, v)
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
 test_run <- FALSE

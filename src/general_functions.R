@@ -158,9 +158,10 @@ region_factor <- function(x, wafwa_only = FALSE, include_entire = TRUE) {
                 "Southern Great Basin")
   } else {
     levels <- c("Western Intermountain",
+                "Great Plains",
                 "Southern Great Basin",
-                'Eastern Intermountain',
-                "Great Plains")
+                'Eastern Intermountain'
+                )
   }
   if(include_entire) {
     levels <- c("Entire study area", levels)
@@ -186,6 +187,8 @@ region2wafwa <- function(x) {
 summary2factor <- function(x) {
   factor(x, levels = c('low', 'median', 'high'))
 }
+
+
 
 # * PFTs ------------------------------------------------------------------
 
