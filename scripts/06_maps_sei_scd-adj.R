@@ -7,11 +7,7 @@
 
 # parameters --------------------------------------------------------------
 
-v <- 'v4' # interpolation version
-# multiple runs may need to listed if different runs done for different
-# grazing levels
-
-run <- 'fire1_eind1_c4grass1_co20_2503'
+source('src/params.R')
 runv <- paste0(run, v)
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
 test_run <- FALSE
@@ -150,5 +146,37 @@ map2(args$groups, args$type_absolute, function(group, type) {
   
 })
 
+# SEI class and change maps -----------------------------------------------
 
 
+c3_graze <- c('M' = 'Moderate', 'VH' = 'Very Heavy')
+c3_rcp <- 'RCP45' # future scenario shown on map
+
+
+c3_info <- info1 %>% 
+  filter(type == 'SEI', graze %in% c3_graze,
+         RCP %in% c('Current', c3_rcp)) %>% 
+  select(-run2)
+
+c3_info2 <- c3_info %>% 
+  filter(RCP == 'Current') %>% 
+  select(-RCP, -years) %>% 
+  left_join(c3_info[c3_info$RCP != 'Current', ],
+            by = join_by(run, group, type, graze, summary),
+            suffix = c('_cur', '_fut'))
+
+r_c3 <- sei2c3(r_comb1[[c3_info$id]])
+
+r_c9 <- c3toc9(current = r_c3[[c3_info2$id_cur]],
+               future = r_c3[[c3_info2$id_fut]])
+
+
+
+g <- plot_4panel_c3c9(r_c3 = r_c3, r_c9 = r_c9,
+                 info_c3 = c3_info[c3_info$RCP == 'Current', ],
+                 info_c9 = c3_info[c3_info$RCP != 'Current', ]
+                 )
+filename <- paste0('figures/sei/maps/4panel_c3c9_RCP45_MVH_scd-adj_', runv, ".png")
+png(filename, res = 600, height = 3*1.8 + 1, width = 3*1.8 - 0.3, units = 'in')
+g
+dev.off()

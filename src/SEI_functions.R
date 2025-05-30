@@ -219,19 +219,73 @@ cov2q_raster <- function(r, eco_raster, pft) {
 
 # continuous sei to three categories of SEI
 sei2c3 <- function(x) {
-  stopifnot(
-    (x>=0 & x<=1) | is.na(x)
-  )
   
-  c3 <- dplyr::case_when(
-    x > 0.431 ~ 'CSA',
-    x <= 0.431 & x > 0.173 ~ 'GOA',
-    x <= 0.173 ~ 'ORA',
-    TRUE ~ NA
-  )
+  if(is.numeric(x)) {
+    stopifnot(
+      (x>=0 & x<=1) | is.na(x)
+    )
+    
+    c3 <- dplyr::case_when(
+      x > 0.431 ~ 'CSA',
+      x <= 0.431 & x > 0.173 ~ 'GOA',
+      x <= 0.173 ~ 'ORA',
+      TRUE ~ NA
+    )
+    
+    c3 <- factor(c3, levels = c('CSA', "GOA", "ORA"))
+    
+  } else if("SpatRaster" %in% class(x)) {
+    m <- matrix(c(
+      -Inf, 0.173, 3,  # ORA
+      0.173, 0.431, 2, # GOA
+      0.431, Inf, 1    # CSA
+    ), ncol = 3, byrow = TRUE)
+    
+    c3 <- terra::classify(x, m, right = TRUE)
+    
+    # levels(c3) <- data.frame(
+    #   ID = 1:3,
+    #   c3 = c("CSA", "GOA", "ORA")
+    # )
+    
+    names(c3) <- names(x)
+
+  } else {
+    stop('class not supported')
+  }
   
-  factor(c3, levels = c('CSA', "GOA", "ORA"))
+  c3
+}
+
+# takes two SEI class rasters, and creates a 9 class change raster
+c3toc9 <- function(current, future) {
+  c9From <-  c(11, 12, 13, 21, 22, 23, 31, 32, 33); 
+  c9To <-  c(1, 2, 3, 4, 5, 6, 7, 8, 9);
   
+  current10 <- current*10
+  
+  c9a <- current10 + future
+  
+  rcl <- matrix(c(c9From, c9To), byrow = FALSE, ncol = 2)
+  c9b <- terra::classify(c9a, rcl)
+  # c9Names <-  c(
+  #   'Stable CSA',
+  #   'CSA becomes GOA',
+  #   'CSA becomes ORA',
+  #   'GOA becomes CSA',
+  #   'Stable GOA',
+  #   'GOA becomes ORA',
+  #   'ORA becomes CSA',
+  #   'ORA becomes GOA',
+  #   'Stable ORA'
+  # )
+  # 
+  # levels(c9b) <- data.frame(
+  #   ID = 1:3,
+  #   c9 = c9Names
+  # )
+  names(c9b) <- names(future)
+  c9b
 }
 
 percent_csa <- function(x, na.rm = TRUE) {

@@ -294,7 +294,8 @@ box_abs_diff <- function(df_abs,
       theme(legend.position = 'none',
             axis.text.x = element_text(angle = 45, hjust = 1)),
       # add space on the left (for tags)
-      scale_x_discrete(expand = expansion(add = c(1, 0.5))) 
+      # (and adding space to the right, to be symetric)
+      scale_x_discrete(expand = expansion(add = c(1, 1))) 
     )
   }
   
@@ -324,13 +325,15 @@ box_abs_diff <- function(df_abs,
   g1b <- egg::tag_facet(g1, tag_pool = fig_letters[index_abs],
                         open = "",
                         close = "",
-                        hjust = -0.25) + 
+                        hjust = -0.1,
+                        size = 3) + 
     theme(strip.text = element_text())
   
   g2b <- egg::tag_facet(g2, tag_pool = fig_letters[index_diff],
                         open = "",
                         close = "",
-                        hjust = -0.25)+ 
+                        hjust = -0.1,
+                        size = 3)+ 
     theme(strip.text = element_text())
 
   g1b + g2b + plot_layout(widths = c(1, n_scen))
@@ -582,6 +585,26 @@ scale_fill_graze <- function(exclude = NULL) {
 
   scale_fill_manual(values = col, name = "Grazing")
 }
+
+scale_fill_c9 <- function(...) {
+  scale_fill_manual(values = unname(c9Palette),
+                    labels = names(c9Palette),
+                    na.value = 'transparent',
+                    na.translate = FALSE,
+                    name = 'SEI class change',
+                    drop = FALSE,
+                    ...)
+}
+
+scale_fill_c3 <- function(...) {
+  scale_fill_manual(values = unname(c3Palette),
+                    na.value = 'transparent',
+                    labels = names(c3Palette),
+                    na.translate = FALSE,
+                    name = 'SEI class',
+                    ...)
+}
+
 
 #' create values vector for ggplot, with midpoint, not 
 #' at mathematical midpoint, useful for not centered diverging color pallets

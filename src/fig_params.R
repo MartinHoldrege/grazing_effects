@@ -65,7 +65,41 @@ cols_ecoregion <- c("Great Plains" = "#ECA130",
 cols_seicont = c("#eee1ba", "#a6611a", "#78c679", "#006837", "#2166ac", "#053061")
 # these are the SEI category break points
 vals_seicont = c(0, 0.173, 0.174, 0.431, 0.432, 1)
-         
+
+
+# * SEI -------------------------------------------------------------------
+
+c9Names <-  c(
+  'Stable CSA',
+  'CSA becomes GOA',
+  'CSA becomes ORA',
+  'GOA becomes CSA',
+  'Stable GOA',
+  'GOA becomes ORA',
+  'ORA becomes CSA',
+  'ORA becomes GOA',
+  'Stable ORA'
+)
+
+c3Names <- c("CSA", "GOA", "ORA")
+
+c9Palette = c('#142b65', # stable core (black)
+              '#b30000', #'#d7301f', # core becomes grow # reds from 9-class OrRd
+              '#67001f',  # core becomes other
+              '#757170', # grow becomes core
+              '#99d4e7', # stable grow
+              '#fc8d59', # grow becomes other
+              '#000000', # other becomes core
+              '#D9D9D9', # other becomes grow
+              '#eee1ba') # stable other
+
+
+names(c9Palette) <- c9Names
+
+c3Palette <- c9Palette[c(1, 5, 9)]
+names(c3Palette) <- c3Names
+
+
 # * for maps --------------------------------------------------------------
 
 # Create color ramp that represents the proportional changes in biomass...

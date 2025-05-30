@@ -667,6 +667,87 @@ plot_map_20panel_perc <- function(
 }
 
 
+# four panels, top row is is historical c3, bottomr row is future c9,
+# columns are two grazing levels
+plot_4panel_c3c9 <- function(r_c3, r_c9, info_c3, info_c9) {
+  
+  stopifnot(
+    nrow(info_c3) == 2,
+    nrow(info_c9) ==2
+  )
+  
+  info_c3$type <- 'c3'
+  info_c9$type <- 'c9'
+  info_comb <- bind_rows(info_c3, info_c9) %>% 
+    arrange(type, RCP, years, graze) %>%
+    ungroup() %>% 
+    mutate(tag_label = fig_letters[1:n()])
+  
+  levs <- levels(info_comb$graze)
+  graze_labs <- paste0(levs[levs %in% info_comb$graze], '\nGrazing')
+  names4leftside <- c('c3' = 'SEI class',
+                      'c9' = 'Change in SEI class')
+  levs_l <- list(c3 = data.frame(ID = 1:3, 
+                                 class = c3Names),
+                 c9 = data.frame(ID = 1:9, 
+                                 class = c9Names))
+  label_left <- info_comb %>% 
+    filter(.data$graze == unique(.data$graze)[1]) %>% 
+    mutate(rcp_year = rcp_label(.data$RCP, .data$years,
+                                include_parenth = FALSE),
+           label_left = paste0(rcp_year, '\n', names4leftside[type])) %>% 
+    pull(label_left)
+  
+  fill <- list(
+    'c3' = scale_fill_c3,
+    'c9' = scale_fill_c9
+  )
+  
+  r_l <- list('c3' = r_c3,
+              'c9' = r_c9)
+  
+  
+  plots1 <- pmap(info_comb[c('id', 'type', 'tag_label')], 
+                 function(id, type, tag_label) {
+                   fl <- fill[[type]]
+                   r <- r_l[[type]][[id]]
+                   levels(r) <- levs_l[[type]]
+                   plot_map2(r = r,
+                             panel_tag = tag_label) + 
+                     fl()
+                 })
+  
+  # labels for the top margin
+  plots_top <- map(graze_labs, function(x) {
+    ggplot() +
+      theme_void() +
+      annotate("text", x = 1, y = 1, label = x, size = 3) +
+      theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+  })
+  
+  # labels for the left margin
+  plots_left <- map(label_left, function(x) {
+    ggplot() +
+      theme_void() +
+      annotate("text", x = 1, y = 1, label = x, angle = 90, size = 3) +
+      theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+  })
+  
+  # this is hard coded, would need to make this more
+  # flexible if want to change number of panels
+  plots2 <- c(list(plot_spacer()), plots_top,
+              plots_left[1], plots1[1:2],
+              plots_left[2], plots1[3:4])
+  
+  
+  g <- patchwork::wrap_plots(plots2, nrow = 3,
+                             widths = c(0.18, rep(1,2)), 
+                             heights = c(0.18, rep(1, 2))) + 
+    plot_layout(guides = 'collect')
+  
+  g2 <- g&theme(legend.position = 'none')
+  g2
+}
 
 # crs -----------------------------------------------------------------------
 

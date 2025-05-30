@@ -8,14 +8,9 @@
 
 # parameters --------------------------------------------------------------
 
-v <- 'v4' # interpolation version
-# multiple runs may need to listed if different runs done for different
-# grazing levels
-
-run <- 'fire1_eind1_c4grass1_co20_2503'
+source('src/params.R')
 
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
-
 
 # dependencies ------------------------------------------------------------
 
@@ -105,57 +100,16 @@ for(group in args$groups){
 
 }
 
-
 # 20 panel % change --------------------------------------------------------------
+# semi-functioning code of % change maps was here--see pre 5/29/25 commits
 
-# g <- plot_map_20panel_perc(
-#   r = r_comb1,
-#   info = info_tmp,
-#   type_absolute = args$type_absolute[[group]],
-#   type_diff =  args$type_diff[[group]],
-#   title = args$titles[[group]],
-#   name4absolute = args$type_absolute[[group]],
-#   palette_absolute = cols_map_bio(10),
-#   palette_diff = cols_map_bio_d2,
-#   lims_diff = c(-100, 300)
-# )
-# 
-# filename <- paste0('figures/sei/maps/20panel_', group, '-', 
-#                    args$type_absolute[[group]], '-perc_', run, ".png")
-# png20panel(filename)
-# print(g)
-# dev.off()
 
-# for(group in args$groups){
-#   
-#   info_tmp <- info1 %>% 
-#     filter(.data$group == !!group)
-#   
-#   type_absolute <- args$type_absolute[[group]]
-#   type_diff =  args$type_diff[[group]]
-#   name4absolute <-  args$type_absolute[[group]]
-#   name4diff <- paste("\u0394", name4absolute, '(%)')
-#   r_perc <- calc_rast_perc_change(r_comb1, info = info_tmp,
-#                                   type_absolute = type_absolute,
-#                                   type_diff = type_diff)
-#   
-#   g <- plot_map_20panel(
-#     r = r_perc,
-#     info = info_tmp,
-#     type_absolute = type_absolute,
-#     type_diff =  type_diff,
-#     title = args$titles[[group]],
-#     name4absolute = name4absolute,
-#     name4diff = name4diff,
-#     palette_absolute = cols_map_bio(10),
-#     palette_diff = cols_map_bio_d2,
-#     lims_diff = c(-100, 300),
-#     midpoint_diff = 0
-#   )
-#   
-#   filename <- paste0('figures/sei/maps/20panel_', group, '-', 
-#                      args$type_absolute[[group]], '-perc_', run, ".png")
-#   png20panel(filename)
-#   print(g)
-#   dev.off()
-# }
+
+
+
+
+
+
+
+
+
