@@ -706,6 +706,7 @@ plot_4panel_c3c9 <- function(r_c3, r_c9, info_c3, info_c9) {
   r_l <- list('c3' = r_c3,
               'c9' = r_c9)
   
+  guide_l <- list('c3' = 'right', 'c9' = 'none')
   
   plots1 <- pmap(info_comb[c('id', 'type', 'tag_label')], 
                  function(id, type, tag_label) {
@@ -714,9 +715,13 @@ plot_4panel_c3c9 <- function(r_c3, r_c9, info_c3, info_c9) {
                    levels(r) <- levs_l[[type]]
                    plot_map2(r = r,
                              panel_tag = tag_label) + 
-                     fl()
+                     fl() + 
+                     theme(legend.position = guide_l[[type]],
+                           plot.tag.position =  'topleft',
+                           plot.tag.location = 'panel',
+                           plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
                  })
-  
+
   # labels for the top margin
   plots_top <- map(graze_labs, function(x) {
     ggplot() +
@@ -732,21 +737,23 @@ plot_4panel_c3c9 <- function(r_c3, r_c9, info_c3, info_c9) {
       annotate("text", x = 1, y = 1, label = x, angle = 90, size = 3) +
       theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
   })
-  
+  color_matrix1 <- color_matrix() # to serve as a legend
   # this is hard coded, would need to make this more
   # flexible if want to change number of panels
-  plots2 <- c(list(plot_spacer()), plots_top,
-              plots_left[1], plots1[1:2],
-              plots_left[2], plots1[3:4])
+  s <- list(plot_spacer())
   
+  plots2 <- c(s, plots_top, s,
+              plots_left[1], plots1[1:2], list(guide_area()), 
+              plots_left[2], plots1[3:4], list(free(color_matrix1)))
   
-  g <- patchwork::wrap_plots(plots2, nrow = 3,
-                             widths = c(0.18, rep(1,2)), 
-                             heights = c(0.18, rep(1, 2))) + 
+  # for troubleshooting layout
+  # plots2 <- map(plots2, \(x) x +   theme(plot.background = element_rect(color = "blue", fill = NA, size = 1)))
+
+  patchwork::wrap_plots(plots2, ncol = 4,
+                             widths = c(0.13, 1, 1, 0.55), 
+                             heights = c(0.13, 1, 1)) + 
     plot_layout(guides = 'collect')
-  
-  g2 <- g&theme(legend.position = 'none')
-  g2
+ 
 }
 
 # crs -----------------------------------------------------------------------

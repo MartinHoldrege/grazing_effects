@@ -18,6 +18,11 @@ legend_pos_box1 <- "top"
 line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
 outlier.size <-  0.5 # outlier size used in boxplot functions below
 
+
+# dependencies ------------------------------------------------------------
+
+source("src/fig_params.R")
+
 # ggplot themes -----------------------------------------------------------
 
 theme_custom1 <- function() {
@@ -685,3 +690,59 @@ values_about_midpoint <- function(colors, midpoint, limits) {
 png20panel <- function(filename) {
   png(filename, res = 600, height = 5*1.8 + 1, width = 4*1.8 - 0.3, units = 'in')
 }
+
+# create 9 color matrix ---------------------------------------------------
+# Creating a 3x3 colored matrix of current and future SEI classes,
+
+
+color_matrix <- function() {
+  
+  
+  c3_levels <- c('CSA', 'GOA', 'ORA')
+  
+  # c9 levels, with there associated current and future SEI categories
+  df_c9 <- tibble(
+    c9Name  = c9Names, 
+    c9Value = 1:9,
+    current = rep(c3_levels, each = 3), # Current SEI (3 levels)
+    future = rep(c3_levels, 3) # future SEI (3 levels)
+  ) %>% 
+    mutate(
+      current = factor(current, levels = rev(c3_levels)),
+      future = factor(future, levels = c3_levels)
+    )
+  
+  # Adding label column (category of change)
+  df_c9$label <- NA
+  df_c9$label[c(1, 5, 9)] <- "Stable"
+  df_c9$label[c(2, 3, 6)] <- "Decline"
+  df_c9$label[c(4, 7, 8)] <- "Increase"
+  
+  # color of text in color matrix
+  text_color <- rep('black', 9)
+  text_color[c(1, 2, 3, 4, 7)] <- 'white' # background is dark
+  names(text_color) <- c9Names
+  stopifnot(names(c9Palette) == df_c9$c9Name)
+  c9Palette
+  text_color
+  c9Names
+  ggplot(df_c9, aes(future, current)) +
+    geom_tile(aes(fill = c9Name)) +
+    geom_text(aes(label = label, color = c9Name), size = 2) +
+    theme_minimal() +
+    scale_x_discrete(position = 'top') +
+    scale_fill_manual(values = c9Palette) +
+    labs(x = "Future",
+         y = "Current") +
+    scale_color_manual(values = text_color)+
+    theme(panel.grid = element_blank(),
+          legend.position = 'none',
+          text = element_text(size = 8),
+          # alternatively make the background white
+          plot.background = element_rect(fill = 'transparent', 
+                                         color = 'transparent'),
+          plot.margin = unit(c(0, 0, 0, 0), "in"),
+          aspect.ratio = 1)
+}
+
+

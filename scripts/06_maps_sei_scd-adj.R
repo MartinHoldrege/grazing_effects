@@ -12,7 +12,6 @@ v <- v_interp
 runv <- paste0(run, v)
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
 test_run <- FALSE
-
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -22,6 +21,7 @@ source("src/general_functions.R")
 source("src/fig_params.R")
 source("src/mapping_functions.R")
 source('src/fig_functions.R')
+source('src/SEI_functions.R')
 
 # read in data ------------------------------------------------------------
 
@@ -149,11 +149,11 @@ map2(args$groups, args$type_absolute, function(group, type) {
 
 # SEI class and change maps -----------------------------------------------
 
-
 c3_graze <- c('M' = 'Moderate', 'VH' = 'Very Heavy')
-c3_rcp <- 'RCP45' # future scenario shown on map
+c3_rcps <- c('RCP45', 'RCP85') # future scenario shown on map
 
 
+for(c3_rcp in c3_rcps) {
 c3_info <- info1 %>% 
   filter(type == 'SEI', graze %in% c3_graze,
          RCP %in% c('Current', c3_rcp)) %>% 
@@ -177,7 +177,13 @@ g <- plot_4panel_c3c9(r_c3 = r_c3, r_c9 = r_c9,
                  info_c3 = c3_info[c3_info$RCP == 'Current', ],
                  info_c9 = c3_info[c3_info$RCP != 'Current', ]
                  )
-filename <- paste0('figures/sei/maps/4panel_c3c9_RCP45_MVH_scd-adj_', runv, ".png")
-png(filename, res = 600, height = 3*1.8 + 1, width = 3*1.8 - 0.3, units = 'in')
-g
+
+
+filename <- paste0('figures/sei/maps/4panel_c3c9_',
+                   c3_rcp, '_',
+                   paste(names(c3_graze), collapse = ''), '_scd-adj_', 
+                   runv, ".png")
+png(filename, res = 600, height = 6.2, width = 7.5, units = 'in')
+  print(g)
 dev.off()
+}
