@@ -213,6 +213,7 @@ C3_Pgrass_ratio <- pft5_bio1 %>%
 
 # this throws a warning (which is ok) because utilization is 0 for some groups
 pft5_bio_d2 <-  pft5_bio1 %>% 
+  filter(run %in% runs_graze) %>% 
   # calculating % scaled change for biomass and individuals
   scaled_change_2var(by = c("run", "PFT", "graze"),
                      vars = c("biomass", "indivs", "utilization"),
@@ -221,9 +222,9 @@ pft5_bio_d2 <-  pft5_bio1 %>%
                      divide_by_max = FALSE) %>% 
   # median across GCMs
   group_by(run, site, years, RCP, PFT, graze, id) %>% 
-  summarise_bio_indivs(suffix = "_diff") %>% 
-  create_id2() %>%  # adding another id variable
-  filter(run %in% runs_graze)
+  summarise_bio_indivs(suffix = "_diff", include_low_high = TRUE) %>% 
+  create_id2() # adding another id variable
+  
 
 
 # effect size; es = ln(biomass scenario of interest/biomass references group)

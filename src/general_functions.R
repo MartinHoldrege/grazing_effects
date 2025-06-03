@@ -744,25 +744,48 @@ summarize_across_GCMs <- function(df, var) {
 #' @param df dataframe with indivs, biomass and bio_suffix, and indivs_suffix
 #' columns
 #' @param suffix string, the suffix (e.g. _diff, _es), of columns of interest
+#' @param include_low_high also provide low/high estimates across GCMs (in addition
+#' to the median)
 #'
 #' @return dataframe, with median values for the biomass and indivs columns
 summarise_bio_indivs <- function(df, suffix = "_diff",
                                  col_names = c('biomass', "indivs", "utilization"),
-                                 abbreviations = c("bio", "indivs", "util")){
+                                 abbreviations = c("bio", "indivs", "util"),
+                                 include_low_high = FALSE){
   
   # columns to summarise
   columns <- c(col_names, paste0(abbreviations, suffix))
   
+
+  if(include_low_high) {
+    tmp_summarize <- function(df) {
+      summarise(df, across(.cols = all_of(!!columns),
+                           .fns = list('median' = ~ median(.x, na.rm = TRUE),
+                                       'low' = calc_low, 
+                                       'high' = calc_high),
+                           .names = "{.col}_{.fn}"),
+                .groups = "drop") %>% 
+        dplyr::rename_with(.fn = ~ str_replace(.x, "_median", ""),
+                    .cols = matches("_median$"))
+    }
+    
+    } else {
+      tmp_summarize <- function(df) {
+        summarise(df, across(.cols = all_of(!!columns),
+                             .fns = \(x) median(x, na.rm = TRUE)),
+                  .groups = "drop") 
+      }
+  }
   # using dtplyr because summarise is super slow with across() which is a
   # known issue: https://github.com/tidyverse/dplyr/issues/4953
   
   # note the use of !!columns below, that is a work around a bug in dtplyr
   # https://github.com/tidyverse/dtplyr/issues/164
+
   out <- df %>% 
-    lazy_dt() %>% # i observed up to 30x speed increase by using dtplyr here
-    summarise(across(.cols = all_of(!!columns),
-                     .fns = median, na.rm = TRUE),
-              .groups = "drop") %>% 
+    # now using lazy_dt with tmp_summarize isn't working
+    # lazy_dt() %>% # i observed up to 30x speed increase by using dtplyr here
+    tmp_summarize() %>% 
     as_tibble() # convert back to tibble
   
   out

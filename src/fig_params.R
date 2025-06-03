@@ -66,7 +66,9 @@ cols_seicont = c("#eee1ba", "#a6611a", "#78c679", "#006837", "#2166ac", "#053061
 # these are the SEI category break points
 vals_seicont = c(0, 0.173, 0.174, 0.431, 0.432, 1)
 
-
+# colors for summary across GCMs
+cols_smry <-   c(low = "#ffffcc", 'median' = "#a1dab4",
+                 'high' = "#2c7fb8") 
 # * SEI -------------------------------------------------------------------
 
 c9Names <-  c(

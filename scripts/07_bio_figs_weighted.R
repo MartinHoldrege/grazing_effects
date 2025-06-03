@@ -82,6 +82,12 @@ bio_gcm2 <- bio_gcm1 %>%
 pft5_bio_d3 <- pft5_bio_d2 %>% 
   filter_clim_extremes() %>% 
   filter(run == !!run) %>% 
+  rename(bio_diff_median = bio_diff) %>% 
+  select(run, site, years, RCP, PFT, graze, matches('bio_diff')) %>% 
+  pivot_longer(cols = matches('bio_diff_'),
+               values_to = 'bio_diff',
+               names_to = 'summary',
+               names_pattern = '([[:alpha:]]+$)') %>% 
   left_join(w1[w1$region == entire, ], 
             by = 'site') %>% 
   df_factor() %>% 
@@ -168,38 +174,39 @@ g2
 dev.off()
 
 # absolute biomass for current and %change for future
+pft5 <- c(pfts, 'C3Pgrass', 'C4Pgrass')
+args <- list(
+  pfts = list(pfts, pft5, pfts, pft5),
+  RCP = c('RCP45', 'RCP45', 'RCP85', 'RCP85')
+)
 
-df_abs <- bio4 %>% 
-  filter(RCP == 'Current', region == entire, PFT %in% pfts)
+pmap(args, function(pfts, RCP) {
+  df_abs <- bio4 %>% 
+    filter(RCP == 'Current', region == entire, PFT %in% pfts) %>% 
+    filter(summary == 'median')
+  
+  df_diff <- pft5_bio_d3 %>% 
+    filter(region == entire) %>% 
+    filter(RCP == !!RCP, PFT %in% pfts)
+  
+  g1 <- box_abs_diff(df_abs = df_abs,
+               df_diff = df_diff,
+               y_abs = 'biomass',
+               y_diff = 'bio_diff',
+               ylab_abs = lab_bio0,
+               ylab_diff = lab_bio2)
+  
+  # Pub qual for the main manuscript
+  n_pft <- length(pfts)
+  filename <- paste0("bio-abs-diff_weighted_entire_",
+                     n_pft, "pft_boxplot_", RCP, "_", 
+                     suffix, ".png")
+  
+  ggsave(file.path("figures/biomass", filename),plot = g1,
+      width = 4.5, height = 5*n_pft/3, dpi = 600)
 
-df_diff <- pft5_bio_d3 %>% 
-  filter(RCP == 'RCP45', PFT %in% pfts)
+})
 
-g1 <- box_abs_diff(df_abs = df_abs,
-             df_diff = df_diff,
-             y_abs = 'biomass',
-             y_diff = 'bio_diff',
-             ylab_abs = lab_bio0,
-             ylab_diff = lab_bio2)
-
-# Pub qual for the main manuscript
-png(paste0("figures/biomass/bio-abs-diff_weighted_entire_3pft_boxplot_RCP45_", suffix, ".png"),
-    width = 3, height = 5, units = 'in', res = 600)
-g1
-dev.off()
-
-g2 <- box_abs_diff(df_abs = df_abs,
-             df_diff = filter(pft5_bio_d3, PFT %in% pfts),
-             y_abs = 'biomass',
-             y_diff = 'bio_diff',
-             ylab_abs = lab_bio0,
-             ylab_diff = lab_bio2)
-
-# pub qual for the appendix
-png(paste0("figures/biomass/bio-abs-diff_weighted_entire_3pft_boxplot_", suffix, ".png"),
-    width = 3.7, height = 5, units = 'in', res = 600)
-g2
-dev.off()
 
 
 

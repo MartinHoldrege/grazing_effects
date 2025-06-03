@@ -235,10 +235,10 @@ weighted_box1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
     theme(panel.spacing.x = unit(0, "lines"),
           axis.text.x = element_text(angle = 45, hjust = 1),
           strip.text.x.top = element_text(size = rel(0.7))) +
+    scale_fill_smry() +
     labs(x = lab_graze,
          y = ylab,
-         subtitle = subtitle,
-         fill = 'Summary across GCMs')
+         subtitle = subtitle)
 }
 
 # boxplot (same as weighted box, but w/ fivenumber summary)
@@ -293,24 +293,27 @@ box_abs_diff <- function(df_abs,
   
   base <- function() {
     list(
-      geom_boxplot(aes(weight = weight), coef = 10),
+      geom_boxplot(aes(weight = weight), coef = 10,
+                   position = position_dodge2(preserve = 'single')),
+      scale_fill_smry(),
       facet_grid(PFT~rcp_year, scales = 'free_y'),
-      scale_fill_graze(),
-      theme(legend.position = 'none',
-            axis.text.x = element_text(angle = 45, hjust = 1)),
-      # add space on the left (for tags)
-      # (and adding space to the right, to be symetric)
-      scale_x_discrete(expand = expansion(add = c(1, 1))) 
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
     )
   }
-  
-  g1 <- ggplot(df_abs, aes(graze, .data[[y_abs]], fill = graze)) +
+
+  g1 <- ggplot(df_abs, aes(graze, .data[[y_abs]], fill = summary)) +
     base() +
     theme(strip.background.y = element_blank(), strip.text.y = element_blank()) +
     labs(x = lab_graze,
-         y = ylab_abs) 
+         y = ylab_abs) +
+    # add space on the left (for tags)
+    # (and adding space to the right, to be symetric)) 
+    scale_x_discrete(expand = expansion(add = c(1, 1))) +
+    guides(fill = 'none') +
+    expand_limits(y = 0)
   
-  g2  <- ggplot(df_diff, aes(graze, .data[[y_diff]], fill = graze))+
+  g2  <- ggplot(df_diff, aes(graze, .data[[y_diff]], fill = summary))+
     geom_hline(yintercept = 0, alpha = 0.5, linetype = 2)+
     base() +
     labs(x = lab_graze,
@@ -341,7 +344,9 @@ box_abs_diff <- function(df_abs,
                         size = 3)+ 
     theme(strip.text = element_text())
 
-  g1b + g2b + plot_layout(widths = c(1, n_scen))
+  comb <- g1b + g2b + plot_layout(widths = c(0.33, n_scen),
+                          guides = 'collect')
+  comb&theme(legend.position = "bottom")
 }
 
 
@@ -609,6 +614,11 @@ rcp_label <- function(rcp, years, add_letters = FALSE,
 # grazing colors (cols_graze defined in the fig_params.R script)
 scale_color_graze <- function() {
   scale_color_manual(values = cols_graze, name = "Grazing")
+}
+
+scale_fill_smry <- function() {
+  scale_fill_manual(values = cols_smry,
+                    name = 'Summary across GCMs')
 }
 
 scale_fill_graze <- function(exclude = NULL) {
