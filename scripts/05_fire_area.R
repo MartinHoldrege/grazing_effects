@@ -7,12 +7,10 @@
 
 # params ------------------------------------------------------------------
 
-run <- 'fire1_eind1_c4grass1_co20_2503'
+source('src/params.R')
+
 test_run <- FALSE
-
 v <- 'v2' # version for output files
-
-v_interp <- 'v4' # interpolation version (input files)
 
 # dependencies ------------------------------------------------------------
 
@@ -35,12 +33,17 @@ fire_files <- list.files(
 # it's not actually loaded into memory
 r_prob_gcm1 <- terra::rast(fire_files) # class SpatRast
 
-if(test_run) {
-  r_prob_gcm1 <- r_prob_gcm1[[1:2]]
-}
+
 
 into_gcm <- c("type", "RCP", "years",  "graze", "GCM")
 info_gcm1 <- create_rast_info(r_prob_gcm1, into = into_gcm)
+
+# fire probability summarized across GCMs
+r_prob_smry1 <- rast(paste0("data_processed/interpolated_rasters/", 
+                            run, "_fire-prob_future_summary_across_GCMs.tif"))
+info_smry1 <- create_rast_info(r_prob_smry1, 
+                               into = c("type", "RCP", "years",  "graze", 
+                                        "summary"))
 
 # computing wise it would be faster to have total_region = FALSE
 # and then sum the summary stats for the individual
@@ -49,6 +52,12 @@ info_gcm1 <- create_rast_info(r_prob_gcm1, into = into_gcm)
 eco1 <- load_wafwa_ecoregions(total_region = TRUE)
 
 r_eco1 <- load_wafwa_ecoregions_raster() # raster of ecoregions
+
+if(test_run) {
+  r_prob_gcm1 <- downsample(r_prob_gcm1) 
+  r_prob_smry1 <- downsample(r_prob_smry1)
+  r_eco1 <- downsample(r_eco1)
+}
 
 # vectors etc -------------------------------------------------------------
 
@@ -62,7 +71,7 @@ age_groups <- create_age_groups()
 # the probability of falling into any one of the categories should be 1
 # (b/ the categories include all possible years)
 test <- map_dbl(age_groups, function(x) {
-  prob_geometric_rule(p = 0.01, a = x['a'], b = x['b'])
+  prob_geometric_rule(p = 0, a = x['a'], b = x['b'])
 })
 stopifnot(all.equal(sum(test), 1))
 
@@ -111,12 +120,15 @@ ba_eco3 <- ba_eco2 %>%
 
 # area by by stand age ----------------------------------------------------
 
+
+# *gcm-wise ---------------------------------------------------------------
+
 # probability of each pixel of falling into a given age group
 prob_by_age_group_l <- map(age_groups, function(x) {
   prob_geometric_rule(r_prob_gcm2, a = x['a'], b = x['b'])
 })
 
-# excpecte area (for each pixel) by age group
+# excpected area (for each pixel) by age group
 area_by_age_group_l <- map(prob_by_age_group_l, \(x) x*area)
 
 area_age_group1 <- map(area_by_age_group_l, 
@@ -144,6 +156,50 @@ area_age_group3 <- area_age_group2 %>%
             area_low = calc_low(area),
             area_high = calc_high(area),
             .groups = "drop")
+
+
+# * pixelwise median fire prob --------------------------------
+# using the abbreviation 'pw' to denote pixelwise
+# these summaries are same as above but for median fire probability
+# this way the median fire probability summed across groups
+# sums to area of region
+
+info_smry2 <- info_smry1 %>% 
+  filter(summary == 'median')
+
+r_prob_smry2 <- r_prob_smry1/100 # convert % to proportion
+
+# probability of each pixel of falling into a given age group
+prob_by_age_group_l_pw <- map(age_groups, function(x) {
+  prob_geometric_rule(r_prob_smry2[[info_smry2$id]], a = x['a'], b = x['b'])
+})
+
+# excpecte area (for each pixel) by age group
+area_by_age_group_l_pw <- map(prob_by_age_group_l_pw, \(x) x*area)
+
+area_age_group1_pw <- map(area_by_age_group_l_pw, 
+                       \(x) terra::extract(x, vect(eco1), fun = sum, 
+                                           na.rm = TRUE, touches = FALSE))
+
+area_age_group2_pw <- map(area_age_group1_pw, function(x) {
+  x$ecoregion <- eco1$ecoregion[x$ID]
+  x$ID <- NULL
+  
+  x %>% 
+    pivot_longer(cols = -ecoregion,
+                 names_to = 'id',
+                 values_to = 'area') 
+  
+}) %>% 
+  bind_rows(.id = 'age_group') %>% 
+  left_join(info_smry1, by = 'id')
+
+# renaming (and widening if there were multiple summary stats)
+# so format consistent with area_age_group3
+area_age_group3_pw <- area_age_group2_pw %>% 
+  pivot_wider(values_from = 'area',
+              names_from = 'summary',
+              names_prefix = 'area_')
 
 # area by ecoregion -------------------------------------------------------
 # for % of area calculations
@@ -178,5 +234,9 @@ if(!test_run) {
   
   write_csv(area_age_group3, 
             paste0("data_processed/area/area-by-age-group_", v, "_", run, 
+                   ".csv"))
+  
+  write_csv(area_age_group3_pw, 
+            paste0("data_processed/area/area-by-age-group_pw_", v, "_", run, 
                    ".csv"))
 }

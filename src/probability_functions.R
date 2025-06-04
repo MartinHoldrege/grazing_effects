@@ -35,7 +35,10 @@ prob_geometric_rule <- function(p, a = 0, b) {
   # 'previous' (a - 1) sums are subtracted
   prob_a_b <- (1 - Pnf^(b + 1))/(1 - Pnf) - (1 - Pnf^a)/(1 - Pnf)
   
-  prob_a_b*p # the sequence must occur after a fire
+  result <- prob_a_b*p # the sequence must occur after a fire
+  
+  # undefined for p = 0, so returning the limits as p approaches 0
+  ifelse(p == 0 & b < Inf, 0, ifelse(p == 0 & b == Inf, 1, result))
 }
 
 
