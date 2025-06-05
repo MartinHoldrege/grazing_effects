@@ -546,6 +546,12 @@ add_sec_axis <- function(name = "% Change", breaks = waiver(),...) {
                                          ...)) 
 }
 
+adjust_graze_x_axis <- function() {
+  list(
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)),
+    labs(x = lab_graze))
+}
+
 # label functions ---------------------------------------------------------
 
 # convert effect size to percent change

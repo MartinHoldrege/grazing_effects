@@ -393,6 +393,7 @@ df_factor <- function(df) {
   if("PFT" %in% nms) df$PFT <- pft_all_factor(df$PFT)
   
   if("region" %in% nms) df$region <- region_factor(df$region)
+  if("ecoregion" %in% nms) df$ecoregion <- region_factor(df$ecoregion)
   
   if('summary' %in% nms) df$summary <- summary2factor(df$summary)
   

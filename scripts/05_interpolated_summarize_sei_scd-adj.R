@@ -57,7 +57,8 @@ r_eco1 <- load_wafwa_ecoregions_raster(wafwa_only = TRUE)
 
 # summary stats calculated for these regions:
 eco1 <- load_wafwa_ecoregions(total_region = TRUE, wafwa_only = FALSE)
-
+r_eco4 <- load_wafwa_ecoregions_raster()
+size <- load_cell_size()
 # info --------------------------------------------------
 
 rast_info <- create_rast_info(rast1, id_noGCM = TRUE) %>% 
@@ -67,15 +68,13 @@ rast_info <- create_rast_info(rast1, id_noGCM = TRUE) %>%
 rast2 <- rast1[[rast_info$id]]
 
 if(test_run) {
-  size <- 100
-  rast2 <- spatSample(rast2, size = size, method = 'regular',
-                      as.raster = TRUE)
-  scd_cov1 <- spatSample(scd_cov1, size = size, method = 'regular',
-                        as.raster = TRUE)
-  r_eco1 <- spatSample(r_eco1, size = size, method = 'regular',
-                       as.raster = TRUE)
-  scd_q1 <- spatSample(scd_q1, size = size, method = 'regular',
-                       as.raster = TRUE)
+  rast2 <- downsample(rast2)
+  scd_cov1 <- downsample(scd_cov1)
+  r_eco1 <- downsample(r_eco1)
+  scd_q1 <- downsample(scd_q1)
+  r_eco4 <- downsample(r_eco4)
+  # after downsampling the size is wrong, but this is just for testing
+  size <- downsample(size) 
 }
 
 compareGeom(scd_cov1, rast2)
@@ -165,6 +164,8 @@ names(sei_scd_adj1) <- str_replace(names(sei_scd_adj1), regex_pft, 'SEI') %>%
 
 sei_scd_adj1 <- writeReadRast(sei_scd_adj1, 'sei_scd_adj1')
 
+
+
 # * calculate gcm level summaries -----------------------------------------
 
 info_sei <- create_rast_info(sei_scd_adj1, 
@@ -173,25 +174,59 @@ info_sei <- create_rast_info(sei_scd_adj1,
                              id_noGCM = TRUE)  
 
 
+
+
 # mean SEI for each region and GCM
 sei_mean1 <- terra::extract(sei_scd_adj1, eco1, mean,  na.rm = TRUE)
 sei_core1 <- terra::extract(sei_scd_adj1, eco1, percent_csa,  na.rm = TRUE)
-
-sei_mean2 <- pivot_longer_extracted(sei_mean1, as.character(eco1$ecoregion), 
+sei_goa1 <- terra::extract(sei_scd_adj1, eco1, percent_goa,  na.rm = TRUE)
+regions <- as.character(eco1$ecoregion)
+sei_mean2 <- pivot_longer_extracted(sei_mean1, regions, 
                                     values_to = 'SEI_mean')
 
-sei_core2 <- pivot_longer_extracted(sei_core1, as.character(eco1$ecoregion), 
+sei_core2 <- pivot_longer_extracted(sei_core1, regions, 
                                     values_to = 'percent_csa')
+sei_goa2 <- pivot_longer_extracted(sei_goa1, regions, 
+                                   values_to = 'percent_goa')
 
 sei_mean_core1 <- left_join(sei_mean2, sei_core2, by = c("id", "region")) %>% 
   left_join(info_sei, by = 'id') %>% 
+  left_join(sei_goa2, by = c("id", "region")) %>% 
   select(-run2, -id_noGCM)
+
+
+# * gcm-wise mean sei by c3 and ecoregion ---------------------------------
+# mean SEI for each ecoregion and historical SEI class in that ecoregion
+
+# 'SEI of the reference class (i.e. this is SEI as in Doherty, except for
+# the artifacts of our approach that are do to coarse 1km scaling)
+id_ref <- info_sei %>% 
+  filter(RCP == 'Current', group == 'SEI', graze == ref_graze) %>% 
+  pull(id)
+stopifnot(length(id_ref) == 1)
+
+c3_ref <- sei2c3(sei_scd_adj1[[id_ref]])
+c3eco <- c3_ref*10 + as.numeric(r_eco4)
+names(c3eco) <- 'c3eco'
+c3eco_sei1 <- zonal(sei_scd_adj1, c3eco, fun = 'mean')
+c3eco_area1 <- zonal(size, c3eco, fun = 'sum')
+
+c3eco_sei2_gcm <- c3eco_sei1 %>% 
+  pivot_longer(-c3eco,
+               values_to = 'SEI_mean',
+               names_to = 'id') %>% 
+  mutate(c3 = c3eco_to_c3(c3eco),
+         region = c3eco_to_eco(c3eco, levels(r_eco4)[[1]]$ecoregion)) %>% 
+  left_join(c3eco_area1, by = "c3eco") %>% 
+  left_join(info_sei, by = 'id') %>% 
+  select(-c3eco)
+
 
 # Calculate summaries and differences -------------------------------------
 
 
 # *median/low/high --------------------------------------------------------
-# summaries across GCMs
+# pixelwise summaries across GCMs
 
 cov_scd_adj_smry <- summarize_gcms_raster(r = cov_scd_adj1, info = rast_info,
                                           include_low_high = FALSE)
@@ -207,6 +242,24 @@ rm('q_scd_adj1'); gc()
 
 sei_scd_adj_smry <- summarize_gcms_raster(sei_scd_adj1, info = info_sei,
                                           include_low_high = TRUE)
+
+info_sei_smry <- create_rast_info(sei_scd_adj_smry, 
+                 into = c("group", "type", "RCP", "years",  "graze", "summary"))
+
+# * pixelwise summary mean sei by c3 and ecoregion ---------------------------------
+# mean SEI for each ecoregion and historical SEI class in that ecoregion
+
+c3eco_sei1_smry <- zonal(sei_scd_adj_smry, c3eco, fun = 'mean')
+
+c3eco_sei2_smry <- c3eco_sei1_smry %>% 
+  pivot_longer(-c3eco,
+               values_to = 'SEI_mean',
+               names_to = 'id') %>% 
+  mutate(c3 = c3eco_to_c3(c3eco),
+         region = c3eco_to_eco(c3eco, levels(r_eco4)[[1]]$ecoregion)) %>% 
+  left_join(c3eco_area1, by = "c3eco") %>% 
+  left_join(info_sei_smry, by = 'id') %>% 
+  select(-c3eco)
 
 # * differences (within grazing level) relative to current climate -----------
 rm('sei_scd_adj1') # make more memory available
@@ -224,8 +277,7 @@ q_scd_adj_diff <- calc_rast_cref(q_scd_adj_smry, info_smry,
 
 sei_scd_adj_diff <- calc_rast_cref(
   sei_scd_adj_smry, 
-  info = create_rast_info(sei_scd_adj_smry, 
-                          into = c("group", "type", "RCP", "years",  "graze", "summary")),
+  info = info_sei_smry,
   by = by,
   type_from = '_SEI_SEI',
   type_to = '_SEI_SEI-rdiff-cref')
@@ -271,6 +323,12 @@ writeRaster(q_sei_diff,
 
  write_csv(sei_mean_core1, paste0('data_processed/raster_means/', runv, 
                                   '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
+ 
+ write_csv(c3eco_sei2_smry, paste0('data_processed/raster_means/', runv, 
+                                   '_sei-mean_scd-adj_smry-by-region-c3.csv'))
+ 
+ write_csv(c3eco_sei2_gcm, paste0('data_processed/raster_means/', runv, 
+                                   '_sei-mean_scd-adj_by-GCM-region-c3.csv'))
 
 }
 

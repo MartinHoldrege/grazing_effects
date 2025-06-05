@@ -257,6 +257,20 @@ sei2c3 <- function(x) {
   c3
 }
 
+c3_factor <- function(x) {
+  levels <- c('CSA', "GOA", "ORA")
+  out <- if(all(x %in% c(1:3))) {
+    factor(x, levels = 1:3, labels = levels)
+  } else if (all(x %in% levels)) {
+    factor(x, levels)
+  } else {
+    stop('incorrect c3 values')
+  }
+  out
+}
+
+
+
 # takes two SEI class rasters, and creates a 9 class change raster
 c3toc9 <- function(current, future) {
   c9From <-  c(11, 12, 13, 21, 22, 23, 31, 32, 33); 
@@ -286,6 +300,24 @@ c3toc9 <- function(current, future) {
   # )
   names(c9b) <- names(future)
   c9b
+}
+
+# convert two digits into c3 (first digit is c3)
+c3eco_to_c3 <- function(x) {
+  stopifnot(x >= 10 & x < 40)
+  c3_num <- round(x/10, 0) 
+  c3_factor(c3_num)
+}
+
+# convert two digit number into the region
+# need to make sure the regions vector is from
+# the raster used for the zonal stats, so the order is correct
+c3eco_to_eco <- function(x, regions) {
+  stopifnot(x >= 10 & x < 40)
+  eco_num <- x %% 10 # returning the digit in the ones position
+  stopifnot(sort(unique(eco_num)) == 0:(length(regions) - 1))
+  # the IDs in factor spatrasters start at 0, not 1
+  regions[eco_num + 1]
 }
 
 c9_factor <- function(x) {

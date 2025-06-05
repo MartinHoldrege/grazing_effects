@@ -846,5 +846,10 @@ load_wafwa_ecoregions_raster <- function(
   levels(r_eco2) <- lvls
   r_eco2
 }
-
-
+load_cell_size <- function() {
+  r <- load_wafwa_ecoregions_raster()
+  s <- terra::cellSize(r, mask = TRUE,
+                       unit = 'ha',
+                       transform = FALSE)
+  s
+}

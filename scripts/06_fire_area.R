@@ -1,5 +1,7 @@
 # Purpose: Calculate the expected burned area, and the amount of
 # area in different categories of expected stand age (based on fire probability)
+# additionally expected burned area by region and current SCD group (based
+# on pixelwise and gcm-wise summaries)
 
 # Author: Martin Holdrege
 
@@ -11,7 +13,10 @@ source('src/params.R')
 
 test_run <- FALSE
 v <- 'v2' # version for output files
-
+runv <- paste0(run, v_interp)
+ref_graze <- 'Moderate' # the reference grazing level for SEI calculations
+# (i.e. current climate at ref graze means we are not adjusting
+# the sei values with stepwat results)
 # dependencies ------------------------------------------------------------
 
 library(terra)
@@ -19,7 +24,7 @@ library(tidyverse)
 source("src/general_functions.R")
 source("src/mapping_functions.R")
 source("src/probability_functions.R")
-
+source("src/SEI_functions.R")
 # read in data ------------------------------------------------------------
 
 # fire probability for each GCM
@@ -32,8 +37,6 @@ fire_files <- list.files(
 # this is kind of a 'raster stack', where each layers is a tif
 # it's not actually loaded into memory
 r_prob_gcm1 <- terra::rast(fire_files) # class SpatRast
-
-
 
 into_gcm <- c("type", "RCP", "years",  "graze", "GCM")
 info_gcm1 <- create_rast_info(r_prob_gcm1, into = into_gcm)
@@ -53,10 +56,23 @@ eco1 <- load_wafwa_ecoregions(total_region = TRUE)
 
 r_eco1 <- load_wafwa_ecoregions_raster() # raster of ecoregions
 
+# * SEI ------------------------------------------------------------
+
+r_sei1 <- rast(file.path("data_processed/interpolated_rasters/", v_interp,
+                    paste0(runv, "_q-sei_scd-adj_summary.tif")))
+
+band <- names(r_sei1) %>% 
+  stringr::str_subset(paste0('_SEI_SEI_Current_Current_', ref_graze, '_median'))
+stopifnot(length(band) == 1)
+r_sei2 <- r_sei1[[band]]
+
+# * if test run -----------------------------------------------------------
+
 if(test_run) {
   r_prob_gcm1 <- downsample(r_prob_gcm1) 
   r_prob_smry1 <- downsample(r_prob_smry1)
   r_eco1 <- downsample(r_eco1)
+  r_sei2 <- downsample(r_sei2)
 }
 
 # vectors etc -------------------------------------------------------------
@@ -79,12 +95,13 @@ stopifnot(all.equal(sum(test), 1))
 
 stopifnot(isTRUE(same.crs(r_prob_gcm1, vect(eco1))))
 
-
-
 # expected burned area ----------------------------------------------------
 
 area <- cellSize(r_prob_gcm1[[1]], unit = 'ha', transform = FALSE)
 varnames(area) <- 'cellSize'
+
+
+# * gcm-wise --------------------------------------------------------------
 
 # amount of area expected to burn in each
 # first convert probability from % to proportion
@@ -111,15 +128,76 @@ ba_eco2 <- ba_eco1 %>%
   left_join(info_gcm1, by = 'id') %>% 
   select(-id)
 
-ba_eco3 <- ba_eco2 %>% 
-  group_by(ecoregion, run, RCP, years, graze) %>% 
-  summarize(area_median = median(area),
-            area_low = calc_low(area),
-            area_high = calc_high(area),
-            .groups = "drop")
+
+# * pixewlise -------------------------------------------------------------
+
+r_prob_smry2 <- r_prob_smry1/100 # convert % to proportion
+
+r_area_exp_smry <- r_prob_smry2*area 
+
+# expected burned area per ecoregion
+ba_eco_smry1 <- terra::extract(
+  r_area_exp_smry ,
+  vect(eco1),           # convert sf to SpatVector
+  fun = sum,
+  na.rm = TRUE,
+  touches = FALSE 
+)
+
+ba_eco_smry1$ecoregion <- eco1$ecoregion
+
+ba_eco_smry2 <- ba_eco_smry1 %>% 
+  select(-ID) %>% 
+  pivot_longer(cols = -ecoregion,
+               names_to = 'id',
+               values_to = 'area') %>% 
+  left_join(info_smry1, by = 'id') %>% 
+  select(-id)
+
+ba_eco_smry3 <- ba_eco_smry2 %>% 
+  pivot_wider(values_from = 'area',
+              names_from = 'summary',
+              names_prefix = 'area_') %>% 
+  select(-type)
+
+# * by current SEI class --------------------------------------------------
+
+c3 <- sei2c3(r_sei2)
+names(c3) <- 'c3'
+
+c3eco <- c3*10 + as.numeric(r_eco1)
+names(c3eco) <- 'c3eco'
+c3eco_area1 <- zonal(area, c3eco, fun = 'sum')
+
+# **gcm-wise --------------------------------------------------------------
+
+c3eco_ba_gcm1 <- zonal(r_area_exp, c3eco, fun = 'sum')
+
+c3eco_ba_gcm2 <- c3eco_ba_gcm1  %>% 
+  pivot_longer(-c3eco,
+               values_to = 'expected_ba',
+               names_to = 'id') %>% 
+  mutate(c3 = c3eco_to_c3(c3eco),
+         region = c3eco_to_eco(c3eco, levels(r_eco1)[[1]]$ecoregion)) %>% 
+  left_join(c3eco_area1, by = "c3eco") %>% 
+  left_join(info_gcm1, by = 'id') %>% 
+  select(-id, c3eco)
+
+# ** pixelwise ------------------------------------------------------------
+
+c3eco_ba_gcm1 <- zonal(r_area_exp, c3eco, fun = 'sum')
+
+c3eco_ba_gcm2 <- c3eco_ba_gcm1  %>% 
+  pivot_longer(-c3eco,
+               values_to = 'expected_ba',
+               names_to = 'id') %>% 
+  mutate(c3 = c3eco_to_c3(c3eco),
+         region = c3eco_to_eco(c3eco, levels(r_eco1)[[1]]$ecoregion)) %>% 
+  left_join(c3eco_area1, by = "c3eco") %>% 
+  left_join(info_gcm1, by = 'id') %>% 
+  select(-id, c3eco)
 
 # area by by stand age ----------------------------------------------------
-
 
 # *gcm-wise ---------------------------------------------------------------
 
@@ -167,7 +245,7 @@ area_age_group3 <- area_age_group2 %>%
 info_smry2 <- info_smry1 %>% 
   filter(summary == 'median')
 
-r_prob_smry2 <- r_prob_smry1/100 # convert % to proportion
+
 
 # probability of each pixel of falling into a given age group
 prob_by_age_group_l_pw <- map(age_groups, function(x) {
@@ -221,8 +299,8 @@ area_eco$ID <- NULL
 # save output -------------------------------------------------------------
 
 if(!test_run) {
-  write_csv(ba_eco3, 
-            paste0("data_processed/area/expected-burn-area_", v, "_", run, 
+  write_csv(ba_eco_smry3, 
+            paste0("data_processed/area/expected-burn-area_smry_", v, "_", run, 
                    ".csv"))
   
   write_csv(ba_eco2, 

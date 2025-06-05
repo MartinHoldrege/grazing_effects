@@ -68,7 +68,11 @@ vals_seicont = c(0, 0.173, 0.174, 0.431, 0.432, 1)
 
 # colors for summary across GCMs
 cols_smry <-   c(low = "#ffffcc", 'median' = "#a1dab4",
-                 'high' = "#2c7fb8") 
+                 'high' = "#2c7fb8")
+
+# for different age groups or 'successional states'
+cols_agegroup <- RColorBrewer::brewer.pal(4, 'BrBG')
+
 # * SEI -------------------------------------------------------------------
 
 c9Names <-  c(
@@ -209,6 +213,8 @@ lab_firep1 <- expression(Delta~"# fires/century")
 
 # fire area
 lab_ba0 <- "Expected burned area (ha/yr)"
+lab_agegroup <- "Years since fire"
+
 
 # climate
 lab_map <- "MAP (mm)"
@@ -246,6 +252,7 @@ lab_q1 <- expression(Delta~"Q")
 lab_areakm0 <- expression("Area ("*km^2*")")
 lab_areaha0 <- "Area (million ha)"
 lab_areaperc0 <- "Area (%)"
+lab_areaperc0b <- "Area (% of region)"
 
 # mapping figure dimensions ------------------------------------------------
 

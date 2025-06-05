@@ -38,7 +38,14 @@ prob_geometric_rule <- function(p, a = 0, b) {
   result <- prob_a_b*p # the sequence must occur after a fire
   
   # undefined for p = 0, so returning the limits as p approaches 0
-  ifelse(p == 0 & b < Inf, 0, ifelse(p == 0 & b == Inf, 1, result))
+
+  if (is.numeric(p)) {
+    out <- ifelse(p == 0 & b < Inf, 0, ifelse(p == 0 & b == Inf, 1, result))
+  } else {
+    r1 <- terra::ifel(p == 0 & b < Inf, 0, result)
+    out <- terra::ifel(p == 0 & b == Inf, 1, r1)
+  }
+  out
 }
 
 
