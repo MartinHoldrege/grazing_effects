@@ -32,10 +32,10 @@ theme_set(theme_custom1())
 options(readr.show_col_types = FALSE)
 # read in data ------------------------------------------------------------
 
-# created in the 05_fire_area.R script
+# created in the 06_fire_area.R script
 # expected burned area
 ba3a <- read_csv(
-  paste0("data_processed/area/expected-burn-area_", suffix,".csv"))
+  paste0("data_processed/area/expected-burn-area_smry_", suffix,".csv"))
 
 # expected burned area by gcm
 ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
@@ -294,7 +294,8 @@ map(rcps, function(rcp){
 
 # *dotplot ----------------------------------------------------------------
 
-base_tradeoff <- function(group = 'rcp_year', linetypes_scen = c(1, 1, 1)) {
+base_tradeoff <- function(group = 'rcp_year', linetypes_scen = c(1, 1, 1),
+                          xlab = '% Core Sagebrush Area') {
   list(
     geom_path(aes(group = .data[[group]], linetype = rcp_year), color = "blue", 
               linewidth = 0.5, alpha = 0.5),
@@ -303,7 +304,7 @@ base_tradeoff <- function(group = 'rcp_year', linetypes_scen = c(1, 1, 1)) {
     scale_color_manual(values = cols_graze, name = lab_graze),
     scale_shape_manual(values = shapes_scen, name = 'Scenario'),
     scale_linetype_manual(name = 'Scenario', values = linetypes_scen),
-    labs(x = '% Core Sagebrush Area',
+    labs(x = xlab,
          y = 'Expected area burned (%/year)'),
     expand_limits(x = 0)
   )
@@ -322,9 +323,10 @@ g2_noerror <- g1 + base_tradeoff()
 g2_error <- g1 + base_tradeoff()
 
 
-ggsave_tradeoff <- function(g, prefix, width = 7) {
-  ggsave(paste0("figures/sei/tradeoff/csa-scd-adj-vs-ba_perc_dotplot_", prefix, '_',
-                suffix, ".png"), 
+ggsave_tradeoff <- function(g, prefix, width = 7,
+                            xvar = "csa") {
+  ggsave(paste0("figures/sei/tradeoff/", xvar, "-scd-adj-vs-ba_perc_dotplot_", 
+                prefix, '_', suffix, ".png"), 
          plot = g, dpi = 600,
          width = width, height = 4.5)
 }
@@ -378,22 +380,35 @@ ggsave_tradeoff(
 # as they suggest)
 
 # continue here--make for core + grow and just core
-map(rcps, function(rcp) {
-  sei_pcent3 %>% 
-    filter()
-  g <- ggplot(sei_pcent3, aes(percent_csa_median, ba_area_median_perc)) +
-    geom_path(data = sei_pcent_gcm3, aes(percent_csa, ba_area_perc, 
+args <- list(
+  rcp = c(rcps, rcps),
+  xvar = c('percent_csa', 'percent_csa', 'percent_csagoa', 'percent_csagoa')
+)
+
+xlabs <- c(percent_csa = '% Core Sagebrush Area',
+           percent_csagoa = '% CSA + GOA')
+pmap(args, function(rcp, xvar) {
+  df_med <- sei_pcent3 %>% 
+    filter(RCP %in% c('Current', rcp))
+  df_gcm <- sei_pcent_gcm3 %>% 
+    filter(RCP %in% c('Current', rcp))
+    
+  x_med <- paste0(xvar, '_median')
+  g <- ggplot(df_med, aes(.data[[x_med]], ba_area_median_perc)) +
+    geom_path(data = df_gcm, aes(.data[[xvar]], ba_area_perc, 
                                          group = rcp_year_GCM, linetype = rcp_year,
                                          color = rcp_year),
               alpha = 0.5,
               linewidth = 0.2, 
               show.legend = FALSE) + # b/ different linewidth get's double plotted on legend +
-    base_tradeoff(linetypes_scen = linetypes_scen) +
+    base_tradeoff(linetypes_scen = linetypes_scen,
+                  xlab = xlabs[xvar]) +
     facet_wrap(~region, scales = 'fixed') 
   
   ggsave_tradeoff(
     g = g,
-    prefix = 'med-GCM-fix'
+    xvar = str_replace(xvar, "percent_", ""),
+    prefix = paste0('med-GCM-fix-', rcp)
   )
 })
 
