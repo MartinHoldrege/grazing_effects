@@ -16,6 +16,7 @@ runv <- paste0(run, v_interp)
 # create additional figures to explore how age groups/fire probability relate
 # (not using actual data)
 explanatory_figures <- TRUE 
+rcps <- c('RCP45', 'RCP85') # figures seperately made for both RCPs
 
 # dependencies ------------------------------------------------------------
 
@@ -41,8 +42,14 @@ ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_",
                             suffix, ".csv"))
 
 # expected area in different years since fire age groups
+# (calculated gcm-wise)
 area_age_group3 <- read_csv(
   paste0("data_processed/area/area-by-age-group_", suffix, ".csv"))
+
+# expected area in different years since fire age groups
+# (calculated pixel-wise)
+area_age_group3_pw <- read_csv(
+  paste0("data_processed/area/area-by-age-group_pw_", suffix, ".csv"))
 
 # area of our study region in each of 3 ecoregions
 area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v,".csv"))
@@ -54,7 +61,7 @@ drivers1 <- read_csv(paste0('data_processed/raster_means/', run,
 
 sei2 <- readRDS('data_processed/temp_rds/sei_df.rds')
 
-# created in "scripts/06_summarize_sei_scd-adj.R"
+# created in "scripts/05_interpolated_summarize_sei_scd-adj.R"
 sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, 
                      '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
 
@@ -84,16 +91,27 @@ ba3 <- df_factor(ba3a) %>%
          id2 = factor(id2, levels = unique(id2)),
          rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
 
-area_age_group3 <- df_factor(area_age_group3) %>% 
+area_age_group3 <- area_age_group3 %>% 
   filter_clim_extremes() %>% 
+  left_join(area_eco, by = join_by(ecoregion)) %>% 
   arrange(graze, RCP, years)  %>% 
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
          id2 = factor(id2, levels = unique(id2)),
          # not reproducible (yet)
          age_group = factor(age_group, levels = names(age_groups)),
-         rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
-
-
+         rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
+  df_factor()
+  
+area_age_group4_pw <- area_age_group3_pw %>% 
+  filter_clim_extremes() %>% 
+  left_join(area_eco, by = join_by(ecoregion)) %>% 
+  arrange(graze, RCP, years)  %>% 
+  mutate(age_group = factor(age_group, levels = rev(names(age_groups))),
+         rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
+                              add_newline = TRUE),
+         area_median_perc = area_median/area*100) %>% 
+  df_factor()
+  
 # *trade-offs ba vs core --------------------------------------------------
 
 # showing area of core vs expected burned area to illustrate the grazing
@@ -119,7 +137,10 @@ sei_pcent3 <- ba3 %>%
          region = region_factor(ecoregion)) %>% 
   select(-ecoregion) %>% 
   left_join(sei_pcent2, by = join_by(RCP, years, graze, region)) %>% 
-  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
+         percent_csagoa_median = percent_goa_median + percent_csa_median,
+         percent_csagoa_low = percent_goa_low + percent_csa_low,
+         percent_csagoa_high = percent_goa_high + percent_csa_high)
   
 # ** gcm level ------------------------------------------------------------
 
@@ -137,7 +158,8 @@ sei_pcent_gcm3 <- ba_gcm1 %>%
   left_join(sei_pcent_gcm2, 
             by = join_by(region, run, RCP, years, graze, GCM)) %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
-         rcp_year_GCM = paste(rcp_year, GCM)) %>% 
+         rcp_year_GCM = paste(rcp_year, GCM),
+         percent_csagoa = percent_goa + percent_csa) %>% 
   df_factor() %>% 
   arrange(rcp_year, GCM, graze) # arranging for geom_path
 
@@ -240,6 +262,33 @@ g2
 dev.off()
 
 
+# * stacked barchart ------------------------------------------------------
+
+# check--area should sum to 100% (with some rounding error)
+check <- area_age_group4_pw %>% 
+  group_by(ecoregion, graze, rcp_year) %>% 
+  summarize(sum_perc = sum(area_median_perc)) %>% 
+  pull(sum_perc)
+
+stopifnot(abs(check - 100) < 0.01)
+
+map(rcps, function(rcp){
+  g <- area_age_group4_pw %>% 
+    filter(RCP %in% c('Current', rcp)) %>% 
+    ggplot(aes(x = graze, y = area_median_perc, fill = age_group)) +
+    geom_bar(stat = 'identity') +
+    facet_grid(ecoregion~rcp_year, scales = 'free_y') +
+    adjust_graze_x_axis() +
+    scale_fill_manual(values = rev(cols_agegroup),
+                      name = lab_agegroup) +
+    labs(y = lab_areaperc0b)
+  
+  filename <- paste0("figures/fire/area/area_age_group_by-region_bar_", rcp, "_", 
+                     suffix, '.png')
+  ggsave(filename, g, height = 8, width = 4, dpi = 600)
+})
+
+  
 # trade-offs ba vs core ---------------------------------------------------
 
 
@@ -273,11 +322,11 @@ g2_noerror <- g1 + base_tradeoff()
 g2_error <- g1 + base_tradeoff()
 
 
-ggsave_tradeoff <- function(g, prefix) {
+ggsave_tradeoff <- function(g, prefix, width = 7) {
   ggsave(paste0("figures/sei/tradeoff/csa-scd-adj-vs-ba_perc_dotplot_", prefix, '_',
                 suffix, ".png"), 
          plot = g, dpi = 600,
-         width = 7, height = 4.5)
+         width = width, height = 4.5)
 }
 
 ggsave_tradeoff(
@@ -328,21 +377,26 @@ ggsave_tradeoff(
 # (they're correlated so direction of effect isn't actually as uncertain
 # as they suggest)
 
+# continue here--make for core + grow and just core
+map(rcps, function(rcp) {
+  sei_pcent3 %>% 
+    filter()
+  g <- ggplot(sei_pcent3, aes(percent_csa_median, ba_area_median_perc)) +
+    geom_path(data = sei_pcent_gcm3, aes(percent_csa, ba_area_perc, 
+                                         group = rcp_year_GCM, linetype = rcp_year,
+                                         color = rcp_year),
+              alpha = 0.5,
+              linewidth = 0.2, 
+              show.legend = FALSE) + # b/ different linewidth get's double plotted on legend +
+    base_tradeoff(linetypes_scen = linetypes_scen) +
+    facet_wrap(~region, scales = 'fixed') 
+  
+  ggsave_tradeoff(
+    g = g,
+    prefix = 'med-GCM-fix'
+  )
+})
 
-g <- ggplot(sei_pcent3, aes(percent_csa_median, ba_area_median_perc)) +
-  geom_path(data = sei_pcent_gcm3, aes(percent_csa, ba_area_perc, 
-                                       group = rcp_year_GCM, linetype = rcp_year,
-                                       color = rcp_year),
-            alpha = 0.5,
-            linewidth = 0.2, 
-            show.legend = FALSE) + # b/ different linewidth get's double plotted on legend +
-  base_tradeoff(linetypes_scen = linetypes_scen) +
-  facet_wrap(~region, scales = 'fixed') 
-
-ggsave_tradeoff(
-  g = g,
-  prefix = 'med-GCM-fix'
-)
 
 # burned area--attribution ------------------------------------------------
 
