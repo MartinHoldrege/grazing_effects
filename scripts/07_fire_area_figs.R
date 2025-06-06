@@ -41,6 +41,14 @@ ba3a <- read_csv(
 ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
                             suffix, ".csv"))
 
+# burned area by current SEI class and ecoregion (pixelwise summaries across gcms) 
+ba_c3_smry1 <- read_csv(
+  paste0("data_processed/area/expected-burn-area_by-c3-smry_", suffix, ".csv"))
+
+# burned area by current SEI class  and ecoregion (values for each GCM)
+ba_c3_gcm1 <- read_csv(
+  paste0("data_processed/area/expected-burn-area_by-c3-GCM_", suffix, ".csv"))
+
 # expected area in different years since fire age groups
 # (calculated gcm-wise)
 area_age_group3 <- read_csv(
@@ -68,6 +76,13 @@ sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv,
 # created in "scripts/05_interpolated_summarize_sei_scd-adj.R"
 sei_pcent_gcm1 <- read_csv(paste0('data_processed/raster_means/', runv, 
                         '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
+
+# pixelwise and gcm wise mean sei by ecoregion and current sei class
+c3eco_sei2_smry <- read_csv(paste0('data_processed/raster_means/', runv, 
+                                  '_sei-mean_scd-adj_smry-by-region-c3.csv'))
+
+c3eco_sei2_gcm <- read_csv(paste0('data_processed/raster_means/', runv, 
+                                 '_sei-mean_scd-adj_by-GCM-region-c3.csv'))
 
 # vectors -----------------------------------------------------------------
 
@@ -162,6 +177,52 @@ sei_pcent_gcm3 <- ba_gcm1 %>%
          percent_csagoa = percent_goa + percent_csa) %>% 
   df_factor() %>% 
   arrange(rcp_year, GCM, graze) # arranging for geom_path
+
+
+# ** by SEI class ---------------------------------------------------------
+
+# pixelwise summaries across gcms
+c3eco_smry1 <- c3eco_sei2_smry %>% 
+  select(-run, -id, -run2, -type, -group) %>% 
+  left_join(ba_c3_smry1, 
+            join_by(c3, region, RCP, years, graze, summary))  %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
+         rcp_year_c3 = paste0(rcp_year, c3)) %>% 
+  filter_clim_extremes() %>% 
+  df_factor() %>% 
+  select(-type) %>% 
+  arrange(rcp_year, c3, graze) # order matters for geom_path
+
+
+test <- c3eco_smry1$area.x - c3eco_smry1$area.y
+stopifnot(abs(test) < 1)# areas calculated in the two datasets need to ~ match
+
+c3eco_smry2 <- c3eco_smry1 %>% 
+  select(-area.y) %>% 
+  rename(area = area.x) %>% 
+  mutate(expected_ba_perc = expected_ba/area*100)
+
+
+# values by GCM
+c3eco_gcm1 <- c3eco_sei2_gcm %>% 
+  select(-run, -id, -run2, -type, -group) %>% 
+  left_join(ba_c3_gcm1, 
+            join_by(c3, region, RCP, years, graze, GCM))  %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
+         rcp_year_c3_gcm = paste0(rcp_year, c3, GCM)) %>% 
+  filter_clim_extremes() %>% 
+  df_factor() %>% 
+  select(-type)%>% 
+  arrange(rcp_year, c3, graze) # order matters for geom_path
+
+test <- c3eco_gcm1$area.x - c3eco_gcm1$area.y
+stopifnot(abs(test) < 1)# areas calculated in the two datasets need to ~ match
+
+c3eco_gcm2 <- c3eco_gcm1 %>% 
+  select(-area.y) %>% 
+  rename(area = area.x) %>% 
+  mutate(expected_ba_perc = expected_ba/area*100)
+
 
 # expected burned area figs --------------------------------------------------
 
@@ -411,6 +472,40 @@ pmap(args, function(rcp, xvar) {
     prefix = paste0('med-GCM-fix-', rcp)
   )
 })
+
+
+# * by current C3 ---------------------------------------------------------
+# showing mean SEI vs expected burned area for each combination of ecoregion 
+# and current SEI class
+
+map(rcps, function(rcp) {
+  
+  df_smry <- c3eco_smry2 %>% 
+    filter(RCP %in% c('Current', rcp),
+           summary == 'median')
+  
+  df_gcm <- c3eco_gcm2 %>% 
+    filter(RCP %in% c('Current', rcp))
+  g <- ggplot(df_smry, aes(SEI_mean, expected_ba_perc)) + 
+    geom_path(aes(group = rcp_year_c3, linetype = rcp_year, color = c3),
+              linewidth = 0.5, alpha = 1) +
+    geom_path(data = df_gcm, aes(group = rcp_year_c3_gcm, linetype = rcp_year, color = c3),
+              linewidth = 0.5, alpha = 0.5) +
+    facet_wrap(~region) +
+    geom_point(aes(color = graze, shape = rcp_year)) +
+    scale_linetype_manual(name = 'Scenario', values = linetypes_scen) +
+    scale_shape_manual(values = shapes_scen, name = 'Scenario') +
+    scale_color_manual(values = c(cols_graze,  c3Palette), name = NULL) +
+    labs(x = 'Mean SEI',
+         y = 'Expected area burned (%/year)')
+  
+  ggsave(paste0("figures/sei/tradeoff/", "sei", "-scd-adj-vs-ba_perc_dotplot_", 
+              'c3eco_', rcp, "_", suffix, ".png"), 
+         plot = g, dpi = 600,
+         width = 6, height = 4.5)
+})
+
+
 
 
 # burned area--attribution ------------------------------------------------

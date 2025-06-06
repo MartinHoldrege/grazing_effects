@@ -185,17 +185,17 @@ c3eco_ba_gcm2 <- c3eco_ba_gcm1  %>%
 
 # ** pixelwise ------------------------------------------------------------
 
-c3eco_ba_gcm1 <- zonal(r_area_exp, c3eco, fun = 'sum')
+c3eco_ba_smry1 <- zonal(r_area_exp_smry, c3eco, fun = 'sum')
 
-c3eco_ba_gcm2 <- c3eco_ba_gcm1  %>% 
+c3eco_ba_smry2 <- c3eco_ba_smry1  %>% 
   pivot_longer(-c3eco,
                values_to = 'expected_ba',
                names_to = 'id') %>% 
   mutate(c3 = c3eco_to_c3(c3eco),
          region = c3eco_to_eco(c3eco, levels(r_eco1)[[1]]$ecoregion)) %>% 
   left_join(c3eco_area1, by = "c3eco") %>% 
-  left_join(info_gcm1, by = 'id') %>% 
-  select(-id, c3eco)
+  left_join(info_smry1, by = 'id') %>% 
+  select(-id, -c3eco)
 
 # area by by stand age ----------------------------------------------------
 
@@ -301,6 +301,14 @@ area_eco$ID <- NULL
 if(!test_run) {
   write_csv(ba_eco_smry3, 
             paste0("data_processed/area/expected-burn-area_smry_", v, "_", run, 
+                   ".csv"))
+  
+  write_csv(c3eco_ba_smry2, 
+            paste0("data_processed/area/expected-burn-area_by-c3-smry_", v, "_", run, 
+                   ".csv"))
+  
+  write_csv(c3eco_ba_gcm2, 
+            paste0("data_processed/area/expected-burn-area_by-c3-GCM_", v, "_", run, 
                    ".csv"))
   
   write_csv(ba_eco2, 
