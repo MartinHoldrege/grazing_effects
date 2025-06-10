@@ -517,6 +517,23 @@ scatter_light <- function(pft, # for subtitle
                x = NA)
   )
 }
+
+
+# facet functions ---------------------------------------------------------
+
+facet_manual_region <- function(legend.position.inside = c(0.05, 0)) {
+  design <- "
+ ABC
+ #DE
+ "
+  list(
+    ggh4x::facet_manual(~region, design = design, labeller = region_labeller),
+    theme(legend.position = 'inside', 
+          legend.position.inside = legend.position.inside,
+          strip.text = element_text(hjust = 0))
+  )
+}
+
 # axis functions ----------------------------------------------------------
 
 # from 'id' column get the label to use for time period in boxplots
@@ -632,6 +649,31 @@ rcp_label <- function(rcp, years, add_letters = FALSE,
 }
 
 
+region_labeller <- ggplot2::as_labeller(
+  x = function(x) {
+    
+    x <- region_factor(x)
+    levels <- levels(x)
+    labels <- paste(fig_letters[1:length(levels)], levels)
+    out <- factor(as.character(x), levels = levels,
+                  labels = labels)
+    as.character(out)
+  }
+)
+  
+
+# legends -----------------------------------------------------------------
+
+make_legend_small <- function(pointSize = 2, textSize = 7, spaceLegend = 0.2,
+                              lineLength = 20) {
+  list(guides(shape = guide_legend(override.aes = list(size = pointSize)),
+              color = guide_legend(override.aes = list(size = pointSize))),
+       theme(legend.title = element_text(size = textSize), 
+             legend.text  = element_text(size = textSize),
+             legend.key.size = unit(spaceLegend, "lines"),
+             legend.key.width = unit(lineLength, 'pt')))
+  
+}
 
 # color functions ---------------------------------------------------------
 

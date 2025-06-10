@@ -21,6 +21,7 @@ library(patchwork)
 source("src/fig_params.R")
 source("src/fig_functions.R")
 source("src/general_functions.R")
+source("src/SEI_functions.R")
 
 theme_set(theme_custom1())
 
@@ -111,6 +112,7 @@ pmap(scen_l, function(RCP, years) {
   df <- c9_area3 %>% 
     filter(RCP == !!RCP, 
            years == !! years)
+
   g <- ggplot(df, aes(c9, y = area_perc_median,fill = c9)) +
     base_c9_area() +
     geom_errorbar(aes(ymin = area_perc_low, ymax = area_perc_high, group = graze),
@@ -122,15 +124,18 @@ pmap(scen_l, function(RCP, years) {
                                                       size = 0.1))) + 
     labs(x = 'Projected change in SEI class',
          y = '% of region') +
-    facet_wrap(~region) +
-    theme(legend.position = 'right')
-  
+    facet_manual_region()
+
+
   path <- paste0(
     "figures/sei/c9-bar_scd-adj_by-region_", RCP, "_", years, "_", suffix, ".png"
   )
   ggsave(path, g, dpi = 600, width = 9, height = 7)
   
 })
+
+
+
 
 
 # GCM level results vs drivers --------------------------------------------

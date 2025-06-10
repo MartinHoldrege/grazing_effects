@@ -503,7 +503,9 @@ pmap(args, function(rcp, xvar) {
               show.legend = FALSE) + # b/ different linewidth get's double plotted on legend +
     base_tradeoff(linetypes_scen = linetypes_scen,
                   xlab = xlabs[xvar]) +
-    facet_wrap(~region, scales = 'fixed') 
+    facet_manual_region(legend.position.inside = c(.1, 0.15)) +
+    make_legend_small()
+  
   
   ggsave_tradeoff(
     g = g,
@@ -530,14 +532,15 @@ map(rcps, function(rcp) {
               linewidth = 0.5, alpha = 1) +
     geom_path(data = df_gcm, aes(group = rcp_year_c3_gcm, linetype = rcp_year, color = c3),
               linewidth = 0.5, alpha = 0.5) +
-    facet_wrap(~region) +
+    facet_manual_region(legend.position.inside = c(.1, 0.15)) +
     geom_point(aes(color = graze, shape = rcp_year)) +
     scale_linetype_manual(name = 'Scenario', values = linetypes_scen) +
     scale_shape_manual(values = shapes_scen, name = 'Scenario') +
     scale_color_manual(values = c(cols_graze,  c3Palette), name = NULL) +
     labs(x = 'Mean SEI',
-         y = 'Expected area burned (%/year)')
-  
+         y = 'Expected area burned (%/year)') +
+    make_legend_small()
+
   ggsave(paste0("figures/sei/tradeoff/", "sei", "-scd-adj-vs-ba_perc_dotplot_", 
               'c3eco_', rcp, "_", suffix, ".png"), 
          plot = g, dpi = 600,
