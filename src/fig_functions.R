@@ -350,6 +350,24 @@ box_abs_diff <- function(df_abs,
 }
 
 
+# dot plots ---------------------------------------------------------------
+
+base_tradeoff <- function(group = 'rcp_year', linetypes_scen = c(1, 1, 1),
+                          xlab = '% Core Sagebrush Area') {
+  list(
+    geom_path(aes(group = .data[[group]], linetype = rcp_year), color = "blue", 
+              linewidth = 0.5, alpha = 0.5),
+    #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5)
+    geom_point(aes(color = graze, shape = rcp_year)),
+    scale_color_manual(values = cols_graze, name = lab_graze),
+    scale_shape_manual(values = shapes_scen, name = 'Scenario'),
+    scale_linetype_manual(name = 'Scenario', values = linetypes_scen),
+    labs(x = xlab,
+         y = 'Expected area burned (%/year)'),
+    expand_limits(x = 0)
+  )
+}
+
 # bar charts --------------------------------------------------------------
 
 base_c9_area <- function(pattern_var = 'graze', legend_title = 'Grazing') {
@@ -546,10 +564,10 @@ add_sec_axis <- function(name = "% Change", breaks = waiver(),...) {
                                          ...)) 
 }
 
-adjust_graze_x_axis <- function() {
+adjust_graze_x_axis <- function(xlab = lab_graze) {
   list(
     theme(axis.text.x = element_text(angle = 45, hjust = 1)),
-    labs(x = lab_graze))
+    labs(x = xlab))
 }
 
 # label functions ---------------------------------------------------------

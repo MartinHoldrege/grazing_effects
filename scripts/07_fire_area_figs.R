@@ -18,6 +18,7 @@ runv <- paste0(run, v_interp)
 explanatory_figures <- TRUE 
 rcps <- c('RCP45', 'RCP85') # figures seperately made for both RCPs
 
+entire <- 'Entire study area' # name of factor level for entire study
 # dependencies ------------------------------------------------------------
 
 library(terra)
@@ -30,6 +31,7 @@ source("src/fig_params.R")
 source("src/probability_functions.R")
 theme_set(theme_custom1())
 options(readr.show_col_types = FALSE)
+
 # read in data ------------------------------------------------------------
 
 # created in the 06_fire_area.R script
@@ -67,6 +69,10 @@ area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v,".csv"))
 drivers1 <- read_csv(paste0('data_processed/raster_means/', run, 
                             '_fire-driver-means_by-ecoregion.csv'))
 
+# created in "scripts/04_maps_fire_attribution.R"
+dom_drivers1 <- read_csv(paste0('data_processed/area/dominant_driver_by-region_',
+                                runv, '.csv'))
+
 sei2 <- readRDS('data_processed/temp_rds/sei_df.rds')
 
 # created in "scripts/05_interpolated_summarize_sei_scd-adj.R"
@@ -87,7 +93,9 @@ c3eco_sei2_gcm <- read_csv(paste0('data_processed/raster_means/', runv,
 # vectors -----------------------------------------------------------------
 
 ecoregions <- region_factor(area_eco$ecoregion) %>% 
-  levels()
+  levels() %>% 
+  setNames(nm = .)
+
 age_groups <- create_age_groups()
 
 # fig params --------------------------------------------------------------
@@ -104,7 +112,11 @@ ba3 <- df_factor(ba3a) %>%
   arrange(graze, RCP, years)  %>% 
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
          id2 = factor(id2, levels = unique(id2)),
-         rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
+         rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
+  left_join(area_eco, by = 'ecoregion') %>% 
+  mutate(across(matches("^area_"), .fns = \(x) x/area*100,
+                .names = '{.col}_perc')) %>% 
+  rename(area_total = area)
 
 area_age_group3 <- area_age_group3 %>% 
   filter_clim_extremes() %>% 
@@ -179,6 +191,8 @@ sei_pcent_gcm3 <- ba_gcm1 %>%
   arrange(rcp_year, GCM, graze) # arranging for geom_path
 
 
+
+
 # ** by SEI class ---------------------------------------------------------
 
 # pixelwise summaries across gcms
@@ -198,9 +212,20 @@ test <- c3eco_smry1$area.x - c3eco_smry1$area.y
 stopifnot(abs(test) < 1)# areas calculated in the two datasets need to ~ match
 
 c3eco_smry2 <- c3eco_smry1 %>% 
-  select(-area.y) %>% 
+  select(-area.y, -run2) %>% 
   rename(area = area.x) %>% 
   mutate(expected_ba_perc = expected_ba/area*100)
+
+# calculating values for entire region
+c3eco_smry3 <- c3eco_smry2 %>% 
+  group_by(c3, RCP, years, graze, summary, run, rcp_year, rcp_year_c3) %>% 
+  summarize(across(c(SEI_mean, expected_ba, expected_ba_perc),
+                   .fns = \(x)weighted.mean(x, w = area)),
+            area = sum(area),
+            .groups = 'drop') %>% 
+  mutate(region = entire) %>% 
+  bind_rows(c3eco_smry2) %>% 
+  df_factor()
 
 
 # values by GCM
@@ -212,16 +237,44 @@ c3eco_gcm1 <- c3eco_sei2_gcm %>%
          rcp_year_c3_gcm = paste0(rcp_year, c3, GCM)) %>% 
   filter_clim_extremes() %>% 
   df_factor() %>% 
-  select(-type)%>% 
+  select(-type) %>% 
   arrange(rcp_year, c3, graze) # order matters for geom_path
 
-test <- c3eco_gcm1$area.x - c3eco_gcm1$area.y
-stopifnot(abs(test) < 1)# areas calculated in the two datasets need to ~ match
-
 c3eco_gcm2 <- c3eco_gcm1 %>% 
-  select(-area.y) %>% 
+  select(-area.y, -c3eco, -run2, -id_noGCM) %>% 
   rename(area = area.x) %>% 
   mutate(expected_ba_perc = expected_ba/area*100)
+
+test <- c3eco_gcm1$area.x - c3eco_gcm1$area.y
+stopifnot(abs(test) < 1)# areas calculated in the two datasets need to ~ matc
+
+# calculate for entire study area
+c3eco_gcm3 <- c3eco_gcm2 %>% 
+  group_by(c3, RCP, years, graze, GCM, run, rcp_year, rcp_year_c3_gcm) %>% 
+  summarize(across(c(SEI_mean, expected_ba, expected_ba_perc),
+                   .fns = \(x)weighted.mean(x, w = area)),
+            area = sum(area),
+            .groups = 'drop') %>% 
+  mutate(region = entire) %>% 
+  bind_rows(c3eco_gcm2) %>% 
+  df_factor()
+
+# * drivers of fire change ------------------------------------------------
+
+stopifnot(lu(dom_drivers1$summary_stat) == 1) # coded to only use one summary_stat
+
+dom_drivers2 <- dom_drivers1 %>% 
+  select(-id, -summary_stat) %>% 
+  group_by(region, run, RCP, years, graze, rcp_year) %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
+                              add_newline = TRUE),
+         dom_driver = driver2factor(dom_driver),
+         perc_area = area_dom/sum(area_dom)*100) %>% 
+  ungroup() %>% 
+  complete(dom_driver, region, run, nesting(RCP, years, graze, rcp_year),
+           fill = list(area_dom = 0, perc_area = 0)) %>% 
+  df_factor()
+
 
 
 # expected burned area figs --------------------------------------------------
@@ -355,21 +408,7 @@ map(rcps, function(rcp){
 
 # *dotplot ----------------------------------------------------------------
 
-base_tradeoff <- function(group = 'rcp_year', linetypes_scen = c(1, 1, 1),
-                          xlab = '% Core Sagebrush Area') {
-  list(
-    geom_path(aes(group = .data[[group]], linetype = rcp_year), color = "blue", 
-              linewidth = 0.5, alpha = 0.5),
-    #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5)
-    geom_point(aes(color = graze, shape = rcp_year)),
-    scale_color_manual(values = cols_graze, name = lab_graze),
-    scale_shape_manual(values = shapes_scen, name = 'Scenario'),
-    scale_linetype_manual(name = 'Scenario', values = linetypes_scen),
-    labs(x = xlab,
-         y = 'Expected area burned (%/year)'),
-    expand_limits(x = 0)
-  )
-}
+
 
 g1 <- ggplot(sei_pcent3, aes(percent_csa_median, ba_area_median_perc))
 
@@ -480,11 +519,11 @@ pmap(args, function(rcp, xvar) {
 
 map(rcps, function(rcp) {
   
-  df_smry <- c3eco_smry2 %>% 
+  df_smry <- c3eco_smry3 %>% 
     filter(RCP %in% c('Current', rcp),
            summary == 'median')
   
-  df_gcm <- c3eco_gcm2 %>% 
+  df_gcm <- c3eco_gcm3 %>% 
     filter(RCP %in% c('Current', rcp))
   g <- ggplot(df_smry, aes(SEI_mean, expected_ba_perc)) + 
     geom_path(aes(group = rcp_year_c3, linetype = rcp_year, color = c3),
@@ -502,10 +541,8 @@ map(rcps, function(rcp) {
   ggsave(paste0("figures/sei/tradeoff/", "sei", "-scd-adj-vs-ba_perc_dotplot_", 
               'c3eco_', rcp, "_", suffix, ".png"), 
          plot = g, dpi = 600,
-         width = 6, height = 4.5)
+         width = 7, height = 4.5)
 })
-
-
 
 
 # burned area--attribution ------------------------------------------------
@@ -576,6 +613,65 @@ pdf(paste0("figures/fire/area/expected_ba_vs_driver_by-GCM_", suffix, '.pdf'),
 print(plots)
 dev.off()
 
+
+# combined figures --------------------------------------------------------
+# combined figure for manuscript
+
+# expected  burned darea
+rcp <- rcps[1]
+ba3_tmp <- ba3 %>% 
+  filter(ecoregion == entire, RCP %in% c("Current", rcp)) %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
+                              add_newline = TRUE))
+
+total_area <- unique(ba3_tmp$area_total)
+
+
+
+g_ba1 <- ggplot(ba3_tmp, aes(x = graze, y = area_median_perc)) +
+  geom_errorbar(aes(ymin = area_low_perc, ymax = area_high_perc), 
+                position = position_dodge(width = 0.5), width = 0) +
+  geom_point(aes(y = area_median_perc), 
+             position = position_dodge(width = 0.5)) +
+  # scale_y_continuous(sec.axis = sec_axis(transform = \(x) total_area*x/100,
+  #                                        name = lab_ba0)) +
+  facet_wrap(~rcp_year) +
+  adjust_graze_x_axis(xlab = NULL) +
+  labs(y = lab_ba1)
+
+
+# years since fire
+
+g_bar1 <- area_age_group4_pw %>% 
+  filter(RCP %in% c('Current', rcp), ecoregion == entire) %>% 
+  ggplot(aes(x = graze, y = area_median_perc, fill = age_group)) +
+  geom_bar(stat = 'identity') +
+  facet_wrap(~rcp_year) +
+  adjust_graze_x_axis(xlab = NULL) +
+  scale_fill_manual(values = rev(cols_agegroup),
+                    name = lab_agegroup) +
+  labs(y = lab_areaperc0)
+
+g_dom <- dom_drivers2 %>% 
+  filter(RCP == rcp, region == entire) %>% 
+  ggplot(aes(x = graze, y = perc_area, fill = dom_driver)) +
+  geom_bar(stat = 'identity') +
+  facet_wrap(~rcp_year) +
+  adjust_graze_x_axis() +
+  scale_fill_manual(values = cols_pred_vars,
+                    name = "Primary driver of\nchange in fire\nprobability") +
+  labs(y = lab_areaperc0)
+
+comb <- guide_area() +  g_dom + plot_layout(guides = 'collect', 
+                                            widths = c(0.8, 1))
+plots <- list(g_ba1, g_bar1, comb)
+
+g <- wrap_plots(plots, ncol = 1)&theme(plot.margin = unit(c(0, 0, 0, 3), "pt"))
+
+ggsave(paste0("figures/fire/area/comb_ba-age-driver_", rcp, "_", 
+              v, "_", runv, '.png'),
+       plot = g,
+       height = 9, width = 5, dpi = 600)
 
 # explanatory figures -----------------------------------------------------
 

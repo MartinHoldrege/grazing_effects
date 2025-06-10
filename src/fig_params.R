@@ -213,6 +213,7 @@ lab_firep1 <- expression(Delta~"# fires/century")
 
 # fire area
 lab_ba0 <- "Expected burned area (ha/yr)"
+lab_ba1 <- "Expected burned area (%/yr)"
 lab_agegroup <- "Years since fire"
 
 

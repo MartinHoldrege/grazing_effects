@@ -3,6 +3,17 @@
 
 # functions that assign factor levels -------------------------------------
 
+# function factory
+var2factor_factory <- function(levels) {
+  function(x, return_levels = FALSE) {
+    if(return_levels) {
+      return(levels)
+    }
+    stopifnot(x %in% levels)
+    factor(x, levels)
+  }
+}
+
 # convert grazing intensity to a factor
 graze2factor <- function(x) {
   # x--input vector of grazing levels (either numeric or already the
@@ -184,11 +195,10 @@ region2wafwa <- function(x) {
   x2
 }
 
-summary2factor <- function(x) {
-  factor(x, levels = c('low', 'median', 'high'))
-}
 
+summary2factor <- var2factor_factory( c('low', 'median', 'high'))
 
+driver2factor <-  var2factor_factory(c('MAT', 'MAP', 'PSP', 'Pherb', 'Aherb'))
 
 # * PFTs ------------------------------------------------------------------
 
