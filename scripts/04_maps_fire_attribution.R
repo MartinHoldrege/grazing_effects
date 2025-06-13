@@ -4,7 +4,6 @@
 
 # Purpose: Maps that examine what variables are most responsible for 
 # the changes in projected fire probability. 
-# also create raster summaries to be used in other scripts
 
 
 # dependencies ------------------------------------------------------------
@@ -122,37 +121,6 @@ info_delta2 <- bind_rows(info_delta1, info_rdiff1)%>%
 r_delta2 <- c(r_delta_driver1, rdiff1)[[info_delta2$id]]
 
 
-# calculate summaries for other scripts -----------------------------------
-
-# area of dominant driver for each ecoregion
-df_driver1 <- map(setNames(nm = info_dom1$id),
-                 function(lyr) {
-  r0 <- r_dom2[[lyr]]
-  names(r0) <- 'dom_driver'
-  r <- c(r0, r_eco1)
-  zonal(area, r, 'sum', na.rm = TRUE)
-}) %>% 
-  bind_rows(.id = 'id') %>% 
-  pivot_longer(cols = -c(dom_driver, id),
-               names_to = 'region',
-               values_to = 'area_dom')
-
-df_driver2 <- df_driver1 %>% 
-  group_by(id, dom_driver) %>% 
-  summarize(area_dom = sum(area_dom),
-            .groups = 'drop') %>% 
-  mutate(region = 'Entire study area') %>% 
-  bind_rows(df_driver1) %>% 
-  left_join(info_dom1, by = 'id') %>% 
-  select(-run2, -type) %>% 
-  df_factor() %>% 
-  arrange(id)
-
-stopifnot(sum(is.na(df_driver2)) == 0) # test for joining, and other issues
-
-write_csv(df_driver2, paste0('data_processed/area/dominant_driver_by-region_',
-                             run, v_interp, '.csv'))
-message('dominant driver csv saved')
 # Maps of delta fire prob -------------------------------------------------
 
 # top right map shows absolute difference in fire prob,
