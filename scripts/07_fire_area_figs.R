@@ -69,12 +69,9 @@ area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v,".csv"))
 drivers1 <- read_csv(paste0('data_processed/raster_means/', run, 
                             '_fire-driver-means_by-ecoregion.csv'))
 
-# created in "scripts/04_maps_fire_attribution.R"
-dom_drivers1 <- read_csv(paste0('data_processed/area/dominant_driver_by-region_',
-                                runv, '.csv'))
-
 # create in "scripts/02b_fire_attribution.R"
 # site level data on change in fire prob due to individual pred vars
+# and dominant drivers of change
 driver_l <- readRDS('data_processed/site_means/fire_dominant_drivers.RDS')
 
 sei2 <- readRDS('data_processed/temp_rds/sei_df.rds')
@@ -271,20 +268,25 @@ c3eco_gcm3 <- c3eco_gcm2 %>%
 
 # * drivers of fire change ------------------------------------------------
 
-stopifnot(lu(dom_drivers1$summary_stat) == 1) # coded to only use one summary_stat
-
-dom_drivers2 <- dom_drivers1 %>% 
-  select(-id, -summary_stat) %>% 
-  group_by(region, run, RCP, years, graze, rcp_year) %>% 
-  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
+dom_drivers2 <- driver_l$dominant_driver1 %>% 
+  filter_clim_extremes() %>% 
+  select(-id) %>% 
+  rename(dom_driver = dominant_driver) %>% 
+  filter(run == !!run) %>% 
+  full_join(weights1, by = 'site',
+            relationship = 'many-to-many') %>% 
+  mutate(area_dom = weight2area(weight),
+         dom_driver = driver2factor(dom_driver, include_none = TRUE)) %>% 
+  group_by(region, run, RCP, years, graze, dom_driver) %>%
+  summarize(area_dom = sum(area_dom),
+            .groups = 'drop_last') %>% 
+    mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
                               add_newline = TRUE),
-         dom_driver = driver2factor(dom_driver),
-         perc_area = area_dom/sum(area_dom)*100) %>% 
+         perc_area = area_dom/sum(area_dom)*100)  %>% 
   ungroup() %>% 
   complete(dom_driver, region, run, nesting(RCP, years, graze, rcp_year),
            fill = list(area_dom = 0, perc_area = 0)) %>% 
   df_factor()
-
 
 # * fire change vs driver change ------------------------------------------
 
@@ -724,61 +726,69 @@ ggsave_delta_prob(plot = g_med0 + geom_point(data = df_med, size = 0.5),
 # combined figure for manuscript
 
 # expected  burned darea
-for(rcp in rcps) {
-ba3_tmp <- ba3 %>% 
-  filter(ecoregion == entire, RCP %in% c("Current", rcp)) %>% 
-  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
-                              add_newline = TRUE))
+args <- expand_grid(rcp = rcps,
+                    region = ecoregions)
+pmap(args, function(rcp, region) {
+  ba3_tmp <- ba3 %>% 
+    filter(ecoregion == region, RCP %in% c("Current", rcp)) %>% 
+    mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
+                                add_newline = TRUE))
+  
+  total_area <- unique(ba3_tmp$area_total)
+  
+  
+  
+  g_ba1 <- ggplot(ba3_tmp, aes(x = graze, y = area_median_perc)) +
+    geom_errorbar(aes(ymin = area_low_perc, ymax = area_high_perc), 
+                  position = position_dodge(width = 0.5), width = 0) +
+    geom_point(aes(y = area_median_perc), 
+               position = position_dodge(width = 0.5)) +
+    # scale_y_continuous(sec.axis = sec_axis(transform = \(x) total_area*x/100,
+    #                                        name = lab_ba0)) +
+    facet_wrap(~rcp_year) +
+    adjust_graze_x_axis(xlab = NULL) +
+    labs(y = lab_ba1)
+  
+  
+  # years since fire
+  
+  g_bar1 <- area_age_group4_pw %>% 
+    filter(RCP %in% c('Current', rcp), ecoregion == region) %>% 
+    ggplot(aes(x = graze, y = area_median_perc, fill = age_group)) +
+    geom_bar(stat = 'identity') +
+    facet_wrap(~rcp_year) +
+    adjust_graze_x_axis(xlab = NULL) +
+    scale_fill_manual(values = rev(cols_agegroup),
+                      name = lab_agegroup) +
+    labs(y = lab_areaperc0)
+  
+  g_dom <- dom_drivers2 %>% 
+    filter(RCP == rcp, region == !!region) %>% 
+    ggplot(aes(x = graze, y = perc_area, fill = dom_driver)) +
+    geom_bar(stat = 'identity') +
+    facet_wrap(~rcp_year) +
+    adjust_graze_x_axis() +
+    scale_fill_manual(values = c(cols_pred_vars, 'None' = 'grey'),
+                      name = "Primary driver of\nchange in fire\nprobability") +
+    labs(y = lab_areaperc0)
+  
+  comb <- guide_area() +  g_dom + plot_layout(guides = 'collect', 
+                                              widths = c(0.8, 1))
+  plots <- list(g_ba1, g_bar1, comb)
+  
+  g <- wrap_plots(plots, ncol = 1)&theme(plot.margin = unit(c(0, 0, 0, 3), "pt"))
+  
+  if(region != entire) {
+    g <- g + plot_annotation(subtitle = region)
+  }
+  
+  ggsave(paste0("figures/fire/area/comb_ba-age-driver_", 
+                words2abbrev(region), "_", rcp, "_", v, "_", runv, '.png'),
+         plot = g,
+         height = 9, width = 5, dpi = 600)
+})
 
-total_area <- unique(ba3_tmp$area_total)
 
-
-
-g_ba1 <- ggplot(ba3_tmp, aes(x = graze, y = area_median_perc)) +
-  geom_errorbar(aes(ymin = area_low_perc, ymax = area_high_perc), 
-                position = position_dodge(width = 0.5), width = 0) +
-  geom_point(aes(y = area_median_perc), 
-             position = position_dodge(width = 0.5)) +
-  # scale_y_continuous(sec.axis = sec_axis(transform = \(x) total_area*x/100,
-  #                                        name = lab_ba0)) +
-  facet_wrap(~rcp_year) +
-  adjust_graze_x_axis(xlab = NULL) +
-  labs(y = lab_ba1)
-
-
-# years since fire
-
-g_bar1 <- area_age_group4_pw %>% 
-  filter(RCP %in% c('Current', rcp), ecoregion == entire) %>% 
-  ggplot(aes(x = graze, y = area_median_perc, fill = age_group)) +
-  geom_bar(stat = 'identity') +
-  facet_wrap(~rcp_year) +
-  adjust_graze_x_axis(xlab = NULL) +
-  scale_fill_manual(values = rev(cols_agegroup),
-                    name = lab_agegroup) +
-  labs(y = lab_areaperc0)
-
-g_dom <- dom_drivers2 %>% 
-  filter(RCP == rcp, region == entire) %>% 
-  ggplot(aes(x = graze, y = perc_area, fill = dom_driver)) +
-  geom_bar(stat = 'identity') +
-  facet_wrap(~rcp_year) +
-  adjust_graze_x_axis() +
-  scale_fill_manual(values = cols_pred_vars,
-                    name = "Primary driver of\nchange in fire\nprobability") +
-  labs(y = lab_areaperc0)
-
-comb <- guide_area() +  g_dom + plot_layout(guides = 'collect', 
-                                            widths = c(0.8, 1))
-plots <- list(g_ba1, g_bar1, comb)
-
-g <- wrap_plots(plots, ncol = 1)&theme(plot.margin = unit(c(0, 0, 0, 3), "pt"))
-
-ggsave(paste0("figures/fire/area/comb_ba-age-driver_", rcp, "_", 
-              v, "_", runv, '.png'),
-       plot = g,
-       height = 9, width = 5, dpi = 600)
-}
 # explanatory figures -----------------------------------------------------
 
 if (explanatory_figures) {

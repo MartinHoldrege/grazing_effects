@@ -9,6 +9,9 @@
 
 # params ------------------------------------------------------------------
 
+# if change less than 1 fire per 500 years then 
+# don't consider the driver of change
+delta_fire_prob_cutoff <- 0.2 # percentage point change
 
 # dependencies ------------------------------------------------------------
 
@@ -157,10 +160,15 @@ one_change2b <- delta_pred_var1 %>%
 # summarize results -------------------------------------------------------
 
 dominant_driver0 <- one_change2b %>% 
+  rename(dominant_driver = pred_var_cur) %>% 
+  # if change less than 1 fire per 500 years then 
+  # don't consider the driver of change
+  mutate(delta_fire_prob = fire_prob_fut - fire_prob_cur,
+         dominant_driver = ifelse(abs(delta_fire_prob) < delta_fire_prob_cutoff, 
+                                  'None', dominant_driver)) %>% 
   group_by(run, site, graze, RCP, years, id, GCM) %>% 
   filter(abs(delta_1var) == max(abs(delta_1var))) %>% 
-  mutate(n = n()) %>% 
-  rename(dominant_driver = pred_var_cur)
+  mutate(n = n()) 
 
 
 # if n>1 that means there were ties for the dominant driver
@@ -174,7 +182,7 @@ dominant_driver1 <- dominant_driver0 %>%
   summarize(dominant_driver = mode_rand(dominant_driver),
             .groups = 'drop') %>% 
   mutate(dominant_driver = factor(dominant_driver,
-                                  levels = !!pred_vars))
+                                  levels = c(!!pred_vars, 'None')))
 
 one_change3 <- one_change2b %>% 
   group_by(run, site, graze, years, RCP, id, pred_var_cur) %>% 
@@ -184,7 +192,6 @@ one_change3 <- one_change2b %>%
             delta_1var_abs = median(abs(delta_1var)),
             .groups = 'drop') %>% 
   mutate(pred_var_cur = factor(pred_var_cur, levels = !!pred_vars))
-
 
 # checks ------------------------------------------------------------------
 
@@ -200,7 +207,8 @@ out <- list(
   one_change_smry1 = one_change3,
   one_change_gcm1 = one_change2b,
   dominant_driver1 = dominant_driver1,
-  pred_vars = pred_vars
+  pred_vars = pred_vars,
+  pred_vars2 = levels(dominant_driver1$dominant_driver)
 )
 
 saveRDS(out, 'data_processed/site_means/fire_dominant_drivers.RDS')

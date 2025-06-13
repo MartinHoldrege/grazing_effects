@@ -198,7 +198,15 @@ region2wafwa <- function(x) {
 
 summary2factor <- var2factor_factory( c('low', 'median', 'high'))
 
-driver2factor <-  var2factor_factory(c('MAT', 'MAP', 'PSP', 'Pherb', 'Aherb'))
+driver2factor <-  function(x, include_none = FALSE) {
+  x <- as.character(x)
+  x <- str_replace(x, 'psp', 'PSP')
+  levels <- c('MAT', 'MAP', 'PSP', 'Pherb', 'Aherb')
+  if(include_none) levels <- c(levels, 'None')
+  stopifnot(x %in% levels)
+  factor(x, levels)
+}
+
 
 # * PFTs ------------------------------------------------------------------
 
@@ -1249,4 +1257,14 @@ writeReadRast <- function(object, objectName, dir = 'tmp') {
   rm(list = objectName, envir = .GlobalEnv)
   gc()
   terra::rast(path)
+}
+
+weight2area <- function(x) {
+  x*100 # each pixel has an area of 100 ha
+}
+
+# extracts the first letter each word, to create abbreviations
+words2abbrev <- function(x) {
+  stringr::str_extract_all(x, "\\b\\w") %>%
+    purrr::map_chr(~ paste0(toupper(.x), collapse = ""))
 }

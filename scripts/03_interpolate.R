@@ -26,7 +26,7 @@ run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
 run_fire <- TRUE
 # interpolate data showing which vars caused changes in fire?
 run_fire_attribution <- TRUE 
-run_util <- TRUE # utilization
+run_util <- FALSE # utilization
 
 # for filtering output, put NULL if don't want to filter that variable
 PFT2run =c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 
