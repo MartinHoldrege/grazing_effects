@@ -49,7 +49,7 @@ qm_Pherb <- qm_quant_factory(
 
 bio2 <- bio1 %>% 
   filter(str_detect(run, 'fire1')) %>% 
-  calc_aherb() %>% 
+  #calc_aherb() %>% 
   filter(PFT %in% c('Aherb', 'Pherb')) %>% 
   select(run, years, RCP, graze, id, site, GCM, biomass, PFT) %>% 
   left_join(clim_all2, by = join_by(years, RCP, site, GCM))
@@ -75,13 +75,24 @@ pred_vars <- c("MAP", "MAT", "psp", "Aherb", "Pherb")
 bio_cur2 <- bio_cur1 %>% 
   pivot_longer(cols = all_of(pred_vars),
                names_to = 'pred_var_cur',
-               values_to = "value_cur")
+               values_to = "value_cur")  %>% 
+  ungroup() %>% 
+  select(-years, -RCP, -GCM, -id) 
 
 # columns labeled with the pred vars, are the 'current' values
 bio_cur3 <- bio_cur2 %>% 
-  select(-years, -RCP, -GCM, -id) %>% 
   full_join(bio_fut1, by = c('run', 'graze', 'site'),
              relationship = "many-to-many")
+
+# change in predictor variable (within a grazing level)
+delta_pred_var1 <- bio_fut1 %>% pivot_longer(cols = all_of(pred_vars),
+                     names_to = 'pred_var_fut',
+                     values_to = "value_fut") %>% 
+  left_join(bio_cur2, by = c('run', 'graze', 'site', 
+                             'pred_var_fut' = 'pred_var_cur')) %>% 
+  mutate(delta_pred_value = value_fut - value_cur) %>% 
+  rename(pred_var = pred_var_fut)
+
 
 test <- bio_cur3 %>% 
   filter(site == 1,
@@ -127,6 +138,7 @@ bio_cur1b$fire_prob_cur <- predict_fire_with(bio_cur1b)
 
 # combine
 one_change2 <- bio_cur1b %>% 
+  ungroup() %>% 
   select(run, site, graze, fire_prob_cur) %>% 
   right_join(one_change) %>% 
   select(-all_of(pred_vars)) %>% 
@@ -136,10 +148,15 @@ one_change2 <- bio_cur1b %>%
   mutate(delta_1var = fire_prob_fut - fire_prob_1var ,
          rcp_years = rcp_label(RCP, years, include_parenth = FALSE)) 
 
+one_change2b <- delta_pred_var1 %>% 
+  rename(pred_value_fut = value_fut, pred_value_cur = value_cur,
+         pred_var_cur = pred_var) %>% 
+  right_join(one_change2, by = c("run", "years", "graze", "site",  "RCP", 
+                                 "GCM", 'pred_var_cur', "id")) 
 
 # summarize results -------------------------------------------------------
 
-dominant_driver0 <- one_change2 %>% 
+dominant_driver0 <- one_change2b %>% 
   group_by(run, site, graze, RCP, years, id, GCM) %>% 
   filter(abs(delta_1var) == max(abs(delta_1var))) %>% 
   mutate(n = n()) %>% 
@@ -159,9 +176,10 @@ dominant_driver1 <- dominant_driver0 %>%
   mutate(dominant_driver = factor(dominant_driver,
                                   levels = !!pred_vars))
 
-one_change3 <- one_change2 %>% 
+one_change3 <- one_change2b %>% 
   group_by(run, site, graze, years, RCP, id, pred_var_cur) %>% 
-  summarize(across(.cols = c('fire_prob_fut', "fire_prob_cur", "delta_1var"),
+  summarize(across(.cols = c('fire_prob_fut', "fire_prob_cur", "delta_1var", 
+                             "pred_value_fut", "pred_value_cur", "delta_pred_value"),
                    .fns = median),
             delta_1var_abs = median(abs(delta_1var)),
             .groups = 'drop') %>% 
@@ -169,7 +187,6 @@ one_change3 <- one_change2 %>%
 
 
 # checks ------------------------------------------------------------------
-
 
 test <- dominant_driver1 %>% 
   group_by(run, id) %>% 
@@ -180,7 +197,8 @@ stopifnot(all(test == 200))
 # output ------------------------------------------------------------------
 
 out <- list(
-  one_change3 = one_change3,
+  one_change_smry1 = one_change3,
+  one_change_gcm1 = one_change2b,
   dominant_driver1 = dominant_driver1,
   pred_vars = pred_vars
 )

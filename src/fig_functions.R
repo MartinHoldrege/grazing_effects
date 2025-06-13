@@ -767,6 +767,26 @@ png20panel <- function(filename) {
   png(filename, res = 600, height = 5*1.8 + 1, width = 4*1.8 - 0.3, units = 'in')
 }
 
+
+ggsave_tradeoff <- function(g, prefix, width = 7,
+                            xvar = "csa") {
+  ggsave(paste0("figures/sei/tradeoff/", xvar, "-scd-adj-vs-ba_perc_dotplot_", 
+                prefix, '_', suffix, ".png"), 
+         plot = g, dpi = 600,
+         width = width, height = 4.5)
+}
+
+ggsave_delta_prob <- function(plot, rcp, smry) {
+  filename <- paste0('figures/fire/delta-prob/delta-prob_vs_delta-pred_', 
+                     smry, "_", rcp, "_", runv, '.png')
+  ggsave(
+    filename = filename,
+    plot = plot,
+    width = 13, height = 10,
+    dpi = 600
+  )
+}
+
 # create 9 color matrix ---------------------------------------------------
 # Creating a 3x3 colored matrix of current and future SEI classes,
 

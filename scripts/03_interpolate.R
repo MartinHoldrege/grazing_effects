@@ -232,7 +232,7 @@ fire_w1 <- bio$fire0 %>%
 # * fire attribution ------------------------------------------------------
 
 if (run_fire_attribution) {
-  one_change_w1 <- attrib$one_change3 %>% 
+  one_change_w1 <- attrib$one_change_smry1 %>% 
     filter_scenarios(run = run2run, years = years2run) %>% 
     mutate(id = paste0(run, v2paste, "_","fire-delta-", 
                        pred_var_cur, "_", id, "_median")) %>% 

@@ -73,6 +73,10 @@ drivers1 <- read_csv(paste0('data_processed/raster_means/', run,
 dom_drivers1 <- read_csv(paste0('data_processed/area/dominant_driver_by-region_',
                                 runv, '.csv'))
 
+# create in "scripts/02b_fire_attribution.R"
+# site level data on change in fire prob due to individual pred vars
+driver_l <- readRDS('data_processed/site_means/fire_dominant_drivers.RDS')
+
 sei2 <- readRDS('data_processed/temp_rds/sei_df.rds')
 
 # created in "scripts/05_interpolated_summarize_sei_scd-adj.R"
@@ -89,6 +93,12 @@ c3eco_sei2_smry <- read_csv(paste0('data_processed/raster_means/', runv,
 
 c3eco_sei2_gcm <- read_csv(paste0('data_processed/raster_means/', runv, 
                                  '_sei-mean_scd-adj_by-GCM-region-c3.csv'))
+
+# interpolation weights from:
+# "scripts/04_interpolation_weights.R"
+weights1 <- read_csv(paste0('data_processed/interpolation_data/interpolation_weights_', 
+                            v_interp, '.csv')) %>% 
+  df_factor()
 
 # vectors -----------------------------------------------------------------
 
@@ -276,7 +286,27 @@ dom_drivers2 <- dom_drivers1 %>%
   df_factor()
 
 
+# * fire change vs driver change ------------------------------------------
 
+# change in fire probability due to one predictor variable,
+# and the change in that predictor, by site
+one_change_smry1 <- driver_l$one_change_smry1 # median across GCMs (site-wise)
+one_change_gcm1 <- driver_l$one_change_gcm1 # values by GCM
+
+one_change_prep <- function(df) {
+  df %>% 
+    left_join(weights1, by = 'site', relationship = 'many-to-many') %>% 
+    rename(pred_var = pred_var_cur) %>% 
+    filter_clim_extremes() %>% 
+    mutate(pred_var = str_replace(pred_var, 'psp', 'PSP'),
+           pred_var = driver2factor(pred_var))
+}
+
+one_change_smry2 <- one_change_smry1 %>% 
+  one_change_prep()
+
+one_change_gcm2 <- one_change_gcm1 %>% 
+  one_change_prep()
 # expected burned area figs --------------------------------------------------
 
 plots <- map(ecoregions, function(region) {
@@ -423,13 +453,6 @@ g2_noerror <- g1 + base_tradeoff()
 g2_error <- g1 + base_tradeoff()
 
 
-ggsave_tradeoff <- function(g, prefix, width = 7,
-                            xvar = "csa") {
-  ggsave(paste0("figures/sei/tradeoff/", xvar, "-scd-adj-vs-ba_perc_dotplot_", 
-                prefix, '_', suffix, ".png"), 
-         plot = g, dpi = 600,
-         width = width, height = 4.5)
-}
 
 ggsave_tradeoff(
   g = g2_noerror + facet_wrap(~region, scales = 'fixed'),
@@ -548,7 +571,10 @@ map(rcps, function(rcp) {
 })
 
 
-# burned area--attribution ------------------------------------------------
+# attribution -------------------------------------------------------------
+
+
+# * burned area--attribution ------------------------------------------------
 
 drivers2 <- drivers1 %>% 
   select(-id)
@@ -617,11 +643,88 @@ print(plots)
 dev.off()
 
 
+# * delta fire prob attribution -------------------------------------------
+
+
+
+for (rcp in rcps) {
+df_gcm <- one_change_gcm2 %>% 
+  filter(RCP == rcp) 
+
+df_med <- one_change_smry2 %>% 
+  filter(RCP == rcp) 
+
+cap1 <- paste0(unique(df_gcm$rcp_years, 
+                      '\nSite level data weighted by area interpolated to'))
+
+g <- ggplot(mapping = aes(delta_pred_value, delta_1var, color = graze)) +
+  facet_grid(region~pred_var, scales = 'free', switch = 'x') +
+  theme(strip.placement.x = 'outside') +
+  #scale_color_manual(values = scales::alpha(cols_graze, alpha = 0.25)) +
+  scale_color_graze() +
+  geom_hline(yintercept = 0, linetype = 2, alpha = 0.2, linewidth = 0.5) +
+  geom_vline(xintercept = 0, linetype = 2, alpha = 0.2, linewidth = 0.5) +
+  labs(x = 'Change in predictor variable (future - historical)',
+       y = 'Change in fire frequency due to change in single predictor (#/100 yrs)',
+       caption = cap1)
+
+g_gcm0 <- g+ coord_cartesian(ylim = c(-2, 2)) +
+  labs(subtitle = 'Results shown by GCM')
+  
+g_gcm <- g_gcm0 + 
+  geom_smooth(
+    data = df_gcm,
+    aes(weight = weight, group = interaction(GCM, graze)),
+    method.args = list(span = 1, degree = 1), # more smoothing
+    method = 'loess',
+    se = FALSE,
+    linewidth = 0.2
+  ) 
+ggsave_delta_prob(g_gcm, rcp, 'by-GCM')
+
+g_gcm_lm <- g_gcm0 + 
+  geom_smooth(
+    data = df_gcm,
+    aes(weight = weight, group = interaction(GCM, graze)),
+    method = 'lm',
+    se = FALSE,
+    linewidth = 0.2
+  ) 
+ggsave_delta_prob(g_gcm_lm, rcp, 'by-GCM-lm')
+g_gcm_point <-  g_gcm0 + 
+  geom_point(
+    data = df_gcm,
+    aes(group = interaction(GCM, graze)),
+    alpha = 0.5,
+    size = 0.3
+  ) 
+
+ggsave_delta_prob(g_gcm_point, rcp, 'by-GCM-point')
+
+g_med0 <- g +
+  labs(subtitle = 'Median across GCMs (by site) shown')
+
+g_med1 <- g_med0 +
+  geom_smooth(data = df_med,
+    aes(weight = weight),
+    method.args = list(span = 1, degree = 1),
+    method = 'loess',
+    se = FALSE,
+    linewidth = 0.75
+  )
+
+ggsave_delta_prob(g_med1, rcp, 'med')
+
+ggsave_delta_prob(plot = g_med0 + geom_point(data = df_med, size = 0.5),
+                  rcp, 
+                  'med-point')
+}
+
 # combined figures --------------------------------------------------------
 # combined figure for manuscript
 
 # expected  burned darea
-rcp <- rcps[1]
+for(rcp in rcps) {
 ba3_tmp <- ba3 %>% 
   filter(ecoregion == entire, RCP %in% c("Current", rcp)) %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
@@ -675,7 +778,7 @@ ggsave(paste0("figures/fire/area/comb_ba-age-driver_", rcp, "_",
               v, "_", runv, '.png'),
        plot = g,
        height = 9, width = 5, dpi = 600)
-
+}
 # explanatory figures -----------------------------------------------------
 
 if (explanatory_figures) {
