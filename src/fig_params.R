@@ -222,10 +222,20 @@ lab_map <- "MAP (mm)"
 lab_mat <- expression("MAT ("*degree*C*")")
 lab_corrtp <- 'Seasonality (T-P correlation)'
 lab_psp <- 'Prop summer ppt'
+lab_psp1 <- expression(Delta~"PSP")
 lab_map0 <- lab_map
 lab_mat0 <- lab_mat
 lab_map1 <- expression(Delta~"MAP (mm)")
 lab_mat1 <- expression(Delta~"MAT ("*degree*C*")")
+
+labs_pred1 <- list(
+  'MAP' = lab_map1,
+  'MAT' = lab_mat1,
+  'PSP' = lab_psp1,
+  'psp' = lab_psp1,
+  'Pherb' = lab_bio1,
+  'Aherb' = lab_bio1
+)
 
 # transpiration
 lab_transp0 <- 'Transpiration (mm)'
