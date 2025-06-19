@@ -323,6 +323,12 @@ info_plots_l <- info_delta4 %>%
   group_by(RCP, years, graze) %>% 
   group_split()
 
+
+
+
+# * 10 panel --------------------------------------------------------------
+
+# left column is change in driver, right column is change in fire due to the driver
 map(info_plots_l, function(df) {
   left <- wrap_plots(df$plot_pred) +
     patchwork::plot_layout(ncol = 1) +
@@ -345,3 +351,65 @@ map(info_plots_l, function(df) {
           width = 6, height = 13, dpi = 600)
 })
 
+
+# * 12 panel --------------------------------------------------------------
+# also include total delta fire prob, and total delta fire prob
+# calculated by summing changes in fire probability attributed to each variable
+
+# plot total delta fire, calculate as a sum of the single variable
+# caused fire changes (this is a check)
+info_att_sum1 <- info_delta4 %>% 
+  ungroup() %>% 
+  filter(type == 'fire-delta-pred') %>% 
+  nest(.by = c("RCP", "years", "graze")) %>% 
+  mutate(plot_attrib = map(data, function(df) {
+    r <- r_delta2[[df$id]]
+    r_sum <- app(r, fun = sum, na.rm = TRUE)
+    tag <- "Sum of attributions"
+    
+    p <- plot_map_inset(r = r_sum,
+                        colors = rev(cols_map_bio_d),
+                        tag_label = tag,
+                        limits = range_delta,
+                        scale_name = "") 
+    p&theme(legend.position = 'none')&guides(fill = 'none')
+  })) %>% 
+  select(-data)
+
+
+info_delta_tot1 <- info_delta3 %>% 
+  ungroup() %>% 
+  filter(type == 'fire-prob-rdiff-cref') %>% 
+  rename(plot_total = plot) %>% 
+  select(RCP, years, graze, plot_total) %>% 
+  right_join(info_att_sum1, by = join_by(RCP, years, graze))
+
+info_delta_tot1$plot_total <- map(info_delta_tot1$plot_total, function(p) {
+  p&theme(legend.position = 'left')
+})
+
+# left column is change in driver, right column is change in fire due to the driver
+map(info_plots_l, function(df) {
+  tmp <- info_delta_tot1 %>% 
+    filter(RCP == df$RCP[1],
+           years == df$years[1],
+           graze == df$graze[1])
+  stopifnot(nrow(tmp) == 1)
+  left <- wrap_plots(c(df$plot_pred, tmp$plot_total)) +
+    patchwork::plot_layout(ncol = 1) 
+  
+  right <- wrap_plots(c(df$plot, tmp$plot_attrib)) +
+    patchwork::plot_layout(ncol = 1, guides = 'collect') 
+  right <- right & theme(
+    legend.position = "bottom",
+    legend.direction = "horizontal",
+    legend.title.position = "top"
+  ) 
+  g <- wrap_plots(left, right, ncol = 2, widths = c(1, 1))
+  graz <- names(graze_levels[graze_levels == df$graze[1]])
+  filename <- paste0("figures/fire_attribution/maps/delta-driver-delta-fire-tot_",
+                     df$RCP[1], "_", graz, "_", v_out, "_", run, ".png")
+  
+  ggsave(filename, plot = g,
+         width = 6, height = 14.5, dpi = 900)
+})
