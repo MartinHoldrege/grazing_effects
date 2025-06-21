@@ -207,6 +207,22 @@ driver2factor <-  function(x, include_none = FALSE) {
   factor(x, levels)
 }
 
+relable_c3_current <- function(x) {
+  stopifnot(is.factor(x))
+  levels <- levels(x)
+  labels <- paste(levels, '(2017-2020)')
+  factor(x, levels = levels, 
+         labels = labels)
+}
+
+relable_graze_long <- function(x) {
+  stopifnot(is.factor(x))
+  levels <- levels(x)
+  labels <- paste(levels, 'grazing')
+  factor(x, levels = levels, 
+         labels = labels)
+}
+
 
 # * PFTs ------------------------------------------------------------------
 

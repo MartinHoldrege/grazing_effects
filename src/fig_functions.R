@@ -398,6 +398,47 @@ base_c9_area <- function(pattern_var = 'graze', legend_title = 'Grazing') {
   out
 }
 
+# simple barchart (for inset) of percent area by SEI class
+area_bar <- function(df_smry_region, area_perc_region, limits) {
+  
+  stopifnot(lu(df_smry_region$region) == 1,
+            lu(df_smry_region$area) == 3)
+  
+  
+  ggplot(area_perc_region, aes(c3, area_perc, fill = c3)) +
+    geom_bar(stat = 'identity') +
+    scale_fill_manual(values = c3Palette) +
+    labs(x = NULL,
+         y = lab_areaperc0) +
+    guides(fill = 'none') +
+    theme(axis.ticks = element_blank(),
+          axis.text = element_blank()) +
+    coord_cartesian(ylim = limits)
+}
+
+# mapping simple c3 area bar chart over regions
+area_bar_map <- function(df_smry) {
+  
+  # percent of total area in each SEI class
+  area_perc <- df_smry %>% 
+    group_by(region, c3) %>% 
+    summarize(area = unique(area),
+              .groups = 'drop_last') %>% 
+    mutate(area_perc = area/sum(area)*100)
+  limits <- c(0, max(area_perc$area_perc))
+  
+  regions <- levels(df_smry$region) %>% 
+    setNames(nm = .)
+  
+  map(regions, function(region) {
+    df_smry_region <- df_smry %>% 
+      filter(region == !!region)
+    area_perc_region <- area_perc %>% 
+      filter(region == !!region)
+    area_bar(df_smry_region, area_perc_region, limits)
+  })
+}
+
 # modify/combine groups of plots ------------------------------------------
 
 
