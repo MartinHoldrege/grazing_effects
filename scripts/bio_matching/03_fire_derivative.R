@@ -25,7 +25,7 @@ library(patchwork)
 source('src/fire_functions.R')
 source("src/mapping_functions.R")
 source("src/fig_params.R")
-
+source('src/fig_functions.R')
 # read in data ------------------------------------------------------------
 
 # functions for quantile matching
@@ -149,14 +149,7 @@ fill_slope <- function(limits = NULL, oob = scales::censor) {
                        oob = oob) 
 }
 
-smaller_legend <- function() {
-  theme(
-    legend.title = element_text(size = rel(0.5)),  # Reduce legend title size
-    legend.text = element_text(size = rel(0.5)),   # Reduce legend text size
-    legend.key.size = unit(0.5, "lines"),          # Reduce legend key size (relative to lines)
-    legend.spacing = unit(0.5, "lines")           # Reduce spacing between legend items
-  )
-}
+
 
 base_deriv <- function(limits = NULL, oob = scales::censor) {
   list(

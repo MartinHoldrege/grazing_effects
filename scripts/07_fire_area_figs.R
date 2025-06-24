@@ -544,70 +544,38 @@ pmap(args, function(rcp, xvar) {
 # showing mean SEI vs expected burned area for each combination of ecoregion 
 # and current SEI class
 
-regions <- levels(df_smry$region)
-region <- regions[1]
-df_smry_region <- df_smry %>% 
-  filter(region == !!region)
-
-df_gcm_region <- df_gcm %>% 
-  filter(region == !!region)
-
-# barcharts showing % of total area by SEI class
-# (to be used as insets)
-bar_l <- area_bar_map(df_smry)
-
-
-xlim <- range(c(df_smry$SEI_mean, df_gcm$SEI_mean))
-ylim <- range(c(df_smry$expected_ba_perc, df_gcm$expected_ba_perc))
-
-
-
-# CONTINUE HERE
-# next relabel c3 and graze,
-# make linechart function and make function for mapping across regions 
-# and combining
-ggplot(df_smry_region, aes(SEI_mean, expected_ba_perc)) + 
-  geom_path(aes(group = rcp_year_c3, linetype = rcp_year, color = c3),
-            linewidth = 0.75, alpha = 1) +
-  geom_path(data = df_gcm_region, aes(group = rcp_year_c3_gcm, linetype = rcp_year, color = c3),
-            linewidth = 0.2, alpha = 0.5) +
-  #facet_manual_region(legend.position.inside = c(.1, 0.15)) +
-  geom_point(aes(color = graze, shape = rcp_year)) +
-  scale_linetype_manual(name = 'Scenario', values = linetypes_scen) +
-  scale_shape_manual(values = shapes_scen, name = 'Scenario') +
-  scale_color_manual(values = c(cols_graze,  c3Palette), name = NULL) +
-  labs(x = 'Mean SEI',
-       y = 'Expected area burned (%/year)')  +
-  coord_cartesian(xlim = xlim, ylim = ylim)
-
 
 map(rcps, function(rcp) {
   
   df_smry <- c3eco_smry3 %>% 
     filter(RCP %in% c('Current', rcp),
-           summary == 'median')
+           summary == 'median') %>% 
+    mutate(c3_cur = relable_c3_current(c3),
+           graze_long = relable_graze_long(graze))
   
   df_gcm <- c3eco_gcm3 %>% 
-    filter(RCP %in% c('Current', rcp))
+    filter(RCP %in% c('Current', rcp))%>% 
+    mutate(c3_cur = relable_c3_current(c3),
+           graze_long = relable_graze_long(graze))
   
-  g <- ggplot(df_smry, aes(SEI_mean, expected_ba_perc)) + 
-    geom_path(aes(group = rcp_year_c3, linetype = rcp_year, color = c3),
-              linewidth = 0.5, alpha = 1) +
-    geom_path(data = df_gcm, aes(group = rcp_year_c3_gcm, linetype = rcp_year, color = c3),
-              linewidth = 0.5, alpha = 0.5) +
-    facet_manual_region(legend.position.inside = c(.1, 0.15)) +
-    geom_point(aes(color = graze, shape = rcp_year)) +
-    scale_linetype_manual(name = 'Scenario', values = linetypes_scen) +
-    scale_shape_manual(values = shapes_scen, name = 'Scenario') +
-    scale_color_manual(values = c(cols_graze,  c3Palette), name = NULL) +
-    labs(x = 'Mean SEI',
-         y = 'Expected area burned (%/year)') +
-    make_legend_small()
-g
+  
+  # barcharts showing % of total area by SEI class
+  # (to be used as insets)
+  bar_l <- area_bar_map(df_smry)
+  plotsl1 <- tradeoff_lines_map(df_smry = df_smry,
+                                df_gcm = df_gcm)
+  plotsl1 <- remove_axis_labels(plotsl1)
+  plotsl2 <- map2(plotsl1, bar_l, tradeoff_add_inset) 
+  
+  
+  comb <- combine_5_panels_labs(plotsl2,
+                                xlab = 'Mean Sagebrush Ecological Integrity',
+                                ylab = 'Expected burned area (%/year)')
+
   ggsave(paste0("figures/sei/tradeoff/", "sei", "-scd-adj-vs-ba_perc_dotplot_", 
               'c3eco_', rcp, "_", suffix, ".png"), 
-         plot = g, dpi = 600,
-         width = 7, height = 4.5)
+         plot = comb, dpi = 600,
+         width = 7, height = 5)
 })
 
 

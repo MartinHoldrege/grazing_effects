@@ -208,7 +208,9 @@ driver2factor <-  function(x, include_none = FALSE) {
 }
 
 relable_c3_current <- function(x) {
-  stopifnot(is.factor(x))
+  if(!is.factor(x)) {
+    x <- c3_factor(x)
+  }
   levels <- levels(x)
   labels <- paste(levels, '(2017-2020)')
   factor(x, levels = levels, 
@@ -216,7 +218,9 @@ relable_c3_current <- function(x) {
 }
 
 relable_graze_long <- function(x) {
-  stopifnot(is.factor(x))
+  if(!is.factor(x)) {
+    x <- graze2factor(x)
+  }
   levels <- levels(x)
   labels <- paste(levels, 'grazing')
   factor(x, levels = levels, 

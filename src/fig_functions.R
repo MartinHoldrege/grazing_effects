@@ -352,21 +352,7 @@ box_abs_diff <- function(df_abs,
 
 # dot plots ---------------------------------------------------------------
 
-base_tradeoff <- function(group = 'rcp_year', linetypes_scen = c(1, 1, 1),
-                          xlab = '% Core Sagebrush Area') {
-  list(
-    geom_path(aes(group = .data[[group]], linetype = rcp_year), color = "blue", 
-              linewidth = 0.5, alpha = 0.5),
-    #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5)
-    geom_point(aes(color = graze, shape = rcp_year)),
-    scale_color_manual(values = cols_graze, name = lab_graze),
-    scale_shape_manual(values = shapes_scen, name = 'Scenario'),
-    scale_linetype_manual(name = 'Scenario', values = linetypes_scen),
-    labs(x = xlab,
-         y = 'Expected area burned (%/year)'),
-    expand_limits(x = 0)
-  )
-}
+
 
 # bar charts --------------------------------------------------------------
 
@@ -398,6 +384,26 @@ base_c9_area <- function(pattern_var = 'graze', legend_title = 'Grazing') {
   out
 }
 
+
+
+
+# functions for tradeoff figure -------------------------------------------
+
+base_tradeoff <- function(group = 'rcp_year', linetypes_scen = c(1, 1, 1),
+                          xlab = '% Core Sagebrush Area') {
+  list(
+    geom_path(aes(group = .data[[group]], linetype = rcp_year), color = "blue", 
+              linewidth = 0.5, alpha = 0.5),
+    #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5)
+    geom_point(aes(color = graze, shape = rcp_year)),
+    scale_color_manual(values = cols_graze, name = lab_graze),
+    scale_shape_manual(values = shapes_scen, name = 'Scenario'),
+    scale_linetype_manual(name = 'Scenario', values = linetypes_scen),
+    labs(x = xlab,
+         y = 'Expected area burned (%/year)'),
+    expand_limits(x = 0)
+  )
+}
 # simple barchart (for inset) of percent area by SEI class
 area_bar <- function(df_smry_region, area_perc_region, limits) {
   
@@ -412,7 +418,9 @@ area_bar <- function(df_smry_region, area_perc_region, limits) {
          y = lab_areaperc0) +
     guides(fill = 'none') +
     theme(axis.ticks = element_blank(),
-          axis.text = element_blank()) +
+          axis.title.y = element_text(size = 7),
+          axis.text = element_blank(),
+          plot.margin = margin(0, 0, 0, 0)) +
     coord_cartesian(ylim = limits)
 }
 
@@ -438,6 +446,59 @@ area_bar_map <- function(df_smry) {
     area_bar(df_smry_region, area_perc_region, limits)
   })
 }
+
+# make the tradeoff lines/point plot 
+tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim) {
+  
+  cols1 <- setNames(cols_graze, relable_graze_long(names(cols_graze)))
+  cols2 <- setNames(c3Palette, relable_c3_current(names(c3Palette)))
+  region <- unique(df_smry_region$region)
+  stopifnot(lu(region) == 1)
+  
+  ggplot(df_smry_region, aes(SEI_mean, expected_ba_perc, color = c3_cur)) + 
+    geom_path(aes(group = rcp_year_c3, linetype = rcp_year),
+              linewidth = 1, alpha = 1) +
+    geom_path(data = df_gcm_region, aes(group = rcp_year_c3_gcm, linetype = rcp_year),
+              linewidth = 0.2, alpha = 0.7) +
+    geom_point(aes(color = graze_long, shape = rcp_year)) +
+    scale_linetype_manual(name = 'Scenario', values = linetypes_scen) +
+    scale_shape_manual(values = shapes_scen, name = 'Scenario') +
+    scale_color_manual(values = c(cols1, cols2), name = NULL) +
+    labs(x = 'Mean SEI',
+         y = 'Expected burned area (%/year)',
+         subtitle = region_label(region))  +
+    coord_cartesian(xlim = xlim, ylim = ylim) +
+    smaller_legend()
+}
+
+# map over region
+tradeoff_lines_map <- function(df_smry, df_gcm) {
+  xlim <- range(c(df_smry$SEI_mean, df_gcm$SEI_mean))
+  ylim <- range(c(df_smry$expected_ba_perc, df_gcm$expected_ba_perc))
+  regions <- levels(df_smry$region) %>% 
+    setNames(nm = .)
+  
+  map(regions, function(region) {
+    df_smry_region <- df_smry %>% 
+      filter(region == !!region)
+    df_gcm_region <- df_gcm %>% 
+      filter(region == !!region)
+    tradeoff_lines(df_smry_region, df_gcm_region, xlim = xlim, ylim = ylim)
+  })
+}
+
+
+tradeoff_add_inset <- function(plot, inset) {
+  plot + inset_element(inset, 
+                       left = 0.73,
+                       bottom = 0.73,
+                       right = 0.98,
+                       top = 0.98,
+                       align_to = 'plot')
+}
+
+
+
 
 # modify/combine groups of plots ------------------------------------------
 
@@ -468,6 +529,36 @@ combine_grid_panels1 <- function(l, remove_y_axis_labels = TRUE) {
   g2 <- g&theme(legend.position = 'bottom')
   g2
   
+}
+
+
+combine_5_panels <- function(plots) {
+  stopifnot(length(plots) == 5)
+  l1 <- c(plots[1:3], list(patchwork::guide_area()),
+          plots[4:5])
+  wrap_plots(l1, nrow = 2, guides = 'collect') +
+    # thise axis collect only works if plots are not
+    # already patchwork combinations (e.g. plot with inset)
+    plot_layout(axes = 'collect',
+                axis_titles = 'collect')
+}
+
+# combine 5 panels, and add seperate plots that are
+# the y and x axis labels
+# this requires the axis labels of the individual
+# plots to already have been removed as needed
+combine_5_panels_labs <- function(plots, xlab, ylab) {
+  y <- ylab_plot(ylab)
+  x <- xlab_plot(xlab)
+  
+  panels <- combine_5_panels(plots)
+  
+  # Combine y label + panels
+  main <- wrap_plots(y, panels, ncol = 2, widths = c(0.02, 1))
+  
+  # Combine with x label
+  final <- wrap_plots(main, x, ncol = 1, heights = c(1, 0.02))
+  final
 }
 
 #' remove axis labels from list of ggplots
@@ -501,6 +592,48 @@ remove_y_titles <- function(plot_list,
   })
   
   plot_list
+}
+
+# remove axis labels for elements of the list of plots
+# based on their index,
+# defaults work for 5 panel region layout
+remove_axis_labels <- function(plots, 
+                               remove_x = c(2, 3),
+                               remove_y = c(2, 3, 5)) {
+  plots[remove_x] <- map(plots[remove_x], function(g) {
+    g + theme(axis.text.x = element_blank())
+  })
+  
+  plots[remove_y] <- map(plots[remove_y], function(g) {
+    g + theme(axis.text.y = element_blank())
+  })
+  # remove all axis titles
+  plots <- map(plots, function(g) {
+    g + labs(x = NULL, y = NULL)
+  })
+  
+}
+
+xlab_plot <- function(xlab = '', ...) {
+  ggplot() + 
+    theme_void() + 
+    labs(x = xlab) +
+    theme(
+      plot.margin = margin(0, 0, 0, 0),
+      axis.title.x = element_text(vjust = 0.5),
+      ...
+    )
+}
+
+ylab_plot <- function(ylab = '', ...) {
+  ggplot() + 
+    theme_void() + 
+    labs(y = ylab) +
+    theme(
+      plot.margin = margin(0, 0, 0, 0),
+      axis.title.y = element_text(angle = 90),
+      ...
+    )
 }
 
 # funs for scatterplots ---------------------------------------------------
@@ -689,18 +822,17 @@ rcp_label <- function(rcp, years, add_letters = FALSE,
   x2
 }
 
+region_label <- function(x) {
+  
+  x <- region_factor(x)
+  levels <- levels(x)
+  labels <- paste(fig_letters[1:length(levels)], levels)
+  out <- factor(as.character(x), levels = levels,
+                labels = labels)
+  as.character(out)
+}
 
-region_labeller <- ggplot2::as_labeller(
-  x = function(x) {
-    
-    x <- region_factor(x)
-    levels <- levels(x)
-    labels <- paste(fig_letters[1:length(levels)], levels)
-    out <- factor(as.character(x), levels = levels,
-                  labels = labels)
-    as.character(out)
-  }
-)
+region_labeller <- ggplot2::as_labeller(x = region_label)
   
 
 # legends -----------------------------------------------------------------
@@ -714,6 +846,15 @@ make_legend_small <- function(pointSize = 2, textSize = 7, spaceLegend = 0.2,
              legend.key.size = unit(spaceLegend, "lines"),
              legend.key.width = unit(lineLength, 'pt')))
   
+}
+
+smaller_legend <- function() {
+  theme(
+    legend.title = element_text(size = rel(0.7)),  # Reduce legend title size
+    legend.text = element_text(size = rel(0.7)),   # Reduce legend text size
+    legend.key.size = unit(0.7, "lines"),          # Reduce legend key size (relative to lines)
+    legend.spacing = unit(0.7, "lines")           # Reduce spacing between legend items
+  )
 }
 
 # color functions ---------------------------------------------------------
