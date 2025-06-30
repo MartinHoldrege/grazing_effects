@@ -568,8 +568,10 @@ pmap(args, function(rcp, xvar) {
 # showing mean SEI vs expected burned area for each combination of ecoregion 
 # and current SEI class
 
-
-map(rcps, function(rcp) {
+args <- expand_grid(rcp = rcps,
+                    # also show lines for each GCM
+                    gcm_path = c(TRUE, FALSE))
+pmap(args, function(rcp, gcm_path) {
   
   df_smry <- c3eco_smry3 %>% 
     filter(RCP %in% c('Current', rcp),
@@ -578,7 +580,7 @@ map(rcps, function(rcp) {
            graze_long = relable_graze_long(graze))
   
   df_gcm <- c3eco_gcm3 %>% 
-    filter(RCP %in% c('Current', rcp))%>% 
+    filter(RCP %in% rcp)%>% 
     mutate(c3_cur = relable_c3_current(c3),
            graze_long = relable_graze_long(graze))
   
@@ -587,7 +589,8 @@ map(rcps, function(rcp) {
   # (to be used as insets)
   bar_l <- area_bar_map(df_smry)
   plotsl1 <- tradeoff_lines_map(df_smry = df_smry,
-                                df_gcm = df_gcm)
+                                df_gcm = df_gcm,
+                                gcm_path = gcm_path)
   plotsl1 <- remove_axis_labels(plotsl1)
   plotsl2 <- map2(plotsl1, bar_l, tradeoff_add_inset) 
   
@@ -595,9 +598,11 @@ map(rcps, function(rcp) {
   comb <- combine_5_panels_labs(plotsl2,
                                 xlab = 'Mean Sagebrush Ecological Integrity',
                                 ylab = 'Expected burned area (%/year)')
+  
+  prefix <- if(gcm_path) '' else 'noGCM_'
 
   ggsave(paste0("figures/sei/tradeoff/", "sei", "-scd-adj-vs-ba_perc_dotplot_", 
-              'c3eco_', rcp, "_", suffix, ".png"), 
+              'c3eco_', prefix, rcp, "_", suffix, ".png"), 
          plot = comb, dpi = 600,
          width = 7, height = 5)
 })

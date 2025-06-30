@@ -59,6 +59,11 @@ sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv,
 # area in each of 9 climate caused SEI class change categories
 c9_area2 <- read_csv(paste0('data_processed/raster_means/', runv, 
                             '_c9-area_scd-adj_summaries_by-ecoregion.csv'))
+
+# map of ecoregions create in
+# "scripts/04_ecoregion_map.R"
+g_region1 <- readRDS("figures/ecoregions_v4_all.rds")
+
 # prepare dataframes ------------------------------------------------------
 
 qsei2 <- qsei1 %>% 
@@ -124,13 +129,27 @@ pmap(scen_l, function(RCP, years) {
                                                       size = 0.1))) + 
     labs(x = 'Projected change in SEI class',
          y = '% of region') +
-    facet_manual_region()
+    facet_manual_region(color_strips = TRUE,
+                        legend.position.inside = c(0.45, 0.31),
+                        # skipping letter used for map
+                        region_letters = fig_letters[c(-4)]) 
+    # make_legend_small()
+
+  
+  g_region2 <- g_region1 +
+    theme(legend.position = 'none') +
+    labs(subtitle = fig_letters[4])
+  
+  g2 <- g +
+    inset_element(g_region2, 
+                  left = -0.05, bottom = 0.05, right = 0.4, top = 0.4,
+                  align_to = 'full')
 
 
   path <- paste0(
     "figures/sei/c9-bar_scd-adj_by-region_", RCP, "_", years, "_", suffix, ".png"
   )
-  ggsave(path, g, dpi = 600, width = 9, height = 7)
+  ggsave(path, g2, dpi = 600, width = 9, height = 7)
   
 })
 

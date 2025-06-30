@@ -38,7 +38,9 @@ suffix <- if(wafwa_only) {
   '_all'
 }
 
-png(paste0("figures/ecoregions_", v, suffix, '.png'),
+name <- paste0("figures/ecoregions_", v, suffix)
+png(paste0(name,  '.png'),
     width = 6, height = 7, units = 'in', res = 900)
 g
 dev.off()
+saveRDS(g, paste0(name, '.rds'))

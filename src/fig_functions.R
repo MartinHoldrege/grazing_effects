@@ -448,33 +448,46 @@ area_bar_map <- function(df_smry) {
 }
 
 # make the tradeoff lines/point plot 
-tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim) {
+tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim,
+                           gcm_path = TRUE) {
   
-  cols1 <- setNames(cols_graze, relable_graze_long(names(cols_graze)))
   cols2 <- setNames(c3Palette, relable_c3_current(names(c3Palette)))
   region <- unique(df_smry_region$region)
   stopifnot(lu(region) == 1)
   
-  ggplot(df_smry_region, aes(SEI_mean, expected_ba_perc, color = c3_cur)) + 
+  g <- ggplot(df_smry_region, aes(SEI_mean, expected_ba_perc, color = c3_cur)) 
+  
+  if(gcm_path) {
+    g <- g + geom_path(data = df_gcm_region, aes(group = rcp_year_c3_gcm, linetype = rcp_year),
+                       linewidth = 0.2, alpha = 0.5) 
+  }
+    
+  g +  
     geom_path(aes(group = rcp_year_c3, linetype = rcp_year),
               linewidth = 1, alpha = 1) +
-    geom_path(data = df_gcm_region, aes(group = rcp_year_c3_gcm, linetype = rcp_year),
-              linewidth = 0.2, alpha = 0.7) +
-    geom_point(aes(color = graze_long, shape = rcp_year)) +
-    scale_linetype_manual(name = 'Scenario', values = linetypes_scen) +
-    scale_shape_manual(values = shapes_scen, name = 'Scenario') +
-    scale_color_manual(values = c(cols1, cols2), name = NULL) +
-    labs(x = 'Mean SEI',
+    scale_color_manual(values = c(cols2), name = 'Historical SEI class') +
+    ggnewscale::new_scale_color() +
+    geom_point(aes(color = graze, shape = rcp_year)) +
+    scale_color_manual(values = cols_graze, name = 'Grazing scenario') +
+    scale_linetype_manual(name = 'Climate scenario', values = unname(linetypes_scen)[1:2]) +
+    scale_shape_manual(values = unname(shapes_scen)[1:2], name = 'Climate scenario') +
+        labs(x = 'Mean SEI',
          y = 'Expected burned area (%/year)',
          subtitle = region_label(region))  +
     coord_cartesian(xlim = xlim, ylim = ylim) +
-    smaller_legend()
+    make_legend_small()
 }
 
 # map over region
-tradeoff_lines_map <- function(df_smry, df_gcm) {
-  xlim <- range(c(df_smry$SEI_mean, df_gcm$SEI_mean))
-  ylim <- range(c(df_smry$expected_ba_perc, df_gcm$expected_ba_perc))
+tradeoff_lines_map <- function(df_smry, df_gcm, gcm_path = TRUE) {
+  x <- df_smry$SEI_mean
+  y <- df_smry$expected_ba_perc
+  if(gcm_path) {
+    x <- c(x, df_gcm$SEI_mean)
+    y <- c(y, df_gcm$expected_ba_perc)
+  }
+  xlim <- range(x)
+  ylim <- range(y)
   regions <- levels(df_smry$region) %>% 
     setNames(nm = .)
   
@@ -483,7 +496,8 @@ tradeoff_lines_map <- function(df_smry, df_gcm) {
       filter(region == !!region)
     df_gcm_region <- df_gcm %>% 
       filter(region == !!region)
-    tradeoff_lines(df_smry_region, df_gcm_region, xlim = xlim, ylim = ylim)
+    tradeoff_lines(df_smry_region, df_gcm_region, xlim = xlim, ylim = ylim,
+                   gcm_path = gcm_path)
   })
 }
 
@@ -494,7 +508,7 @@ tradeoff_add_inset <- function(plot, inset) {
                        bottom = 0.73,
                        right = 0.98,
                        top = 0.98,
-                       align_to = 'plot')
+                       align_to = 'panel')
 }
 
 
@@ -695,18 +709,37 @@ scatter_light <- function(pft, # for subtitle
 
 # facet functions ---------------------------------------------------------
 
-facet_manual_region <- function(legend.position.inside = c(0.05, 0)) {
+facet_manual_region <- function(legend.position = 'inside',
+                                legend.position.inside = c(0.05, 0),
+                                color_strips = FALSE,
+                                # letters to use for facet prefixes
+                                region_letters = NULL) {
   design <- "
  ABC
  #DE
  "
+  
+  if(color_strips) {
+    # ordering, and only keeping the appropriate 
+    cols <- cols_ecoregion[region_factor(include_entire = FALSE, 
+                                         return_levels = TRUE)]
+    strip_theme_region <- ggh4x::strip_themed(
+      text_x = ggh4x::elem_list_text(color = c('black', cols))
+    )
+  } else {
+    strip_theme_region <- ggh4x::strip_vanilla()
+  }
+  region_labeller <- region_labeller_factory(region_letters)
   list(
-    ggh4x::facet_manual(~region, design = design, labeller = region_labeller),
-    theme(legend.position = 'inside', 
+    ggh4x::facet_manual(~region, design = design, labeller = region_labeller,
+                        strip = strip_theme_region),
+    theme(legend.position = legend.position, 
           legend.position.inside = legend.position.inside,
           strip.text = element_text(hjust = 0))
   )
 }
+
+
 
 # axis functions ----------------------------------------------------------
 
@@ -822,17 +855,28 @@ rcp_label <- function(rcp, years, add_letters = FALSE,
   x2
 }
 
-region_label <- function(x) {
+region_label_factory <- function(region_letters = NULL) {
+  if(is.null(region_letters)) {
+    region_letters <- fig_letters # from the global environment
+  }
   
-  x <- region_factor(x)
-  levels <- levels(x)
-  labels <- paste(fig_letters[1:length(levels)], levels)
-  out <- factor(as.character(x), levels = levels,
-                labels = labels)
-  as.character(out)
+  function(x) {
+    x <- region_factor(x)
+    levels <- levels(x)
+    labels <- paste(region_letters[1:length(levels)], levels)
+    out <- factor(as.character(x), levels = levels,
+                  labels = labels)
+    as.character(out)
+  }
+
 }
 
-region_labeller <- ggplot2::as_labeller(x = region_label)
+region_labeller_factory <- function(region_letters = NULL) {
+  region_label <- region_label_factory(region_letters = region_letters)
+  ggplot2::as_labeller(x = region_label)
+}
+
+region_labeller <- region_labeller_factory(fig_letters)
   
 
 # legends -----------------------------------------------------------------

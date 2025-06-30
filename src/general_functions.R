@@ -162,7 +162,8 @@ cut_depth <- function(x, two_depths = FALSE) {
   out
 }
 
-region_factor <- function(x, wafwa_only = FALSE, include_entire = TRUE) {
+region_factor <- function(x = NULL, wafwa_only = FALSE, include_entire = TRUE,
+                          return_levels = FALSE) {
   
   if (wafwa_only) {
     levels <- c("Great Plains", "Intermountain West", 
@@ -176,6 +177,9 @@ region_factor <- function(x, wafwa_only = FALSE, include_entire = TRUE) {
   }
   if(include_entire) {
     levels <- c("Entire study area", levels)
+  }
+  if(return_levels) {
+    return(levels)
   }
 
   stopifnot(x %in% levels)
