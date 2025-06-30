@@ -300,6 +300,7 @@ one_change_prep <- function(df) {
     left_join(weights1, by = 'site', relationship = 'many-to-many') %>% 
     rename(pred_var = pred_var_cur) %>% 
     filter_clim_extremes() %>% 
+    filter(run == !!run) %>% 
     mutate(pred_var = str_replace(pred_var, 'psp', 'PSP'),
            pred_var = driver2factor(pred_var))
 }
@@ -309,6 +310,29 @@ one_change_smry2 <- one_change_smry1 %>%
 
 one_change_gcm2 <- one_change_gcm1 %>% 
   one_change_prep()
+
+# summarized across sites (sas = summarized across sites)
+create_sas <- function(df) {
+  df %>% 
+    summarize(across(c(delta_pred_value, delta_1var),
+                   .fns = \(x) weighted.mean(x, w = weight)),
+            .groups = 'drop') %>% 
+    mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
+    arrange(run, region, years, RCP, pred_var, graze)
+}
+
+
+# "pixel level" medians (across gcms) then summarized across sites/pixels
+one_change_smry_sas1 <- one_change_smry2 %>% 
+  group_by(run, years, RCP, graze, region, pred_var) %>% 
+  create_sas() 
+
+one_change_gcm_sas1 <- one_change_gcm2 %>% 
+  group_by(run, years, RCP, graze, GCM, region, pred_var) %>% 
+  arrange(GCM) %>% 
+  create_sas()%>% 
+  mutate(rcp_year_gcm = paste(rcp_year, GCM))
+
 # expected burned area figs --------------------------------------------------
 
 plots <- map(ecoregions, function(region) {
@@ -654,7 +678,6 @@ dev.off()
 # * delta fire prob attribution -------------------------------------------
 
 
-
 for (rcp in rcps) {
 df_gcm <- one_change_gcm2 %>% 
   filter(RCP == rcp) 
@@ -728,6 +751,32 @@ ggsave_delta_prob(plot = g_med0 + geom_point(data = df_med, size = 0.5),
                   'med-point')
 }
 
+# ** summaries across pixels/sites ----------------------------------------
+
+for (rcp in rcps) {
+df_smry <- one_change_smry_sas1 %>% 
+  filter(RCP == rcp)
+df_gcm <- one_change_gcm_sas1 %>% 
+  filter(RCP == rcp)
+
+g <- ggplot(mapping = aes(delta_pred_value, delta_1var)) +
+  facet_grid(region~pred_var, scales = 'free', switch = 'x') +
+  theme(strip.placement.x = 'outside') +
+  geom_point(data = df_gcm, aes(color = graze), size = 0.5) +
+  geom_path(data = df_gcm, aes(group = GCM), alpha = 0.5,
+            linewidth = 0.5) +
+  geom_point(data = df_smry , aes(color = graze)) +
+  geom_path(data = df_smry ) +
+  scale_color_graze() +
+  geom_hline(yintercept = 0, linetype = 2, alpha = 0.2, linewidth = 0.5) +
+  geom_vline(xintercept = 0, linetype = 2, alpha = 0.2, linewidth = 0.5) +
+  labs(x = 'Mean change in predictor variable (future - historical)',
+       y = 'Mean change in fire frequency due to change in single predictor (#/100 yrs)',
+       caption = paste(rcp, 'summarized across sites'))
+
+ggsave_delta_prob(g, rcp, smry = 'sas')
+
+}
 # combined figures --------------------------------------------------------
 # combined figure for manuscript
 

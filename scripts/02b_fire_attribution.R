@@ -157,6 +157,7 @@ one_change2b <- delta_pred_var1 %>%
   right_join(one_change2, by = c("run", "years", "graze", "site",  "RCP", 
                                  "GCM", 'pred_var_cur', "id")) 
 
+
 # summarize results -------------------------------------------------------
 
 dominant_driver0 <- one_change2b %>% 
@@ -184,6 +185,7 @@ dominant_driver1 <- dominant_driver0 %>%
   mutate(dominant_driver = factor(dominant_driver,
                                   levels = c(!!pred_vars, 'None')))
 
+# summarizie across GCMs
 one_change3 <- one_change2b %>% 
   group_by(run, site, graze, years, RCP, id, pred_var_cur) %>% 
   summarize(across(.cols = c('fire_prob_fut', "fire_prob_cur", "delta_1var", 
