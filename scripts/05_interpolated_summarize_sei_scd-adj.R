@@ -18,6 +18,7 @@ source("src/params.R") # run and version
 test_run <- FALSE
 # intermediate rasters saved, usually want true b/ of disc storage, except when testing/debugging
 remove_tmp_files = FALSE
+rerun <- FALSE # re-create temporary files
 # dependencies ------------------------------------------------------------
 
 library(tidyverse) 
@@ -77,7 +78,26 @@ if(test_run) {
   size <- downsample(size) 
 }
 
+hash <- digest::digest(list(rast2, scd_cov1,
+                            r_eco1, scd_q1, r_eco4, size))
+
+path_hash <- "tmp/hash.txt"
+
+if(!file.exists(path_hash)) {
+  dir.create('tmp/', showWarnings = FALSE)
+  write_lines(hash, path_hash)
+  rerun <- TRUE
+} else {
+  old_hash <- read_lines(path_hash)
+  
+  if(old_hash != hash) {
+    write_lines(hash, path_hash)
+    rerun <- TRUE # have to rerun if the hash is different (inputs don't match)
+  } 
+}
+
 compareGeom(scd_cov1, rast2)
+
 
 # convert stepwat biomass to cover ----------------------------------------
 
@@ -87,56 +107,69 @@ get_pft <- function(df) {
 
 # 'stepwat' cover
 info_pft_l <- unname(split(rast_info, as.character(rast_info$PFT)))
-sw_cov1 <-  info_pft_l  %>% 
-  map(.f = function(df) {
+
+if(tmp_exists('cov_scd_adj1', rerun)) {
+  cov_scd_adj1 <- read_tmp_tif('cov_scd_adj1')
+} else {
+  
+  sw_cov1 <-  info_pft_l  %>% 
+    map(.f = function(df) {
+      pft <- get_pft(df)
+      bio2cov_hold(rast2[[df$id]], pft = pft)
+    }) %>% 
+    rast()
+  
+  # proportional change cover -----------------------------------------------
+  
+  # proportional cover relative to the reference state
+  sw_cov_prop1 <- map(info_pft_l, .f = function(df, cover = sw_cov1) {
+      pft <- get_pft(df)
+      ref_id <- df %>% 
+        filter(RCP == 'Current',
+               graze == ref_graze) %>% 
+        pull(id)
+      stopifnot(length(ref_id) == 1)
+      r_ref <- cover[[ref_id]]
+      r <- cover[[df$id]]
+      (r - r_ref)/r_ref
+    }) %>% 
+    rast()
+  rm('sw_cov1')
+  gc()
+  
+  # scd cover adjusted by prop change ---------------------------------------
+  
+  cov_scd_adj1 <- map(info_pft_l, .f = function(df) {
     pft <- get_pft(df)
-    bio2cov_hold(rast2[[df$id]], pft = pft)
+    prop <- sw_cov_prop1[[df$id]]
+    out <- scd_cov1[[pft]] + scd_cov1[[pft]]*prop
+    names(out) <- names(prop)
+    out
   }) %>% 
-  rast()
+    rast()
+  
+  
+  rm('sw_cov_prop1')
+  gc()
+  cov_scd_adj1 <- writeReadRast(cov_scd_adj1, 'cov_scd_adj1')
 
-# proportional change cover -----------------------------------------------
+}
 
-# proportional cover relative to the reference state
-sw_cov_prop1 <- map(info_pft_l, .f = function(df, cover = sw_cov1) {
-    pft <- get_pft(df)
-    ref_id <- df %>% 
-      filter(RCP == 'Current',
-             graze == ref_graze) %>% 
-      pull(id)
-    stopifnot(length(ref_id) == 1)
-    r_ref <- cover[[ref_id]]
-    r <- cover[[df$id]]
-    (r - r_ref)/r_ref
-  }) %>% 
-  rast()
-rm('sw_cov1')
-gc()
-# scd cover adjusted by prop change ---------------------------------------
-
-cov_scd_adj1 <- map(info_pft_l, .f = function(df) {
-  pft <- get_pft(df)
-  prop <- sw_cov_prop1[[df$id]]
-  out <- scd_cov1[[pft]] + scd_cov1[[pft]]*prop
-  names(out) <- names(prop)
-  out
-}) %>% 
-  rast()
-
-# writing to disk so not stored in memory
-dir.create('tmp/', showWarnings = FALSE)
-rm('sw_cov_prop1', 'scd_cov1')
-gc()
-cov_scd_adj1 <- writeReadRast(cov_scd_adj1, 'cov_scd_adj1')
-
+rm('scd_cov1')
 
 # Q scores of 'adjusted' cover -------------------------------------------------
 
-q_scd_adj1 <- map(info_pft_l, .f = function(df, cover = cov_scd_adj1) {
-  r <- cover[[df$id]]/100 # convert from % to proportion
-  cov2q_raster(r, eco_raster = r_eco1, pft = get_pft(df))
-}) %>% 
-  rast()
-q_scd_adj1 <- writeReadRast(q_scd_adj1, 'q_scd_adj1')
+if(tmp_exists('q_scd_adj1', rerun)) {
+  q_scd_adj1 <- read_tmp_tif('q_scd_adj1')
+} else {
+  q_scd_adj1 <- map(info_pft_l, .f = function(df, cover = cov_scd_adj1) {
+    r <- cover[[df$id]]/100 # convert from % to proportion
+    cov2q_raster(r, eco_raster = r_eco1, pft = get_pft(df))
+  }) %>% 
+    rast()
+  q_scd_adj1 <- writeReadRast(q_scd_adj1, 'q_scd_adj1')
+}
+
 
 # Calculate SEI -----------------------------------------------------------
 
@@ -152,48 +185,26 @@ test <- map(info_pft_l, function(df) {
 stopifnot(length(unique(test)) == 1,
           length(info_pft_l) == 3)
 
-sei_scd_adj1 <- q_scd_adj1[[info_pft_l[[1]]$id]]*
-  q_scd_adj1[[info_pft_l[[2]]$id]]*
-  q_scd_adj1[[info_pft_l[[3]]$id]]*
-  scd_q1[['Q4']]*
-  scd_q1[['Q5']]
-
-# leaving same number of name components as the Q layers, so can combine
-names(sei_scd_adj1) <- str_replace(names(sei_scd_adj1), regex_pft, 'SEI') %>% 
-  str_replace('biomass', 'SEI')
-
-sei_scd_adj1 <- writeReadRast(sei_scd_adj1, 'sei_scd_adj1')
-
-
-
-# * calculate gcm level summaries -----------------------------------------
+if(tmp_exists('sei_scd_adj1', rerun)) {
+  sei_scd_adj1 <- read_tmp_tif('sei_scd_adj1')
+} else {
+  sei_scd_adj1 <- q_scd_adj1[[info_pft_l[[1]]$id]]*
+    q_scd_adj1[[info_pft_l[[2]]$id]]*
+    q_scd_adj1[[info_pft_l[[3]]$id]]*
+    scd_q1[['Q4']]*
+    scd_q1[['Q5']]
+  
+  # leaving same number of name components as the Q layers, so can combine
+  names(sei_scd_adj1) <- str_replace(names(sei_scd_adj1), regex_pft, 'SEI') %>% 
+    str_replace('biomass', 'SEI')
+  
+  sei_scd_adj1 <- writeReadRast(sei_scd_adj1, 'sei_scd_adj1')
+}
 
 info_sei <- create_rast_info(sei_scd_adj1, 
                              into = c("group", "type", "RCP", "years", 
                                       "graze", "GCM"), 
                              id_noGCM = TRUE)  
-
-
-
-
-# mean SEI for each region and GCM
-sei_mean1 <- terra::extract(sei_scd_adj1, eco1, mean,  na.rm = TRUE)
-sei_core1 <- terra::extract(sei_scd_adj1, eco1, percent_csa,  na.rm = TRUE)
-sei_goa1 <- terra::extract(sei_scd_adj1, eco1, percent_goa,  na.rm = TRUE)
-regions <- as.character(eco1$ecoregion)
-sei_mean2 <- pivot_longer_extracted(sei_mean1, regions, 
-                                    values_to = 'SEI_mean')
-
-sei_core2 <- pivot_longer_extracted(sei_core1, regions, 
-                                    values_to = 'percent_csa')
-sei_goa2 <- pivot_longer_extracted(sei_goa1, regions, 
-                                   values_to = 'percent_goa')
-
-sei_mean_core1 <- left_join(sei_mean2, sei_core2, by = c("id", "region")) %>% 
-  left_join(info_sei, by = 'id') %>% 
-  left_join(sei_goa2, by = c("id", "region")) %>% 
-  select(-run2, -id_noGCM)
-
 
 # * gcm-wise mean sei by c3 and ecoregion ---------------------------------
 # mean SEI for each ecoregion and historical SEI class in that ecoregion
@@ -239,14 +250,48 @@ q_scd_adj_smry <- summarize_gcms_raster(q_scd_adj1, info = rast_info,
                                           include_low_high = TRUE)
 rm('q_scd_adj1'); gc()
 
-
 sei_scd_adj_smry <- summarize_gcms_raster(sei_scd_adj1, info = info_sei,
                                           include_low_high = TRUE)
 
 info_sei_smry <- create_rast_info(sei_scd_adj_smry, 
                  into = c("group", "type", "RCP", "years",  "graze", "summary"))
 
-# * pixelwise summary mean sei by c3 and ecoregion ---------------------------------
+# ** calculate gcm & pixelwise areas -----------------------------------------
+
+
+p <- paste0('data_processed/raster_means/', runv, 
+            '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv')
+
+if(!file.exists(p) | rerun) {
+  # mean SEI for each region and GCM
+  sei_mean1 <- terra::extract(sei_scd_adj1, eco1, mean,  na.rm = TRUE)
+  sei_core1 <- terra::extract(sei_scd_adj1, eco1, percent_csa,  na.rm = TRUE)
+  sei_goa1 <- terra::extract(sei_scd_adj1, eco1, percent_goa,  na.rm = TRUE)
+  region_area <- terra::extract(size, eco1, sum, na.rm = TRUE)
+  regions <- as.character(eco1$ecoregion)
+  
+  region_area$region <- regions
+  region_area$ID <- NULL
+  sei_mean2 <- pivot_longer_extracted(sei_mean1, regions, 
+                                      values_to = 'SEI_mean')
+  
+  sei_core2 <- pivot_longer_extracted(sei_core1, regions, 
+                                      values_to = 'percent_csa')
+  sei_goa2 <- pivot_longer_extracted(sei_goa1, regions, 
+                                     values_to = 'percent_goa')
+  
+  sei_mean_core1 <- left_join(sei_mean2, sei_core2, by = c("id", "region")) %>% 
+    left_join(info_sei, by = 'id') %>% 
+    left_join(sei_goa2, by = c("id", "region")) %>% 
+    left_join(region_area, by = 'region') %>% 
+    select(-run2, -id_noGCM)
+  
+  if(!test_run) {
+    write_csv(sei_mean_core1, p)
+  }
+}
+
+
 # mean SEI for each ecoregion and historical SEI class in that ecoregion
 
 c3eco_sei1_smry <- zonal(sei_scd_adj_smry, c3eco, fun = 'mean')
@@ -281,6 +326,7 @@ sei_scd_adj_diff <- calc_rast_cref(
   by = by,
   type_from = '_SEI_SEI',
   type_to = '_SEI_SEI-rdiff-cref')
+
 
 
 # Output -------------------------------------------------------------
@@ -321,8 +367,7 @@ writeRaster(q_sei_diff,
                       paste0(runv, "_q-sei-rdiff-cref_scd-adj_summary.tif")),
             overwrite = TRUE)
 
- write_csv(sei_mean_core1, paste0('data_processed/raster_means/', runv, 
-                                  '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
+
  
  write_csv(c3eco_sei2_smry, paste0('data_processed/raster_means/', runv, 
                                    '_sei-mean_scd-adj_smry-by-region-c3.csv'))

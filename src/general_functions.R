@@ -1015,6 +1015,23 @@ join_subsetcells <- function(step_dat, sc_dat,
   out
 }
 
+# temporary files ---------------------------------------------------------
+
+tmp_exists <- function(object_name, rerun, suffix = '.tif') {
+  file.exists(paste0('tmp/', object_name, suffix)) & !rerun
+}
+
+read_tmp_tif <- function(object_name) {
+  rast(paste0('tmp/', object_name, '.tif'))
+}
+# for saving intermediate rasters to disk to save memory
+writeReadRast <- function(object, objectName, dir = 'tmp') {
+  path <- file.path(dir, paste0(objectName, '.tif'))
+  terra::writeRaster(object, path, overwrite = TRUE)
+  rm(list = objectName, envir = .GlobalEnv)
+  gc()
+  terra::rast(path)
+}
 
 # misc. -------------------------------------------------------------------
 
@@ -1274,14 +1291,8 @@ pixel2area <- function(x) {
   x*100
 }
 
-# for saving intermediate rasters to disk to save memory
-writeReadRast <- function(object, objectName, dir = 'tmp') {
-  path <- file.path(dir, paste0(objectName, '.tif'))
-  terra::writeRaster(object, path, overwrite = TRUE)
-  rm(list = objectName, envir = .GlobalEnv)
-  gc()
-  terra::rast(path)
-}
+
+
 
 weight2area <- function(x) {
   x*100 # each pixel has an area of 100 ha

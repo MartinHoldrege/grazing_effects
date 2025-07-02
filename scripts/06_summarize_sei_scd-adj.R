@@ -31,17 +31,25 @@ eco2 <- vect(eco1['ecoregion'])
 
 r_eco1 <- load_wafwa_ecoregions_raster(wafwa_only = FALSE)
 
+size <- load_cell_size()
+
 # * fire ------------------------------------------------------------------
 # this is for summarizing SEI at different bins of fire probability
 # created in "scripts/05_interpolated_maps_fire.R"
 r_fire1 <- rast(file.path("data_processed/interpolated_rasters", 
           paste0(run, "_fire-prob_future_summary_across_GCMs.tif")))
 
+
+# * setup -----------------------------------------------------------------
+
+
 if(test_run) {
   r_qsei1 <- downsample(r_qsei1)
   r_fire1 <- downsample(r_fire1)
   r_eco1 <- downsample(r_eco1)
+  size <- downsample(size)
 }
+
 
 # names of layers --------------------------------------------------
 
@@ -77,6 +85,12 @@ info_sei1 <- info1[info1$type == 'SEI', ]
 r_sei <- r_qsei1[[info_sei1$id]]
 
 # % core
+region_area0 <- terra::extract(size, eco1, sum,  na.rm = TRUE)
+region_area <- region_area0 %>% 
+  mutate(region = as.character(eco1$ecoregion)) %>% 
+  select(-ID) %>% 
+  rename(area_region = area)
+
 sei_core1 <- terra::extract(r_sei, eco1, percent_csa,  na.rm = TRUE)
 sei_core2 <- pivot_longer_extracted(sei_core1, as.character(eco1$ecoregion), 
                                     values_to = 'percent_csa') 
@@ -86,16 +100,24 @@ sei_goa2 <- pivot_longer_extracted(sei_goa1, as.character(eco1$ecoregion),
                                     values_to = 'percent_goa') 
 
 sei_pcent <- left_join(sei_core2, sei_goa2, by = c('region', 'id')) %>% 
+  left_join(region_area, by = 'region') %>% 
   left_join(info1, by = 'id') %>% 
   select(-run2)
 
+
+sei_pcent_long <- sei_pcent %>% 
+  mutate(percent_ora = 100 - percent_goa - percent_csa) %>% 
+  pivot_longer(cols = matches('percent_'),
+               names_to = 'c3',
+               values_to = 'c3_percent') %>% 
+  mutate(c3_area = c3_percent/100*area_region,
+         c3 = str_to_upper(str_replace(c3, 'percent_', ''))) %>% 
+  select(-group, -type, -id)
 
 # calculating C9 transition -----------------------------------------------
 # within a grazing level, and for a given scenario the area falling into
 # each of 9 possible SEI class changes
 
-size <- cellSize(r_sei[[1]], unit = 'ha', 
-                 transform = FALSE, mask = TRUE)
 
 r_c3 <- sei2c3(r_sei)
 
@@ -213,6 +235,9 @@ write_csv(eco_smry1, paste0('data_processed/raster_means/', prefix,
 
 write_csv(sei_pcent , paste0('data_processed/raster_means/', prefix, 
                             '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
+
+write_csv(sei_pcent_long, paste0('data_processed/raster_means/', prefix, 
+                             '_sei-class-pcent-long_scd-adj_summaries_by-ecoregion.csv'))
 
 write_csv(df_seifire3, paste0('data_processed/raster_means/', prefix, 
                               '_sei-by-fire-bin_scd-adj_summaries_by-ecoregion.csv'))
