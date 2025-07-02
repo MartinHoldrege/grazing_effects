@@ -439,6 +439,8 @@ df_factor <- function(df) {
   
   if('summary' %in% nms) df$summary <- summary2factor(df$summary)
   
+  if('c3' %in% nms) df$c3 <- c3_factor(df$c3)
+  
   df
 }
 

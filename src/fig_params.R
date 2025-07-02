@@ -104,7 +104,7 @@ names(c9Palette) <- c9Names
 
 c3Palette <- c9Palette[c(1, 5, 9)]
 names(c3Palette) <- c3Names
-
+cols_c3 <- c3Palette
 
 # * for maps --------------------------------------------------------------
 
@@ -254,7 +254,7 @@ lab_es_on_off_indivs <- expression("ln("*frac(individuals~C4off, individuals~C4o
 # SEI
 lab_sei0 <- 'SEI'
 lab_sei1 <- expression(Delta~"SEI")
-
+lab_c3 <- 'SEI class'
 # Q
 lab_q0 <- 'Q Value'
 lab_q1 <- expression(Delta~"Q")
@@ -262,6 +262,7 @@ lab_q1 <- expression(Delta~"Q")
 # area
 lab_areakm0 <- expression("Area ("*km^2*")")
 lab_areaha0 <- "Area (million ha)"
+lab_area0 <- 'Area (ha)'
 lab_areaperc0 <- "Area (%)"
 lab_areaperc0b <- "Area (% of region)"
 

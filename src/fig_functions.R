@@ -713,7 +713,8 @@ facet_manual_region <- function(legend.position = 'inside',
                                 legend.position.inside = c(0.05, 0),
                                 color_strips = FALSE,
                                 # letters to use for facet prefixes
-                                region_letters = NULL) {
+                                region_letters = NULL,
+                                scales = 'fixed') {
   design <- "
  ABC
  #DE
@@ -732,7 +733,8 @@ facet_manual_region <- function(legend.position = 'inside',
   region_labeller <- region_labeller_factory(region_letters)
   list(
     ggh4x::facet_manual(~region, design = design, labeller = region_labeller,
-                        strip = strip_theme_region),
+                        strip = strip_theme_region,
+                        scales = scales),
     theme(legend.position = legend.position, 
           legend.position.inside = legend.position.inside,
           strip.text = element_text(hjust = 0))

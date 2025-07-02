@@ -14,6 +14,9 @@ v_input <- 'v2' # version for some input files
 
 scen_l <- list(RCP = c('RCP45', 'RCP85'),
                years = c('2070-2100', '2070-2100'))
+
+ref_graze <- 'Moderate'
+rcps <- unique(scen_l$RCP)
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -53,7 +56,7 @@ ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_",
 # create in "scripts/06_summarize_sei_scd-adj.R"
 # percent core and grow areas by region for low, median, and high SEI (across GCMs)
 sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, 
-                             '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
+                             '_sei-class-pcent-long_scd-adj_summaries_by-ecoregion.csv'))
 
 # create in "scripts/06_summarize_sei_scd-adj.R"
 # area in each of 9 climate caused SEI class change categories
@@ -71,6 +74,42 @@ qsei2 <- qsei1 %>%
                               add_newline = TRUE)) %>% 
   df_factor() %>% 
   filter_clim_extremes()
+
+
+# * SEI class area --------------------------------------------------------
+
+sei_pcent1 <- df_factor(sei_pcent1) %>% 
+  filter_clim_extremes() %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
+                              add_newline = TRUE))
+
+# change in area and % asei_pcent# change in area and % area in each sei class,
+# relative to historical climate (within grazing level comparisons)
+c3_clim_delta <- sei_pcent1 %>% 
+  filter(RCP == 'Current') %>% 
+  select(-RCP, -years, -summary, -area_region, -c3_percent, -rcp_year) %>% 
+  right_join(
+    filter(sei_pcent1, RCP != 'Current'),
+    by = c('region', 'graze', 'c3', 'run'),
+    suffix = c('_cur', '')) %>% 
+  select(-c3_percent) %>% 
+  mutate(delta_area = c3_area - c3_area_cur,
+         # % change in area each c3 class
+         delta_area_perc = delta_area/c3_area_cur*100)
+
+# change in area of each sei class relative to reference grazing level
+c3_graze_delta <- sei_pcent1 %>% 
+  filter(graze == ref_graze) %>% 
+  select(-area_region, -c3_percent, -graze) %>% 
+  right_join(
+    filter(sei_pcent1, graze != ref_graze),
+    by = c('region', 'c3', 'run', 'RCP', 'years', 'rcp_year', 'summary'),
+    suffix = c('_ref', '')) %>% 
+  select(-c3_percent) %>% 
+  mutate(delta_area = c3_area - c3_area_ref,
+         # % change in area each c3 class
+         delta_area_perc = delta_area/c3_area_ref*100)
+
 
 # boxplots ----------------------------------------------------------------
 
@@ -101,6 +140,113 @@ png(paste0("figures/sei/q-sei_scd-adj_weighted_by-region_3pft_boxplot_", suffix,
 g3&theme(legend.position = 'bottom')
 dev.off()
 
+
+# c3 area -----------------------------------------------------------------
+
+base_bar <- function() {
+  list(geom_bar(aes(x = graze, 
+                    fill = c3), 
+                stat = 'identity', position = position_dodge2()),
+       adjust_graze_x_axis(),
+       scale_fill_manual(values = cols_c3,
+                         name = lab_c3)
+  )
+}
+
+hline <- function() {
+  geom_hline(yintercept = 0, linetype = 1,
+             alpha = 0.5)
+}
+
+# dimension of 10 panel figures (2 cols)
+width10 <- 5
+height10 <- 9
+
+# dimensions of 5 panel figures (1 per region)
+widthr <- 6.3
+heightr <- 6
+
+map(rcps, function(rcp) {
+
+  df <- sei_pcent1 %>% 
+    filter(RCP %in% c('Current', rcp),
+           summary == 'median')
+  # for labeling
+  rcp_year <- unique(df$rcp_year[df$RCP == rcp])
+  
+  # absolute area
+  g <- ggplot(df, aes(y = c3_area)) +
+    base_bar() +
+    facet_grid(region ~rcp_year, scales = 'free_y') +
+    labs(y = lab_area0)
+  
+  ggsave(paste0('figures/sei/c3_area/c3-bar_abs-area_by-region_',
+                rcp, "_", runv, '.png'),
+         plot = g,
+         dpi = 600, height = height10, width = width10)
+  
+  # change in area relative to historical climate
+  # (within grazing level)
+  df <- c3_clim_delta %>% 
+    filter(RCP %in% c('Current', rcp),
+           summary == 'median') 
+  
+  g <- ggplot(df, aes(y = delta_area)) +
+    hline()+
+    base_bar() +
+    facet_manual_region(legend.position.inside = c(0.1, 0.2),
+                        scales = 'free_y') +
+    labs(y = 'Change in area relative to historical climate (ha)',
+         subtitle = str_replace(rcp_year, '\n', ' '))
+  
+  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area_by-region_',
+                rcp, "_", runv, '.png'),
+         plot = g,
+         dpi = 600, height = heightr, width = widthr)
+  
+  g <- ggplot(df, aes(y = delta_area_perc)) +
+    hline()+
+    base_bar() +
+    facet_manual_region(legend.position.inside = c(0.1, 0.2)) +
+    labs(y = 'Change in SEI class area relative to historical climate (%)',
+         subtitle = str_replace(rcp_year, '\n', ' '))
+  
+  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area-perc_by-region_',
+                rcp, "_", runv, '.png'),
+         plot = g,
+         dpi = 600, height = heightr, width = widthr)
+  
+  # change in c3 area relative to moderate grazing 
+  # within a climate scenario
+  df <- c3_graze_delta %>% 
+    filter(RCP %in% c('Current', rcp),
+           summary == 'median') 
+  
+  g <- ggplot(df, aes(y = delta_area)) +
+    hline()+
+    base_bar() +
+    facet_grid(region ~rcp_year, scales = 'free_y') +
+    labs(y = paste('Change in SEI class area relative to',
+                   str_to_lower(ref_graze), 'grazing (ha)'))
+  
+  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area_by-region_',
+                rcp, "_", runv, '.png'),
+         plot = g,
+         dpi = 600, height = height10, width = width10)
+  
+  g <- ggplot(df, aes(y = delta_area_perc)) +
+    hline()+
+    base_bar() +
+    facet_grid(region ~rcp_year) +
+    labs(y = paste('Change in SEI class area relative to',
+                   str_to_lower(ref_graze), 'grazing (%)'))
+  
+  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area-perc_by-region_',
+                rcp, "_", runv, '.png'),
+         plot = g,
+         dpi = 600, height = height10, width = width10)
+
+})
 
 # c9 area barcharts -------------------------------------------------------
 
