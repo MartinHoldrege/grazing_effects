@@ -608,6 +608,35 @@ pmap(args, function(rcp, gcm_path) {
 })
 
 
+# * conceptual figure -----------------------------------------------------
+
+dummy <- tibble(
+  group = rep(c('a', 'b', 'c'), each = 4),
+  graze = rep(graze2factor(c("Very Heavy", "Heavy", "Moderate", "Light")), 
+              times = 3),
+  y = c(1, 2, 3, 4,
+        1, 2, 3, 4,
+        1, 1, 1, 1),
+  x = c(rep(0.75, 4),
+        c(1, 2, 3, 4)*1.2 + 0.5,
+        (2:5)*1.2)
+)
+
+g <- ggplot(dummy, aes(x, y)) +
+  geom_path(aes(group = group), alpha = 0.5) +
+  geom_point(aes(color = graze)) +
+  scale_color_graze() +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank()) +
+  labs(x = 'Mean Sagebrush Ecological Integrity',
+       y = 'Burned Area') +
+  expand_limits(x = c(0.2, 6.5),
+                y = c(0.5, 4.5))
+
+ggsave("figures/sei/tradeoff/conceptual_fig_v1.png", 
+       plot = g, dpi = 600,
+       width = 4, height = 3)
+
 # attribution -------------------------------------------------------------
 
 
