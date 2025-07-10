@@ -12,6 +12,7 @@ v <- v_interp
 runv <- paste0(run, v)
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
 test_run <- FALSE
+c3_rcps <- c('RCP45', 'RCP85') # future scenario shown on map
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -149,8 +150,10 @@ map2(args$groups, args$type_absolute, function(group, type) {
 
 # SEI class and change maps -----------------------------------------------
 
+# * climate c9 ------------------------------------------------------------
+# include map of change in sei
+
 c3_graze <- c('M' = 'Moderate', 'VH' = 'Very Heavy')
-c3_rcps <- c('RCP45', 'RCP85') # future scenario shown on map
 
 
 for(c3_rcp in c3_rcps) {
@@ -186,4 +189,61 @@ filename <- paste0('figures/sei/maps/4panel_c3c9_',
 png(filename, res = 600, height = 6.2, width = 7.5, units = 'in')
   print(g)
 dev.off()
+}
+
+
+# * grazing c9 --------------------------------------------------------------
+# change sei class relative to moderate grazing (within a climate scenario)
+
+ref_graze <- 'Moderate'
+target_grazeL <- list(
+  c('Light', 'Heavy', 'Very Heavy'),
+  'Very Heavy')
+
+
+
+for(rcp in c3_rcps) {
+  for(target_graze in target_grazeL) {
+    
+    c3_info <- info1 %>% 
+      filter(type == 'SEI',
+             graze %in% c(ref_graze, target_graze),
+             RCP %in% c('Current', rcp)) %>% 
+      select(-run2, -group, -type)
+    
+    c3_info2 <- c3_info %>% 
+      filter(graze == ref_graze) %>% 
+      select(-graze) %>% 
+      left_join(c3_info[c3_info$graze != ref_graze, ],
+                by = join_by(run, RCP, years, summary),
+                suffix = c('_ref', '_target'))
+    
+    r_c3 <- sei2c3(r_comb1[[c3_info$id[c3_info$graze == ref_graze]]])
+    c3_target <- sei2c3(r_comb1[[c3_info2$id_target]])
+    r_c9 <- c3toc9(r_c3[[c3_info2$id_ref]], c3_target)
+    
+    info_c3 <- c3_info[c3_info$graze == ref_graze, ]
+    info_c9 <- c3_info[c3_info$graze != ref_graze, ]
+    
+    g <- plot_c3c9_gref(r_c3 = r_c3, r_c9 = r_c9,
+                        info_c3 = info_c3, info_c9 = info_c9)
+    
+    n <- nrow(c3_info)
+    filename <- paste0('figures/sei/maps/c3c9gref_', n, 'panel_',
+                       rcp, '_',
+                       paste0(words2abbrev(target_graze), collapse = ''), '_', 
+                       runv, ".png")
+    
+    width <- if(n == 8) {
+      8.5
+    } else if (n == 4) {
+      4.5
+    } else {
+      stop('set fig width')
+    }
+    
+    png(filename, res = 800, height = 6.2, width = width, units = 'in')
+    print(g)
+    dev.off()
+  }
 }

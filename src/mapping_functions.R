@@ -756,6 +756,105 @@ plot_4panel_c3c9 <- function(r_c3, r_c9, info_c3, info_c9) {
  
 }
 
+
+
+# within a climate scenario comparisons to a grazing reference level (gref)
+# top row is is historical, bottom is future
+# left column is c3 moderate grazing, other columns (can be 1 or more,
+# depending on what 'target' grazing grazing levels are selected
+plot_c3c9_gref <- function(r_c3, r_c9, info_c3, info_c9) {
+  
+  stopifnot(
+    nrow(info_c3) == 2
+  )
+  
+  info_c3$type <- 'c3'
+  info_c9$type <- 'c9'
+  info_comb <- bind_rows(info_c3, info_c9) %>% 
+    arrange(RCP, years, type, graze) %>%
+    ungroup() %>% 
+    mutate(tag_label = fig_letters[1:n()])
+  
+  graze_labs <- paste0(unique(info_comb$graze), ' Grazing')
+  n_target <- lu(info_c9$graze)
+  names4top <- paste0(graze_labs, 
+                      paste0('\n',c('(SEI class)', 
+                                    rep('(Change in SEI class)', n_target)))
+  )
+  levs_l <- list(c3 = data.frame(ID = 1:3, 
+                                 class = c3Names),
+                 c9 = data.frame(ID = 1:9, 
+                                 class = c9Names))
+  label_left <- info_comb %>% 
+    filter(.data$graze == unique(.data$graze)[1]) %>% 
+    mutate(rcp_year = rcp_label(.data$RCP, .data$years,
+                                include_parenth = FALSE)) %>%  
+    pull(rcp_year)
+  
+  fill <- list(
+    'c3' = scale_fill_c3,
+    'c9' = scale_fill_c9
+  )
+  
+  r_l <- list('c3' = r_c3,
+              'c9' = r_c9)
+  
+  guide_l <- list('c3' = 'right', 'c9' = 'none')
+  
+  plots1 <- pmap(info_comb[c('id', 'type', 'tag_label')], 
+                 function(id, type, tag_label) {
+                   fl <- fill[[type]]
+                   r <- r_l[[type]][[id]]
+                   levels(r) <- levs_l[[type]]
+                   plot_map2(r = r,
+                             panel_tag = tag_label) + 
+                     fl() + 
+                     theme(legend.position = guide_l[[type]],
+                           plot.tag.position =  'topleft',
+                           plot.tag.location = 'panel',
+                           plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+                 })
+  
+  # labels for the top margin
+  plots_top <- map(names4top, function(x) {
+    ggplot() +
+      theme_void() +
+      annotate("text", x = 1, y = 1, label = x, size = 3) +
+      theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+  })
+  
+  # labels for the left margin
+  plots_left <- map(label_left, function(x) {
+    ggplot() +
+      theme_void() +
+      annotate("text", x = 1, y = 1, label = x, angle = 90, size = 3) +
+      theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+  })
+  color_matrix1 <- color_matrix() # to serve as a legend
+  # this is hard coded, would need to make this more
+  # flexible if want to change number of panels
+  s <- list(plot_spacer())
+  
+  n <- length(plots1)
+  if(n == 4) {
+    plots2 <- c(s, plots_top,
+                plots_left[1], plots1[1:(n/2)], 
+                plots_left[2], plots1[(n/2 + 1):n], 
+                s, list(guide_area()), list(free(color_matrix1)))
+  } else {
+    plots2 <- c(s, plots_top,
+                plots_left[1], plots1[1:(n/2)], 
+                plots_left[2], plots1[(n/2 + 1):n], 
+                s, list(guide_area()), list(free(color_matrix1)), rep(s, n/2 - 2))
+  }
+  
+  patchwork::wrap_plots(plots2, ncol = 1 + n/2,
+                        widths = c(0.13, rep(1, n/2)), 
+                        heights = c(0.13, 1, 1, 0.6)) + 
+    plot_layout(guides = 'collect')
+  
+}
+
 # crs -----------------------------------------------------------------------
 
 # the crs to be used for the sagebrush conservation design (this is the same
