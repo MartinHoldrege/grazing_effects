@@ -162,24 +162,71 @@ cut_depth <- function(x, two_depths = FALSE) {
   out
 }
 
-region_factor <- function(x = NULL, wafwa_only = FALSE, include_entire = TRUE,
-                          return_levels = FALSE) {
+all_region_levels <- function() {
+  lev_l <- list(
+    'wafwa' = c("Great Plains", "Intermountain West", 
+                "Southern Great Basin"),
+    r1.0 = c("Western Intermountain",
+             "Great Plains",
+             "Southern Great Basin",
+             'Eastern Intermountain'),
+    r1.1 = c("NW Deserts", "NW Mountains", "Great Plains", "Southern Great Basin", 
+             "Middle Rockies", "WY Basin", "Plateaus", "Southern Mountains")
+  )
+  lev_l
+}
+
+# determine which version of regions
+which_vr <- function(x) {
+  # removing the entire study area for next matching step
+  x <- str_subset(x, '[Ee]ntire', negate = TRUE)
+  l <- all_region_levels()
   
-  if (wafwa_only) {
-    levels <- c("Great Plains", "Intermountain West", 
-                "Southern Great Basin")
-  } else {
-    levels <- c("Western Intermountain",
-                "Great Plains",
-                "Southern Great Basin",
-                'Eastern Intermountain'
-                )
-  }
+  lgl <- map_lgl(l, \(y) same_elem(x, y)) # which version does it match
+  stopifnot(sum(lgl) == 1)
+  names(l[lgl]) # name of the version
+}
+
+region_factor <- function(x = NULL, wafwa_only = FALSE, include_entire = TRUE,
+                          return_levels = FALSE,
+                          v = NULL) {
+  
+    
+    if(!is.null(v) & !return_levels) {
+      stop('not currently setup to use region version when return_levels = FALSE')
+    }
+    
+
+    lev_l <- all_region_levels()
+    
+    if(return_levels) {
+      if(wafwa_only) {
+        stopifnot(is.null(v) | v == 'r1.0')
+        v = 'wafwa'
+      }
+      stopifnot(v %in% names(lev_l))
+      levels <- lev_l[[v]]
+      if(include_entire) {
+        levels <- c("Entire study area", levels)
+      }
+      return(levels)
+    }
+    # using same_elem to be adjusted if it's ok for x to have levels
+    # missing
+
+  x2 <- str_subset(x, 'Entire study area', negate = TRUE) 
+  levels <- if(wafwa_only) {
+      lev_l$wafwa
+    } else if(same_elem(x2, lev_l$r1.0)) {
+      lev_l$r1.0
+    } else if(same_elem(x2, lev_l$r1.1)) {
+      lev_l$r1.1
+    } else {
+      stop ('correct levels not present')
+    }
+
   if(include_entire) {
     levels <- c("Entire study area", levels)
-  }
-  if(return_levels) {
-    return(levels)
   }
 
   stopifnot(x %in% levels)
@@ -187,17 +234,24 @@ region_factor <- function(x = NULL, wafwa_only = FALSE, include_entire = TRUE,
 }
 
 # convert 'our' regions to the wafwa regions
+# for aggregation
 region2wafwa <- function(x) {
 
   x2 <- as.character(x)
-  x2[str_detect(x2, 'Intermountain')] <- 'Intermountain West'
-    
+  vr <- which_vr(x2)
+  
+  eco <- load_wafwa_ecoregions(total_region = FALSE, v = vr)
+  from <- eco$region
+  to <- eco$wafwa_NAME
+  x2 <- replace_from_to(x, from = from, to = to)
+
   if(is.factor(x)) {
     include_entire <- any(str_detect(x, 'Entire'))
     x2 <- region_factor(x2, wafwa_only = TRUE, include_entire = include_entire)
   } 
   x2
 }
+
 
 
 summary2factor <- var2factor_factory( c('low', 'median', 'high'))
@@ -1304,4 +1358,14 @@ weight2area <- function(x) {
 words2abbrev <- function(x) {
   stringr::str_extract_all(x, "\\b\\w") %>%
     purrr::map_chr(~ paste0(toupper(.x), collapse = ""))
+}
+
+same_elem <- function(x, y) {
+  all(x %in% y) & all(y %in% x)
+}
+
+replace_from_to <- function(x, from, to) {
+  out <- to[match(x, from)]
+  out[is.na(out)] <- x[is.na(out)]
+  out
 }

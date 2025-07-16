@@ -877,9 +877,22 @@ load_template <- function(template_path = file.path(
   r
 }
 
-load_wafwa_ecoregions <- function(total_region = FALSE, wafwa_only = FALSE) {
+load_wafwa_ecoregions <- function(total_region = FALSE,
+                                  wafwa_only = FALSE,
+                                  v = 'r1.0') {
+  
+
   # file created by the 01_ecoregions.R script
-  shp1 <- sf::st_read('data_processed/ecoregions/four_regions_v1.gpkg')
+  if(v == 'r1.0') {
+    shp1 <- sf::st_read('data_processed/ecoregions/four_regions_v1.gpkg')
+  } else {
+    path <- paste0('data_processed/ecoregions/regions_', v, '.gpkg')
+    stopifnot(file.exists(path),
+              # wafwa only doesn't work with newer 
+              !wafwa_only)
+    shp1 <- sf::st_read(path)
+  }
+  
   shp2 <- shp1|> 
     dplyr::rename(geometry = geom)
   
@@ -892,7 +905,6 @@ load_wafwa_ecoregions <- function(total_region = FALSE, wafwa_only = FALSE) {
   } else {
     shp2$ecoregion <- shp2$region
   }
-
 
     # also have a seperate row for the entire region
   if(total_region) {
@@ -911,10 +923,12 @@ load_wafwa_ecoregions <- function(total_region = FALSE, wafwa_only = FALSE) {
 }
 
 load_wafwa_ecoregions_raster <- function(
-    wafwa_only = FALSE) {
+    wafwa_only = FALSE,
+    v = 'r1.0') {
   
   r_template <- load_template()
-  eco1 <- load_wafwa_ecoregions(wafwa_only = wafwa_only)
+  eco1 <- load_wafwa_ecoregions(wafwa_only = wafwa_only,
+                                v = v)
   r_eco <- terra::rasterize(
     terra::vect(eco1),
     r_template,
