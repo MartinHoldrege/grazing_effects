@@ -9,7 +9,12 @@
 
 source("src/params.R")
 test_run <- FALSE
-runv <- paste0(run, v_interp)
+run <- opt$run
+v_interp <- opt$v_interp
+runv <- paste0(opt$run)
+vr <- opt$vr
+vr_name <- opt$vr_name
+yr_lab <- opt$yr_lab
 fire_breaks <- c(seq(0, 2.5, by = 0.25), 3, 4) # intervals to cut fire probability into
 
 # dependencies ------------------------------------------------------------
@@ -24,18 +29,20 @@ source("src/SEI_functions.R")
 
  # file create in 05_interpolated_summarize_sei_scd-adj.R
 r_qsei1 <- rast(file.path("data_processed/interpolated_rasters/", v_interp,
-                     paste0(runv, "_q-sei_scd-adj_summary.tif")))
+                     paste0(runv, yr_lab, "_q-sei_scd-adj_summary.tif")))
 
-eco1 <- load_wafwa_ecoregions(wafwa_only = FALSE, total_region = TRUE)
+eco1 <- load_wafwa_ecoregions(wafwa_only = FALSE, total_region = TRUE,
+                              v = vr)
 eco2 <- vect(eco1['ecoregion'])
 
-r_eco1 <- load_wafwa_ecoregions_raster(wafwa_only = FALSE)
+r_eco1 <- load_wafwa_ecoregions_raster(wafwa_only = FALSE,
+                                       v = vr)
 
 size <- load_cell_size()
 
 # * fire ------------------------------------------------------------------
 # this is for summarizing SEI at different bins of fire probability
-# created in "scripts/05_interpolated_maps_fire.R"
+# created in "scripts/04_interpolated_summarize.R"
 r_fire1 <- rast(file.path("data_processed/interpolated_rasters", 
           paste0(run, "_fire-prob_future_summary_across_GCMs.tif")))
 
@@ -228,7 +235,7 @@ df_seifire3 <- bind_rows(df_seifire_entire, df_seifire_regions)
 
 # save output -------------------------------------------------------------
 
-prefix <- if(test_run) 'test' else runv
+prefix <- if(test_run) 'test' else paste0(runv, vr_name)
 
 write_csv(eco_smry1, paste0('data_processed/raster_means/', prefix, 
                             '_q-sei_scd-adj_summaries_by-ecoregion.csv'))
