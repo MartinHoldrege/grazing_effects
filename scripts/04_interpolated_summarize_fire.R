@@ -17,8 +17,9 @@ source("src/general_functions.R")
 
 # params ------------------------------------------------------------------
 
-v <- 'v4' # interpolation version
-runs <- c('fire1_eind1_c4grass0_co20_2503', 'fire1_eind1_c4grass1_co20_2503')
+source('src/params.R')
+v <- opt$v_interp # interpolation version
+runs <- opt$run #c('fire1_eind1_c4grass0_co20_2503', 'fire1_eind1_c4grass1_co20_2503')
 # some terra operations can be done in parallel and need 
 # to know num of cores
 num.cores <- parallel::detectCores(logical = FALSE) 

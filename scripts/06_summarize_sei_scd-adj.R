@@ -8,10 +8,10 @@
 # params ------------------------------------------------------------------
 
 source("src/params.R")
-test_run <- FALSE
+test_run <- opt$test_run
 run <- opt$run
 v_interp <- opt$v_interp
-runv <- paste0(opt$run)
+runv <- paste0(paste0(opt$run), v_interp)
 vr <- opt$vr
 vr_name <- opt$vr_name
 yr_lab <- opt$yr_lab
@@ -28,7 +28,7 @@ source("src/SEI_functions.R")
 # read in data ------------------------------------------------------------
 
  # file create in 05_interpolated_summarize_sei_scd-adj.R
-r_qsei1 <- rast(file.path("data_processed/interpolated_rasters/", v_interp,
+r_qsei1 <- rast(file.path("data_processed/interpolated_rasters", v_interp,
                      paste0(runv, yr_lab, "_q-sei_scd-adj_summary.tif")))
 
 eco1 <- load_wafwa_ecoregions(wafwa_only = FALSE, total_region = TRUE,
@@ -235,7 +235,7 @@ df_seifire3 <- bind_rows(df_seifire_entire, df_seifire_regions)
 
 # save output -------------------------------------------------------------
 
-prefix <- if(test_run) 'test' else paste0(runv, vr_name)
+prefix <- if(test_run) 'test' else paste0(runv, vr_name, yr_lab)
 
 write_csv(eco_smry1, paste0('data_processed/raster_means/', prefix, 
                             '_q-sei_scd-adj_summaries_by-ecoregion.csv'))

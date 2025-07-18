@@ -12,7 +12,7 @@
 source('src/params.R')
 
 test_run <- FALSE
-v <- 'v2' # version for output files
+v <- paste0('v2', vr_name) # version for output files
 runv <- paste0(run, v_interp)
 ref_graze <- 'Moderate' # the reference grazing level for SEI calculations
 # (i.e. current climate at ref graze means we are not adjusting
@@ -25,6 +25,7 @@ source("src/general_functions.R")
 source("src/mapping_functions.R")
 source("src/probability_functions.R")
 source("src/SEI_functions.R")
+
 # read in data ------------------------------------------------------------
 
 # fire probability for each GCM
@@ -52,9 +53,9 @@ info_smry1 <- create_rast_info(r_prob_smry1,
 # and then sum the summary stats for the individual
 # ecoregions, instead of then seperately computing for the total_region
 # (doing this for now, because it requires fewer lines of code)
-eco1 <- load_wafwa_ecoregions(total_region = TRUE)
+eco1 <- load_wafwa_ecoregions(total_region = TRUE, v = vr)
 
-r_eco1 <- load_wafwa_ecoregions_raster() # raster of ecoregions
+r_eco1 <- load_wafwa_ecoregions_raster(v = vr) # raster of ecoregions
 
 # * SEI ------------------------------------------------------------
 

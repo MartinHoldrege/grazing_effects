@@ -2,23 +2,33 @@
 
 # Script started Jan 7, 2022
 
-# Purpose: Create maps of biomass and change in biomass across the west
-# based on STEPWAT2 output for 200 sites (for each plant functional
-# type and climate and grazing scenario) that has been upscaled across
-# the west. The rasters of interpolated data are created
-# in the 03_interpolate.R script, which can takes ~ 4 hours to run on
-# my laptop (when excluding RCP4.5)
+# calculate proportional change in cover, apply those to
+# remote sensed cover estimates, then calculated Q values, and SEI values
+# and SEI class summary stats
 
-# this script takes ~ 10 min to run
 
 
 # params ------------------------------------------------------------------
 
-source("src/params.R") # run and version
+source("src/params.R") # some params used in this script
 test_run <- FALSE
 # intermediate rasters saved, usually want true b/ of disc storage, except when testing/debugging
 remove_tmp_files = FALSE
 rerun <- FALSE # re-create temporary files
+# 
+# for filenames
+if(years == '2070-2100') {
+  dir <- 'tmp' # where temporary files are put
+} else if (years == '2030-2060') {
+  dir <- 'tmp/mid'
+}
+v <- opt$v_interp # interpolation version
+runv <- paste0(run, v, opt$yr_lab) # in this script run v is being used for writing scripts
+
+pfts <- c('Sagebrush', 'Pherb', 'Aherb')
+
+ref_graze <- 'Moderate' # all delta covers are relative to this grazing level
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse) 
@@ -27,22 +37,12 @@ source("src/mapping_functions.R")
 source("src/general_functions.R")
 source("src/SEI_functions.R")
 
-# params ------------------------------------------------------------------
-
-v <- v_interp # interpolation version
-
-runv <- paste0(run, v)
-
-pfts <- c('Sagebrush', 'Pherb', 'Aherb')
-
-ref_graze <- 'Moderate' # all delta covers are relative to this grazing level
-
 # read in data ------------------------------------------------------------
 
 # * rasters ---------------------------------------------------------------
 
 # data up-scaled for each GCM
-regex <- paste0(runv, '.*(', paste(pfts, collapse = '|'), ")")
+regex <- paste0(paste0(run, v), '.*(', paste(pfts, collapse = '|'), ")")
 
 regex <- "fire1_eind1_c4grass1_co20_2503v4.*(Sagebrush|Pherb|Aherb)"
 bio_files <- list.files(file.path("data_processed/interpolated_rasters/biomass", v),
@@ -54,16 +54,17 @@ rast1 <- terra::rast(bio_files) # class SpatRast
 scd_cov1 <- load_scd_cover() # cover's used for the SCD
 scd_q1 <- load_scd_q()
 
-r_eco1 <- load_wafwa_ecoregions_raster(wafwa_only = TRUE)
+r_eco1 <- load_wafwa_ecoregions_raster(wafwa_only = TRUE) # for Q curves
 
 # summary stats calculated for these regions:
-eco1 <- load_wafwa_ecoregions(total_region = TRUE, wafwa_only = FALSE)
-r_eco4 <- load_wafwa_ecoregions_raster()
+eco1 <- load_wafwa_ecoregions(total_region = TRUE, wafwa_only = FALSE,
+                              v = vr)
+r_eco4 <- load_wafwa_ecoregions_raster(v = vr)
 size <- load_cell_size()
 # info --------------------------------------------------
 
 rast_info <- create_rast_info(rast1, id_noGCM = TRUE) %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   arrange(PFT, graze, RCP, years, GCM, id)
 
 rast2 <- rast1[[rast_info$id]]
@@ -78,10 +79,14 @@ if(test_run) {
   size <- downsample(size) 
 }
 
+# not including r_eco4 in the digest b/ 
+# ecoregion summaries are not saved (re-run every time, and this
+# way not everything will rerun if use new regions--change
+# if code adjusted)
 hash <- digest::digest(list(rast2, scd_cov1,
-                            r_eco1, scd_q1, r_eco4, size))
+                            r_eco1, scd_q1, size))
 
-path_hash <- "tmp/hash.txt"
+path_hash <- paste0(dir, "/hash", ".txt")
 
 if(!file.exists(path_hash)) {
   dir.create('tmp/', showWarnings = FALSE)
@@ -109,7 +114,7 @@ get_pft <- function(df) {
 info_pft_l <- unname(split(rast_info, as.character(rast_info$PFT)))
 
 if(tmp_exists('cov_scd_adj1', rerun)) {
-  cov_scd_adj1 <- read_tmp_tif('cov_scd_adj1')
+  cov_scd_adj1 <- read_tmp_tif('cov_scd_adj1', dir = dir)
 } else {
   
   sw_cov1 <-  info_pft_l  %>% 
@@ -151,7 +156,7 @@ if(tmp_exists('cov_scd_adj1', rerun)) {
   
   rm('sw_cov_prop1')
   gc()
-  cov_scd_adj1 <- writeReadRast(cov_scd_adj1, 'cov_scd_adj1')
+  cov_scd_adj1 <- writeReadRast(cov_scd_adj1, 'cov_scd_adj1', dir = dir)
 
 }
 
@@ -160,14 +165,14 @@ rm('scd_cov1')
 # Q scores of 'adjusted' cover -------------------------------------------------
 
 if(tmp_exists('q_scd_adj1', rerun)) {
-  q_scd_adj1 <- read_tmp_tif('q_scd_adj1')
+  q_scd_adj1 <- read_tmp_tif('q_scd_adj1', dir = dir)
 } else {
   q_scd_adj1 <- map(info_pft_l, .f = function(df, cover = cov_scd_adj1) {
     r <- cover[[df$id]]/100 # convert from % to proportion
     cov2q_raster(r, eco_raster = r_eco1, pft = get_pft(df))
   }) %>% 
     rast()
-  q_scd_adj1 <- writeReadRast(q_scd_adj1, 'q_scd_adj1')
+  q_scd_adj1 <- writeReadRast(q_scd_adj1, 'q_scd_adj1', dir = dir)
 }
 
 
@@ -186,7 +191,7 @@ stopifnot(length(unique(test)) == 1,
           length(info_pft_l) == 3)
 
 if(tmp_exists('sei_scd_adj1', rerun)) {
-  sei_scd_adj1 <- read_tmp_tif('sei_scd_adj1')
+  sei_scd_adj1 <- read_tmp_tif('sei_scd_adj1', dir = dir)
 } else {
   sei_scd_adj1 <- q_scd_adj1[[info_pft_l[[1]]$id]]*
     q_scd_adj1[[info_pft_l[[2]]$id]]*
@@ -198,7 +203,7 @@ if(tmp_exists('sei_scd_adj1', rerun)) {
   names(sei_scd_adj1) <- str_replace(names(sei_scd_adj1), regex_pft, 'SEI') %>% 
     str_replace('biomass', 'SEI')
   
-  sei_scd_adj1 <- writeReadRast(sei_scd_adj1, 'sei_scd_adj1')
+  sei_scd_adj1 <- writeReadRast(sei_scd_adj1, 'sei_scd_adj1', dir = dir)
 }
 
 info_sei <- create_rast_info(sei_scd_adj1, 
@@ -227,6 +232,8 @@ c3eco_sei2_gcm <- c3eco_sei1 %>%
                values_to = 'SEI_mean',
                names_to = 'id') %>% 
   mutate(c3 = c3eco_to_c3(c3eco),
+         # warning here is ok on test runs (sampling can miss regions), but not ok
+         # for real run
          region = c3eco_to_eco(c3eco, levels(r_eco4)[[1]]$ecoregion)) %>% 
   left_join(c3eco_area1, by = "c3eco") %>% 
   left_join(info_sei, by = 'id') %>% 
@@ -259,7 +266,7 @@ info_sei_smry <- create_rast_info(sei_scd_adj_smry,
 # ** calculate gcm & pixelwise areas -----------------------------------------
 
 
-p <- paste0('data_processed/raster_means/', runv, 
+p <- paste0('data_processed/raster_means/', runv, vr_name, yr_lab,
             '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv')
 
 if(!file.exists(p) | rerun) {
@@ -369,10 +376,10 @@ writeRaster(q_sei_diff,
 
 
  
- write_csv(c3eco_sei2_smry, paste0('data_processed/raster_means/', runv, 
+ write_csv(c3eco_sei2_smry, paste0('data_processed/raster_means/', runv, vr_name,
                                    '_sei-mean_scd-adj_smry-by-region-c3.csv'))
  
- write_csv(c3eco_sei2_gcm, paste0('data_processed/raster_means/', runv, 
+ write_csv(c3eco_sei2_gcm, paste0('data_processed/raster_means/', runv, vr_name,
                                    '_sei-mean_scd-adj_by-GCM-region-c3.csv'))
 
 }
@@ -382,6 +389,7 @@ writeRaster(q_sei_diff,
 
 if(remove_tmp_files) {
   paths <- list.files('tmp/', pattern = '.tif', full.names = TRUE)
-  file.remove(paths)
+  paths2 <- list.files('tmp/mid', pattern = '.tif', full.names = TRUE)
+  file.remove(c(paths, paths2))
 }
 

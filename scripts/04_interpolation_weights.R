@@ -9,7 +9,10 @@
 
 # params ------------------------------------------------------------------
 
-v <- 'v4' # interpolation version
+source('src/params.R')
+v <- opt$v_interp # interpolation version
+vr <- opt$vr
+vr_name <- opt$vr_name
 
 # dependencies ------------------------------------------------------------
 
@@ -19,7 +22,7 @@ source("src/mapping_functions.R")
 
 # load data ---------------------------------------------------------------
 
-r_eco <- load_wafwa_ecoregions_raster()
+r_eco <- load_wafwa_ecoregions_raster(v = vr)
 
 locs1 <- rast(paste0("data_processed/interpolation_data/interp_locations_200sites_",
                      v, ".tif"))
@@ -74,6 +77,7 @@ if (FALSE) {
     summarize(area = sum(weight)*pixel_size)
   
   # here area calculated differently
+  # only works ecoregion area is for the same ecoregions
   check <- read_csv(paste0("data_processed/area/ecoregion-area_v1.csv"))
   check
 }
@@ -91,5 +95,5 @@ stopifnot(1:200 %in% weights2$site) # make sure all sites show up
 
 write_csv(weights2, 
           paste0('data_processed/interpolation_data/interpolation_weights_', 
-                 v, '.csv'))
+                 v, vr_name, '.csv'))
 

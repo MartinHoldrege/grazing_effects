@@ -6,14 +6,16 @@
 
 # params ------------------------------------------------------------------
 
+source('src/params.R')
 pfts <- c('Sagebrush', 'Aherb', 'Pherb')
-run <- 'fire1_eind1_c4grass1_co20_2503'
-v_interp <- 'v4' # interpolation version (input files)
 
 date <- '20250228' # date associated w/ the climate data (this date, in file name,
 # would be updated if new climate data source, or sites, etc. were used. )
-
-test_run <- FALSE
+v_interp <- opt$v_interp
+run <- opt$run
+test_run <- opt$test_run
+vr <- opt$vr
+vr_name <- opt$vr_name
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -55,7 +57,7 @@ r_comb1 <- c(r_clim1, r_bio1)
 
 # *ecoregions -------------------------------------------------------------
 
-eco1 <- load_wafwa_ecoregions(total_region = TRUE)
+eco1 <- load_wafwa_ecoregions(total_region = TRUE, v = vr)
 eco2 <- vect(eco1)
 
 # names of layers --------------------------------------------------
@@ -98,6 +100,6 @@ eco_mean1 <- map(eco_mean_l1, function(x) {
 
 # save output -------------------------------------------------------------
 
-write_csv(eco_mean1, paste0('data_processed/raster_means/', run, 
+write_csv(eco_mean1, paste0('data_processed/raster_means/', run, vr_name,
                             '_fire-driver-means_by-ecoregion.csv'))
 

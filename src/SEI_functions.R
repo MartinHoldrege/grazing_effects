@@ -101,13 +101,13 @@ bio2q <- function(x, pft, region) {
 #' convert cover to Q (quality) score
 #'
 #' @param x cover
-#' @param region ecoregion
+#' @param region ecoregion (must be a wafwa region)
 #' @param pft string
 cov2q <- function(x, pft, region) {
   
   tab <- q_curves_cover2[[pft]]
   
-  region <- region2wafwa(region)
+  # region <- region2wafwa(region)
   
   stopifnot(region %in% names(tab),
             is.character(pft),
@@ -305,7 +305,7 @@ c3toc9 <- function(current, future) {
 # convert two digits into c3 (first digit is c3)
 c3eco_to_c3 <- function(x) {
   stopifnot(x >= 10 & x < 40)
-  c3_num <- round(x/10, 0) 
+  c3_num <- floor(x/10) 
   c3_factor(c3_num)
 }
 
@@ -315,7 +315,10 @@ c3eco_to_c3 <- function(x) {
 c3eco_to_eco <- function(x, regions) {
   stopifnot(x >= 10 & x < 40)
   eco_num <- x %% 10 # returning the digit in the ones position
-  stopifnot(sort(unique(eco_num)) == 0:(length(regions) - 1))
+  stopifnot(unique(eco_num) %in% 0:(length(regions) - 1))
+  if(!all(0:(length(regions) - 1) %in% unique(eco_num))) {
+    warning('some region levels missing from x')
+  }
   # the IDs in factor spatrasters start at 0, not 1
   regions[eco_num + 1]
 }

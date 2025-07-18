@@ -16,12 +16,14 @@ source("src/general_functions.R")
 source("src/fig_params.R")
 source("src/mapping_functions.R")
 source('src/fig_functions.R')
+source('src/params.R')
 # params ------------------------------------------------------------------
 
-runs <- c('fire1_eind1_c4grass1_co20_2503')
+runs <- opt$run
 names(runs) <- runs
 v_out <- "v1" # version appended to output
-
+years <- opt$years
+yr_lab <- opt$years
 graze_levels <- c("grazL" = "Light")
 ref_graze <- 'Light' # reference graze level for within gcm comparisons
 
@@ -66,7 +68,7 @@ paths_rdiff <- list.files(path_r, full.names = TRUE,
 rdiff1 <- rast(paths_rdiff)
 
 info_rdiff0 <- create_rast_info(rdiff1, into = into)%>% 
-  filter_clim_extremes()
+  filter_clim_extremes(years = years)
 
 info_rdiff1 <- info_rdiff0 %>% 
   filter(graze %in% graze_levels) 
@@ -93,7 +95,7 @@ r <- c(r1, rdiff1)
 
 info_20panel <- info1a %>% 
   bind_rows(info_rdiff0) %>% 
-  filter(years != '2030-2060' & years != '2031-2060') 
+  filter(years %in% c('Current', !!years)) 
 
 g <- plot_map_20panel(
   r = r,
@@ -110,7 +112,7 @@ g <- plot_map_20panel(
   )
 
 
-filename <- paste0('figures/fire/maps/20panel_fire-prob_', run, ".png")
+filename <- paste0('figures/fire/maps/20panel_fire-prob_', run, yr_lab, ".png")
 png20panel(filename)
 print(g)
 dev.off()
@@ -144,7 +146,7 @@ g <- plot_map_20panel(
 )
 
 
-filename <- paste0('figures/fire/maps/20panel_fire-prob-perc_', run, ".png")
+filename <- paste0('figures/fire/maps/20panel_fire-prob-perc_', run, yr_lab, ".png")
 png20panel(filename)
 print(g)
 dev.off()
@@ -153,7 +155,7 @@ dev.off()
 
 # combining difference and absolute biomass
 info_c1 <- bind_rows(info1, info_rdiff1) %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   mutate(type = fct_rev(factor(type))) %>% 
   arrange(run, RCP, type, years)
 
@@ -190,7 +192,8 @@ range_d <- c(-m, m)
 title_diff <- "\u0394 # fires/century" # delta
 
 # using cair_pdf so 'delta' symbol printed
-cairo_pdf(paste0("figures/fire/maps/fire-prob-rdiff-cref_", v_out, ".pdf"),
+cairo_pdf(paste0("figures/fire/maps/fire-prob-rdiff-cref_", v_out, yr_lab,
+                 ".pdf"),
           width = 12, height = 7, onefile = TRUE)
 for(df in info_c_l){
   print(df$id[1])
@@ -324,7 +327,7 @@ for (run in runs) {
     comb2
   })
   
-  pdf(paste0("figures/fire/maps/", run, "_delta-prob_wgcm-", ref_graze, '_', 
+  pdf(paste0("figures/fire/maps/", run, yr_lab, "_delta-prob_wgcm-", ref_graze, '_', 
              v_out, '.pdf'),
       width = 10, height = 10)
     map(pages, print)

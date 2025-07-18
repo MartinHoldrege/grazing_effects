@@ -226,7 +226,7 @@ eco1 <- lev3c %>%
   summarise(geometry = st_union(geometry), .groups = 'drop')
 
 eco2 <- st_transform(eco1, crs_scd)
-
+df_region2d <- st_transform(df_region2c, crs_scd)
 ggplot(eco2) +
   geom_sf(fill = "lightgray", color = "black") +
   geom_sf_text(aes(label = region), size = 3) +
@@ -236,5 +236,5 @@ ggplot(eco2) +
 st_write(eco2, 'data_processed/ecoregions/four_regions_v1.gpkg',
          overwrite = TRUE, append = FALSE)
 
-st_write(df_region2c, 'data_processed/ecoregions/regions_r1.1.gpkg',
+st_write(df_region2d, 'data_processed/ecoregions/regions_r1.1.gpkg',
          overwrite = TRUE, append = FALSE)

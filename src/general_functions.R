@@ -1023,11 +1023,12 @@ filter_scenarios <- function(df, PFT = NULL,
 
 # misc functions ---------------------------------------------------------------
 
-filter_clim_extremes <- function(df) {
+filter_clim_extremes <- function(df, years = '2070-2100') {
   # set which scenarios to examine
+  stopifnot(years %in% df$years)
   df %>% 
-    filter(RCP == "Current" | (RCP == 'RCP45' & years == '2070-2100') |
-             (RCP == 'RCP85' & years == '2070-2100'))
+    filter(RCP == "Current" | (RCP == 'RCP45' & years == !!years) |
+             (RCP == 'RCP85' & years == !!years))
 }
 
 
@@ -1077,8 +1078,8 @@ tmp_exists <- function(object_name, rerun, suffix = '.tif') {
   file.exists(paste0('tmp/', object_name, suffix)) & !rerun
 }
 
-read_tmp_tif <- function(object_name) {
-  rast(paste0('tmp/', object_name, '.tif'))
+read_tmp_tif <- function(object_name, dir = 'tmp') {
+  rast(paste0(dir, '/', object_name, '.tif'))
 }
 # for saving intermediate rasters to disk to save memory
 writeReadRast <- function(object, objectName, dir = 'tmp') {
