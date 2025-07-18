@@ -5,18 +5,29 @@
 # Author: Martin Holdrege
 # Script Started: May 13, 2025
 
+
+# STOP--continue updating this for new inputs
+# still need to run for r1.0 mid and r1.1
+
 # params ------------------------------------------------------------------
 
 source("src/params.R")
+run <- opt$run
+v_interp <- opt$v_interp
+vr <- opt$vr
+vr_name <- opt$vr_name
 runv <- paste0(run, v_interp)
+yr_lab <- opt$yr_lab
 suffix <- paste0(runv, '_v1') # for figures
-v_input <- 'v2' # version for some input files
 
+v_input <- paste0('v2', vr_name) # version for some input files
 scen_l <- list(RCP = c('RCP45', 'RCP85'),
-               years = c('2070-2100', '2070-2100'))
+               years = rep(opt$years, 2))
 
 ref_graze <- 'Moderate'
 rcps <- unique(scen_l$RCP)
+
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -35,37 +46,39 @@ options(readr.show_col_types = FALSE)
 # fivenumber summaries (for boxplots) across regions of Q and SEI
 # (SCD adjusted) rasters (i.e. these are area weighted summaries)
 # created in 06_summarize_sei_scd-adj
-qsei1 <- read_csv(paste0('data_processed/raster_means/', runv,  
+qsei1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name,
+                         yr_lab,
                          '_q-sei_scd-adj_summaries_by-ecoregion.csv'))
 
 # file created in 05_interpolated_summarize_sei_scd-adj.R
 # mean SEI and % core by ecoregion and GCM
-sei_byGCM1 <- read_csv(paste0('data_processed/raster_means/', runv, 
+sei_byGCM1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name,
+                              yr_lab,
                              '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
 
 # average of climatic drivers, per gcm and region
 # file output by 04_summarize_fire_drivers.R
-drivers1 <- read_csv(paste0('data_processed/raster_means/', run, 
+drivers1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
                   '_fire-driver-means_by-ecoregion.csv'))
 
 # expected burned area by gcm
-# created in 05_fire_area.R
+# created in 06_fire_area.R
 ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
-                           v_input, "_", run, ".csv"))
+                           v_input, vr_name, "_", run, ".csv"))
 
 # create in "scripts/06_summarize_sei_scd-adj.R"
 # percent core and grow areas by region for low, median, and high SEI (across GCMs)
-sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, 
+sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name, yr_lab,
                              '_sei-class-pcent-long_scd-adj_summaries_by-ecoregion.csv'))
 
 # create in "scripts/06_summarize_sei_scd-adj.R"
 # area in each of 9 climate caused SEI class change categories
-c9_area2 <- read_csv(paste0('data_processed/raster_means/', runv, 
+c9_area2 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name, yr_lab, 
                             '_c9-area_scd-adj_summaries_by-ecoregion.csv'))
 
 # map of ecoregions create in
 # "scripts/04_ecoregion_map.R"
-g_region1 <- readRDS("figures/ecoregions_v4_all.rds")
+g_region1 <- readRDS(paste0("figures/ecoregions_", v_interp, "_", vr, ".rds"))
 
 # prepare dataframes ------------------------------------------------------
 

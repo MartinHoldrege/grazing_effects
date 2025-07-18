@@ -7,11 +7,14 @@
 # and SEI class summary stats
 
 
-
 # params ------------------------------------------------------------------
 
 source("src/params.R") # some params used in this script
-test_run <- FALSE
+yr_lab <- opt$yr_lab
+test_run <- opt$test_run
+run <- opt$run
+vr <- opt$vr
+vr_name <- opt$vr_name
 # intermediate rasters saved, usually want true b/ of disc storage, except when testing/debugging
 remove_tmp_files = FALSE
 rerun <- FALSE # re-create temporary files
@@ -376,10 +379,12 @@ writeRaster(q_sei_diff,
 
 
  
- write_csv(c3eco_sei2_smry, paste0('data_processed/raster_means/', runv, vr_name,
+ write_csv(c3eco_sei2_smry, paste0('data_processed/raster_means/', 
+                                   runv, vr_name, yr_lab,
                                    '_sei-mean_scd-adj_smry-by-region-c3.csv'))
  
- write_csv(c3eco_sei2_gcm, paste0('data_processed/raster_means/', runv, vr_name,
+ write_csv(c3eco_sei2_gcm, paste0('data_processed/raster_means/', 
+                                  runv, vr_name, yr_lab,
                                    '_sei-mean_scd-adj_by-GCM-region-c3.csv'))
 
 }

@@ -10,6 +10,10 @@
 
 source("src/params.R")
 
+run <- opt$run
+v_interp <- opt$v_interp
+vr_name <- opt$vr_name
+yr_lab <- opt$yr_lab
 v <- 'v2' # version of input files (and for now also used in output file names)
 suffix <- paste0(v, "_", run)
 runv <- paste0(run, v_interp)
@@ -19,6 +23,7 @@ explanatory_figures <- TRUE
 rcps <- c('RCP45', 'RCP85') # figures seperately made for both RCPs
 
 entire <- 'Entire study area' # name of factor level for entire study
+
 # dependencies ------------------------------------------------------------
 
 library(terra)
@@ -94,7 +99,7 @@ c3eco_sei2_gcm <- read_csv(paste0('data_processed/raster_means/', runv,
 # interpolation weights from:
 # "scripts/04_interpolation_weights.R"
 weights1 <- read_csv(paste0('data_processed/interpolation_data/interpolation_weights_', 
-                            v_interp, '.csv')) %>% 
+                            v_interp, vr_name, '.csv')) %>% 
   df_factor()
 
 # vectors -----------------------------------------------------------------
