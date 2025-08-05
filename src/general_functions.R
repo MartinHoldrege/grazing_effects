@@ -192,10 +192,6 @@ region_factor <- function(x = NULL, wafwa_only = FALSE, include_entire = TRUE,
                           v = NULL) {
   
     
-    if(!is.null(v) & !return_levels) {
-      stop('not currently setup to use region version when return_levels = FALSE')
-    }
-    
 
     lev_l <- all_region_levels()
     
@@ -217,6 +213,9 @@ region_factor <- function(x = NULL, wafwa_only = FALSE, include_entire = TRUE,
   x2 <- str_subset(x, 'Entire study area', negate = TRUE) 
   levels <- if(wafwa_only) {
       lev_l$wafwa
+    } else if (!is.null(v)) {
+      stopifnot(v %in% names(lev_l))
+      lev_l[[v]]
     } else if(same_elem(x2, lev_l$r1.0)) {
       lev_l$r1.0
     } else if(same_elem(x2, lev_l$r1.1)) {

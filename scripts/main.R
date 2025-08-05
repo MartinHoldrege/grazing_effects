@@ -45,15 +45,16 @@ uu <- function(x) unname(unlist(x))
 
 
 
-# still need to run
-callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_end)) 
-callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
-callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
-
+# have run
+# callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_end)) 
+callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) # missing output, running again
+# callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
+# callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) # to do
+# callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_end)) 
 
 # r1.0 --------------------------------------------------------------------
 
 arg_list_mid$vr <- "--vr=r1.0"
-callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
-callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
-#callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) # not ready yet
+# callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
+# callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
+#callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) 

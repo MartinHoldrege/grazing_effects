@@ -5,9 +5,7 @@
 # Author: Martin Holdrege
 # Script Started: May 13, 2025
 
-
-# STOP--continue updating this for new inputs
-# still need to run for r1.0 mid and r1.1
+# STOP still need to run for mid r1.1
 
 # params ------------------------------------------------------------------
 
@@ -26,7 +24,7 @@ scen_l <- list(RCP = c('RCP45', 'RCP85'),
 
 ref_graze <- 'Moderate'
 rcps <- unique(scen_l$RCP)
-
+years <- opt$years
 
 # dependencies ------------------------------------------------------------
 
@@ -50,6 +48,7 @@ qsei1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name,
                          yr_lab,
                          '_q-sei_scd-adj_summaries_by-ecoregion.csv'))
 
+
 # file created in 05_interpolated_summarize_sei_scd-adj.R
 # mean SEI and % core by ecoregion and GCM
 sei_byGCM1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name,
@@ -64,7 +63,7 @@ drivers1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
 # expected burned area by gcm
 # created in 06_fire_area.R
 ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
-                           v_input, vr_name, "_", run, ".csv"))
+                           v_input, "_", run, ".csv"))
 
 # create in "scripts/06_summarize_sei_scd-adj.R"
 # percent core and grow areas by region for low, median, and high SEI (across GCMs)
@@ -81,18 +80,20 @@ c9_area2 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name, yr_la
 g_region1 <- readRDS(paste0("figures/ecoregions_", v_interp, "_", vr, ".rds"))
 
 # prepare dataframes ------------------------------------------------------
+nr <- lu(qsei1$region) # number of regions
+mr <- nr/5 # multiplier for number of regions (i.e. for figure heights etc. )
 
 qsei2 <- qsei1 %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE, 
                               add_newline = TRUE)) %>% 
   df_factor() %>% 
-  filter_clim_extremes()
+  filter_clim_extremes(years = years)
 
 
 # * SEI class area --------------------------------------------------------
 
 sei_pcent1 <- df_factor(sei_pcent1) %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
                               add_newline = TRUE))
 
@@ -148,8 +149,9 @@ g_sei <- box_fivenum1(df = filter(qsei2, group == 'SEI'),
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = TRUE)
 g3 <- g2 + g_sei + plot_layout(guides = 'collect')
 
-png(paste0("figures/sei/q-sei_scd-adj_weighted_by-region_3pft_boxplot_", suffix, ".png"),
-    width = 11, height = 10, units = 'in', res = 600)
+png(paste0("figures/sei/q-sei_scd-adj_weighted_by-region_3pft_boxplot", 
+           vr_name, yr_lab, "_", suffix, ".png"),
+    width = 11, height = 2.3 + 7.7*mr, units = 'in', res = 600)
 g3&theme(legend.position = 'bottom')
 dev.off()
 
@@ -173,14 +175,14 @@ hline <- function() {
 
 # dimension of 10 panel figures (2 cols)
 width10 <- 5
-height10 <- 9
+height10 <- 1.5 + 7.5*mr
 
 # dimensions of 5 panel figures (1 per region)
-widthr <- 6.3
-heightr <- 6
+widthr <- if (nr <= 6) 6.3 else 7
+heightr <- if (nr <= 6) 6 else 7
 
 map(rcps, function(rcp) {
-
+  suffix <- paste0(vr_name, '_', rcp, yr_lab, "_", runv)
   df <- sei_pcent1 %>% 
     filter(RCP %in% c('Current', rcp),
            summary == 'median')
@@ -193,8 +195,7 @@ map(rcps, function(rcp) {
     facet_grid(region ~rcp_year, scales = 'free_y') +
     labs(y = lab_area0)
   
-  ggsave(paste0('figures/sei/c3_area/c3-bar_abs-area_by-region_',
-                rcp, "_", runv, '.png'),
+  ggsave(paste0('figures/sei/c3_area/c3-bar_abs-area_by-region',suffix, '.png'),
          plot = g,
          dpi = 600, height = height10, width = width10)
   
@@ -207,25 +208,27 @@ map(rcps, function(rcp) {
   g <- ggplot(df, aes(y = delta_area)) +
     hline()+
     base_bar() +
-    facet_manual_region(legend.position.inside = c(0.1, 0.2),
+    facet_manual_region(v = vr,
+                        legend.position.inside = c(0.1, 0.2),
                         scales = 'free_y') +
     labs(y = 'Change in area relative to historical climate (ha)',
          subtitle = str_replace(rcp_year, '\n', ' '))
   
-  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area_by-region_',
-                rcp, "_", runv, '.png'),
+  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area_by-region', 
+                suffix, '.png'),
          plot = g,
          dpi = 600, height = heightr, width = widthr)
   
   g <- ggplot(df, aes(y = delta_area_perc)) +
     hline()+
     base_bar() +
-    facet_manual_region(legend.position.inside = c(0.1, 0.2)) +
+    facet_manual_region(legend.position.inside = c(0.1, 0.2),
+                        v = vr) +
     labs(y = 'Change in SEI class area relative to historical climate (%)',
          subtitle = str_replace(rcp_year, '\n', ' '))
   
-  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area-perc_by-region_',
-                rcp, "_", runv, '.png'),
+  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area-perc_by-region', 
+                suffix, '.png'),
          plot = g,
          dpi = 600, height = heightr, width = widthr)
   
@@ -242,8 +245,8 @@ map(rcps, function(rcp) {
     labs(y = paste('Change in SEI class area relative to',
                    str_to_lower(ref_graze), 'grazing (ha)'))
   
-  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area_by-region_',
-                rcp, "_", runv, '.png'),
+  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area_by-region',
+                suffix, '.png'),
          plot = g,
          dpi = 600, height = height10, width = width10)
   
@@ -254,8 +257,8 @@ map(rcps, function(rcp) {
     labs(y = paste('Change in SEI class area relative to',
                    str_to_lower(ref_graze), 'grazing (%)'))
   
-  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area-perc_by-region_',
-                rcp, "_", runv, '.png'),
+  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area-perc_by-region',
+                suffix, '.png'),
          plot = g,
          dpi = 600, height = height10, width = width10)
 
@@ -263,56 +266,57 @@ map(rcps, function(rcp) {
 
 # c9 area barcharts -------------------------------------------------------
 
-c9_area3 <- c9_area2 %>% 
-  select(-id) %>% 
-  pivot_wider(values_from = c('area', 'area_perc'),
-              names_from = summary) %>% 
-  mutate(across(matches('area'), .fns = \(x) ifelse(is.na(x), 0, x)),
-         c9 = c9_factor(c9)) %>% 
-  df_factor()
-
-pmap(scen_l, function(RCP, years) {
-  
-  df <- c9_area3 %>% 
-    filter(RCP == !!RCP, 
-           years == !! years)
-
-  g <- ggplot(df, aes(c9, y = area_perc_median,fill = c9)) +
-    base_c9_area() +
-    geom_errorbar(aes(ymin = area_perc_low, ymax = area_perc_high, group = graze),
-                  stat = 'identity',
-                  width=.3,
-                  position=position_dodge(0.9)) +
-    guides(pattern = guide_legend(ncol = 1,
-                                  override.aes = list(fill = "white", color = 'black',
-                                                      size = 0.1))) + 
-    labs(x = 'Projected change in SEI class',
-         y = '% of region') +
-    facet_manual_region(color_strips = TRUE,
-                        legend.position.inside = c(0.45, 0.31),
-                        # skipping letter used for map
-                        region_letters = fig_letters[c(-4)]) 
-    # make_legend_small()
-
-  
-  g_region2 <- g_region1 +
-    theme(legend.position = 'none') +
-    labs(subtitle = fig_letters[4])
-  
-  g2 <- g +
-    inset_element(g_region2, 
-                  left = -0.05, bottom = 0.05, right = 0.4, top = 0.4,
-                  align_to = 'full')
-
-
-  path <- paste0(
-    "figures/sei/c9-bar_scd-adj_by-region_", RCP, "_", years, "_", suffix, ".png"
-  )
-  ggsave(path, g2, dpi = 600, width = 9, height = 7)
-  
-})
-
-
+# c9_area3 <- c9_area2 %>% 
+#   select(-id) %>% 
+#   pivot_wider(values_from = c('area', 'area_perc'),
+#               names_from = summary) %>% 
+#   mutate(across(matches('area'), .fns = \(x) ifelse(is.na(x), 0, x)),
+#          c9 = c9_factor(c9)) %>% 
+#   df_factor()
+# 
+# pmap(scen_l, function(RCP, years) {
+#   
+#   df <- c9_area3 %>% 
+#     filter(RCP == !!RCP, 
+#            years == !! years)
+# 
+#   g <- ggplot(df, aes(c9, y = area_perc_median,fill = c9)) +
+#     base_c9_area() +
+#     geom_errorbar(aes(ymin = area_perc_low, ymax = area_perc_high, group = graze),
+#                   stat = 'identity',
+#                   width=.3,
+#                   position=position_dodge(0.9)) +
+#     guides(pattern = guide_legend(ncol = 1,
+#                                   override.aes = list(fill = "white", color = 'black',
+#                                                       size = 0.1))) + 
+#     labs(x = 'Projected change in SEI class',
+#          y = '% of region') +
+#     facet_manual_region(color_strips = TRUE,
+#                         legend.position.inside = c(0.45, 0.31),
+#                         # skipping letter used for map
+#                         region_letters = fig_letters[c(-4)]) 
+#     # make_legend_small()
+# 
+#   
+#   g_region2 <- g_region1 +
+#     theme(legend.position = 'none') +
+#     labs(subtitle = fig_letters[4])
+#   
+#   g2 <- g +
+#     inset_element(g_region2, 
+#                   left = -0.05, bottom = 0.05, right = 0.4, top = 0.4,
+#                   align_to = 'full')
+# 
+# 
+#   path <- paste0(
+#     "figures/sei/c9-bar_scd-adj_by-region", vr_name, 
+#     "_", RCP, "_", years, "_", suffix, ".png"
+#   )
+#   ggsave(path, g2, dpi = 600, width = 9*mr, height = 7*mr)
+#   
+# })
+# 
+# 
 
 
 
@@ -414,8 +418,10 @@ plots2 <- map(rcp_year, function(x) {
   
 })
 
-pdf(paste0("figures/sei/sei_scd-adj_vs_driver_by-GCM_", suffix, '.pdf'),
-    width = 14, height = 10)
+pdf(paste0("figures/sei/sei_scd-adj_vs_driver_by-GCM",vr_name, yr_lab, "_", 
+           suffix, '.pdf'),
+    width = 14, height = 10*mr)
 plots1
 plots2
 dev.off()
+

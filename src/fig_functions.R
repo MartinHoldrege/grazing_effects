@@ -709,28 +709,44 @@ scatter_light <- function(pft, # for subtitle
 
 # facet functions ---------------------------------------------------------
 
-facet_manual_region <- function(legend.position = 'inside',
-                                legend.position.inside = c(0.05, 0),
+facet_manual_region <- function(v = 'r1.0', 
+                                legend.position = NULL,
+                                legend.position.inside = NULL,
                                 color_strips = FALSE,
                                 # letters to use for facet prefixes
                                 region_letters = NULL,
                                 scales = 'fixed') {
-  design <- "
- ABC
- #DE
- "
+  
+  if(v == 'r1.0') {
+    design <- "
+               ABC
+               #DE
+               "
+    if(is.null(legend.position)) legend.position <-  'inside'
+    if(is.null(legend.position.inside)) legend.position.inside = c(0.05, 0)
+
+  } else if(v == 'r1.1') {
+    design <- "
+               ABC
+               DEF
+               GHI
+               "
+    legend.position = 'right'
+  } else {
+    stop("function doesn't support this version of regions, must update")
+  }
+
   
   if(color_strips) {
     # ordering, and only keeping the appropriate 
-    cols <- cols_ecoregion[region_factor(include_entire = FALSE, 
-                                         return_levels = TRUE)]
+    cols <- get_cols_ecoregion(v = v)
     strip_theme_region <- ggh4x::strip_themed(
       text_x = ggh4x::elem_list_text(color = c('black', cols))
     )
   } else {
     strip_theme_region <- ggh4x::strip_vanilla()
   }
-  region_labeller <- region_labeller_factory(region_letters)
+  region_labeller <- region_labeller_factory(region_letters, v = v)
   list(
     ggh4x::facet_manual(~region, design = design, labeller = region_labeller,
                         strip = strip_theme_region,
@@ -857,13 +873,14 @@ rcp_label <- function(rcp, years, add_letters = FALSE,
   x2
 }
 
-region_label_factory <- function(region_letters = NULL) {
+region_label_factory <- function(region_letters = NULL,
+                                 v = NULL) {
   if(is.null(region_letters)) {
     region_letters <- fig_letters # from the global environment
   }
   
   function(x) {
-    x <- region_factor(x)
+    x <- region_factor(x, v = v)
     levels <- levels(x)
     labels <- paste(region_letters[1:length(levels)], levels)
     out <- factor(as.character(x), levels = levels,
@@ -873,8 +890,10 @@ region_label_factory <- function(region_letters = NULL) {
 
 }
 
-region_labeller_factory <- function(region_letters = NULL) {
-  region_label <- region_label_factory(region_letters = region_letters)
+region_labeller_factory <- function(region_letters = NULL,
+                                    v = NULL) {
+  region_label <- region_label_factory(region_letters = region_letters,
+                                       v = v)
   ggplot2::as_labeller(x = region_label)
 }
 
