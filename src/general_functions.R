@@ -234,10 +234,10 @@ region_factor <- function(x = NULL, wafwa_only = FALSE, include_entire = TRUE,
 
 # convert 'our' regions to the wafwa regions
 # for aggregation
-region2wafwa <- function(x) {
+region2wafwa <- function(x, v = NULL) {
 
   x2 <- as.character(x)
-  vr <- which_vr(x2)
+  vr <- if(is.null(v)) which_vr(x2) else v
   
   eco <- load_wafwa_ecoregions(total_region = FALSE, v = vr)
   from <- eco$region
@@ -246,7 +246,8 @@ region2wafwa <- function(x) {
 
   if(is.factor(x)) {
     include_entire <- any(str_detect(x, 'Entire'))
-    x2 <- region_factor(x2, wafwa_only = TRUE, include_entire = include_entire)
+    x2 <- region_factor(x2, wafwa_only = TRUE, include_entire = include_entire,
+                        vr)
   } 
   x2
 }
@@ -474,7 +475,7 @@ spp2pft <- function(x) {
 #' @param df dataframe with key columns to be converted to factors
 #'
 #' @return dataframe with key columns converted to factors
-df_factor <- function(df) {
+df_factor <- function(df, v = NULL) {
   stopifnot(is.data.frame(df))
   
   nms <- names(df)
@@ -487,8 +488,8 @@ df_factor <- function(df) {
   
   if("PFT" %in% nms) df$PFT <- pft_all_factor(df$PFT)
   
-  if("region" %in% nms) df$region <- region_factor(df$region)
-  if("ecoregion" %in% nms) df$ecoregion <- region_factor(df$ecoregion)
+  if("region" %in% nms) df$region <- region_factor(df$region, v = v)
+  if("ecoregion" %in% nms) df$ecoregion <- region_factor(df$ecoregion, v = v)
   
   if('summary' %in% nms) df$summary <- summary2factor(df$summary)
   

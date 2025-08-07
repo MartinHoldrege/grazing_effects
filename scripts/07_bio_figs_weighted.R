@@ -7,11 +7,14 @@
 # params ------------------------------------------------------------------
 
 source('src/params.R')
+yr_lab <- opt$yr_lab
+years <- opt$years
 runv <- paste0(run, v_interp)
-q_curve_fig <- TRUE # create figure showing the 'biomass' q curves
-
-suffix <- paste0(run, '_v2') # for figures
+q_curve_fig <- FALSE # create figure showing the 'biomass' q curves
+v <- '_v2'
+suffix <- paste0(run, v, vr_name, yr_lab) # for figures
 pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -36,7 +39,7 @@ l <- readRDS(path_rds) # created in 02_sommarize_bio.R
 # in each ecoregion
 # created in 04_interpolation_weights.R
 w1 <- read_csv(paste0('data_processed/interpolation_data/interpolation_weights_', 
-                       v_interp, '.csv'),
+                       v_interp, vr_name, '.csv'),
                show_col_types = FALSE)
 
 bio_gcm1 <- l$pft5_bio1 # 
@@ -45,7 +48,8 @@ fire_med1 <- l$fire_med1
 pft5_bio_d2 <- l$pft5_bio_d2
 
 # create in "scripts/06_summarize_sei_scd-adj.R"
-seifire1 <- read_csv(paste0('data_processed/raster_means/', runv,
+seifire1 <- read_csv(paste0('data_processed/raster_means/', 
+                            runv, vr_name, yr_lab,  
                            '_sei-by-fire-bin_scd-adj_summaries_by-ecoregion.csv'),
                     show_col_types = FALSE)
 
@@ -54,7 +58,7 @@ w1 <- df_factor(w1)
 entire <- levels(w1$region)[1] # entire study region
 bio3 <- bio2 %>% 
   left_join(w1, by = 'site',relationship = "many-to-many") %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   filter(run == !!run) %>% 
   df_factor() 
 
@@ -73,14 +77,14 @@ bio4 <- bio3 %>%
 
 bio_gcm2 <- bio_gcm1 %>% 
   left_join(w1, by = 'site',relationship = "many-to-many") %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   filter(run == !!run) %>% 
   df_factor() %>% 
   filter(region != levels(region)[1])
 
 # % change
 pft5_bio_d3 <- pft5_bio_d2 %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   filter(run == !!run) %>% 
   rename(bio_diff_median = bio_diff) %>% 
   select(run, site, years, RCP, PFT, graze, matches('bio_diff')) %>% 
@@ -90,7 +94,7 @@ pft5_bio_d3 <- pft5_bio_d2 %>%
                names_pattern = '([[:alpha:]]+$)') %>% 
   left_join(w1[w1$region == entire, ], 
             by = 'site') %>% 
-  df_factor() %>% 
+  df_factor(v = vr) %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
                               add_newline = TRUE))
   
@@ -117,7 +121,8 @@ q_gcm1 <- bio_gcm2 %>%
   filter(region != levels(region)[1],
          PFT %in% pfts) %>%  # entire study area
   group_by(PFT, region) %>% 
-  mutate(Q = bio2q(biomass, as.character(unique(PFT)), as.character(unique(region))),
+  mutate(Q = bio2q(biomass, as.character(unique(PFT)), as.character(unique(region)),
+                   v = vr),
          rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
                               add_newline = TRUE))
 
@@ -140,7 +145,7 @@ sei2 <- sei1 %>%
   df_factor()
 
 # for use in the 06_fire_area_figs.R script
-saveRDS(sei2, 'data_processed/temp_rds/sei_df.rds')
+saveRDS(sei2, paste0('data_processed/temp_rds/sei_df', vr_name, yr_lab, '.rds'))
 
 q1 <- q_gcm1 %>% 
   group_by(run, years, RCP, rcp_year, graze, site, weight, region, PFT) %>% 
@@ -180,6 +185,7 @@ args <- list(
   RCP = c('RCP45', 'RCP45', 'RCP85', 'RCP85')
 )
 
+# figure for entire region
 pmap(args, function(pfts, RCP) {
   df_abs <- bio4 %>% 
     filter(RCP == 'Current', region == entire, PFT %in% pfts) %>% 
@@ -199,8 +205,8 @@ pmap(args, function(pfts, RCP) {
   # Pub qual for the main manuscript
   n_pft <- length(pfts)
   filename <- paste0("bio-abs-diff_weighted_entire_",
-                     n_pft, "pft_boxplot_", RCP, "_", 
-                     suffix, ".png")
+                     n_pft, "pft_boxplot_", RCP, yr_lab, "_", 
+                     run, v, ".png")
   
   ggsave(file.path("figures/biomass", filename),plot = g1,
       width = 4.5, height = 5*n_pft/3, dpi = 600)
@@ -244,7 +250,8 @@ plots[[n]] <- plots[[n]] + theme(strip.text.y = element_blank())
 g_sei <- weighted_box1(df = sei2,
                      y_string = 'SEI',
                      ylab = lab_sei0,
-                     subtitle = 'SEI')
+                     subtitle = 'SEI',
+                     strip.text.y = element_text(size = rel(0.7)))
 
 
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = TRUE)
@@ -378,7 +385,7 @@ base_fire_bins <- function() {
   list(geom_tile(),
        labs(x = lab_graze,
             y =  lab_firep0),
-    theme(axis.text.y = element_text(size = rel(0.8)),
+    theme(axis.text.y = element_text(size = rel(0.7)),
           axis.text.x = element_text(angle = 45, hjust = 1)),
     facet_grid(region~rcp_year))
 }

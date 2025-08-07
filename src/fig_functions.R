@@ -227,14 +227,16 @@ geom_boxplot_identity <- function(...) {
                ...)
 }
 
-weighted_box1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
+weighted_box1 <- function(df, y_string, ylab = NULL, subtitle = NULL,
+                          strip.text.y = element_text(size = rel(0.7))) {
   ggplot(df, aes(graze, .data[[y_string]], fill = summary)) +
     geom_boxplot(aes(weight = weight), position = position_dodge2(preserve = 'single'),
                  outlier.size = 0.25, outlier.alpha = 0.5) + 
     facet_grid(region~rcp_year) +
     theme(panel.spacing.x = unit(0, "lines"),
           axis.text.x = element_text(angle = 45, hjust = 1),
-          strip.text.x.top = element_text(size = rel(0.7))) +
+          strip.text.x.top = element_text(size = rel(0.7)),
+          strip.text.y = strip.text.y) +
     scale_fill_smry() +
     labs(x = lab_graze,
          y = ylab,

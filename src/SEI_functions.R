@@ -76,11 +76,12 @@ bio2cov <- function(x, pft) {
 #' @param x biomass
 #' @param region ecoregion
 #' @param pft string
-bio2q <- function(x, pft, region) {
+#' @param v which verion of ecorgions is be used
+bio2q <- function(x, pft, region, v = NULL) {
   
   tab <- q_curves_cover2[[pft]]
   
-  region <- region2wafwa(region)
+  region <- region2wafwa(region, v)
   
   cover <- bio2cov(x, pft)/100 # convert from % to proportion
   stopifnot(region %in% names(tab),

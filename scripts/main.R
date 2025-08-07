@@ -21,6 +21,11 @@ scripts_vr <- c(
   # 'scripts/06_fire_area.R',
 )
 
+# to run for all combinations of vr and years
+scripts_vr_yr <- c(
+  'scripts/07_bio_figs_weighted.R'
+)
+
 # parameters --------------------------------------------------------------
 
 end <- "--years=2070-2100"
@@ -31,7 +36,10 @@ arg_list_end <- list(
 )
 arg_list_mid <- arg_list_end
 arg_list_mid$years <- mid
-
+arg_list_r1.0_mid <- arg_list_mid
+arg_list_r1.0_mid$vr <- "--vr=r1.0"
+arg_list_r1.0_end <- arg_list_end
+arg_list_r1.0_end$vr <- "--vr=r1.0"
 # functions ---------------------------------------------------------------
 
 uu <- function(x) unname(unlist(x))
@@ -47,10 +55,17 @@ uu <- function(x) unname(unlist(x))
 
 # have run
 # callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_end)) 
-callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) # missing output, running again
+# callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) 
 # callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
-# callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) # to do
+# callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) # done
 # callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_end)) 
+
+for(script in scripts_vr_yr) {
+  callr::rscript(script, cmdargs = uu(arg_list_end))
+  callr::rscript(script, cmdargs = uu(arg_list_mid))
+  callr::rscript(script, cmdargs = uu(arg_list_r1.0_end))
+  callr::rscript(script, cmdargs = uu(arg_list_r1.0_mid))
+}
 
 # r1.0 --------------------------------------------------------------------
 

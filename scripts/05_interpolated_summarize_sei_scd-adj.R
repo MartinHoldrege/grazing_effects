@@ -269,7 +269,7 @@ info_sei_smry <- create_rast_info(sei_scd_adj_smry,
 # ** calculate gcm & pixelwise areas -----------------------------------------
 
 
-p <- paste0('data_processed/raster_means/', runv, vr_name, yr_lab,
+p <- paste0('data_processed/raster_means/', runv, vr_name, 
             '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv')
 
 if(!file.exists(p) | rerun) {
@@ -380,11 +380,11 @@ writeRaster(q_sei_diff,
 
  
  write_csv(c3eco_sei2_smry, paste0('data_processed/raster_means/', 
-                                   runv, vr_name, yr_lab,
+                                   runv, vr_name, 
                                    '_sei-mean_scd-adj_smry-by-region-c3.csv'))
  
  write_csv(c3eco_sei2_gcm, paste0('data_processed/raster_means/', 
-                                  runv, vr_name, yr_lab,
+                                  runv, vr_name, 
                                    '_sei-mean_scd-adj_by-GCM-region-c3.csv'))
 
 }

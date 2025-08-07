@@ -51,8 +51,8 @@ qsei1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name,
 
 # file created in 05_interpolated_summarize_sei_scd-adj.R
 # mean SEI and % core by ecoregion and GCM
-sei_byGCM1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name,
-                              yr_lab,
+sei_byGCM1 <- read_csv(paste0('data_processed/raster_means/', 
+                              runv, yr_lab, vr_name,
                              '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
 
 # average of climatic drivers, per gcm and region

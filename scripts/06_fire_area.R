@@ -11,9 +11,12 @@
 
 source('src/params.R')
 
-test_run <- FALSE
-v <- paste0('v2', vr_name) # version for output files
-runv <- paste0(run, v_interp)
+test_run <- opt$test_run
+vr_name <- opt$vr_name
+run <- opt$run
+v_interp <- opt$v_interp
+v <- paste0('v2', opt$vr_name) # version for output files
+runv <- paste0(opt$run, opt$v_interp)
 ref_graze <- 'Moderate' # the reference grazing level for SEI calculations
 # (i.e. current climate at ref graze means we are not adjusting
 # the sei values with stepwat results)
