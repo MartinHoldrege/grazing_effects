@@ -15,13 +15,13 @@ v_interp <- opt$v_interp
 vr_name <- opt$vr_name
 yr_lab <- opt$yr_lab
 v <- 'v2' # version of input files (and for now also used in output file names)
-suffix <- paste0(v, "_", run)
+suffix <- paste0(v, vr_name, "_", run)
 runv <- paste0(run, v_interp)
 # create additional figures to explore how age groups/fire probability relate
 # (not using actual data)
 explanatory_figures <- TRUE 
 rcps <- c('RCP45', 'RCP85') # figures seperately made for both RCPs
-
+years <- opt$years
 entire <- 'Entire study area' # name of factor level for entire study
 
 # dependencies ------------------------------------------------------------
@@ -41,6 +41,7 @@ options(readr.show_col_types = FALSE)
 
 # created in the 06_fire_area.R script
 # expected burned area
+# includes mid and end century
 ba3a <- read_csv(
   paste0("data_processed/area/expected-burn-area_smry_", suffix,".csv"))
 
@@ -67,11 +68,12 @@ area_age_group3_pw <- read_csv(
   paste0("data_processed/area/area-by-age-group_pw_", suffix, ".csv"))
 
 # area of our study region in each of 3 ecoregions
-area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v,".csv"))
+area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v, vr_name,
+                            ".csv"))
 
 # created in the 04_summarize_fire_drivers.R script
 # means, by ecoregion, of the drivers of fire probability
-drivers1 <- read_csv(paste0('data_processed/raster_means/', run, 
+drivers1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
                             '_fire-driver-means_by-ecoregion.csv'))
 
 # create in "scripts/02b_fire_attribution.R"
@@ -79,21 +81,26 @@ drivers1 <- read_csv(paste0('data_processed/raster_means/', run,
 # and dominant drivers of change
 driver_l <- readRDS('data_processed/site_means/fire_dominant_drivers.RDS')
 
-sei2 <- readRDS('data_processed/temp_rds/sei_df.rds')
+# created in 07_bio_figs_weighted.R
+sei2 <- readRDS(paste0('data_processed/temp_rds/sei_df', vr_name, yr_lab, '.rds'))
+
+# created in "scripts/06_summarize_sei_scd-adj.R"
+sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', 
+                              runv, vr_name, yr_lab, 
+                              '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
 
 # created in "scripts/05_interpolated_summarize_sei_scd-adj.R"
-sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, 
-                     '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
-
-# created in "scripts/05_interpolated_summarize_sei_scd-adj.R"
-sei_pcent_gcm1 <- read_csv(paste0('data_processed/raster_means/', runv, 
-                        '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
+sei_pcent_gcm1 <- read_csv(paste0('data_processed/raster_means/', 
+                                  runv, yr_lab, vr_name,   
+                                  '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
 
 # pixelwise and gcm wise mean sei by ecoregion and current sei class
-c3eco_sei2_smry <- read_csv(paste0('data_processed/raster_means/', runv, 
+c3eco_sei2_smry <- read_csv(paste0('data_processed/raster_means/',
+                                   runv, yr_lab,vr_name,
                                   '_sei-mean_scd-adj_smry-by-region-c3.csv'))
 
-c3eco_sei2_gcm <- read_csv(paste0('data_processed/raster_means/', runv, 
+c3eco_sei2_gcm <- read_csv(paste0('data_processed/raster_means/', 
+                                  runv, yr_lab, vr_name,
                                  '_sei-mean_scd-adj_by-GCM-region-c3.csv'))
 
 # interpolation weights from:
@@ -107,20 +114,29 @@ weights1 <- read_csv(paste0('data_processed/interpolation_data/interpolation_wei
 ecoregions <- region_factor(area_eco$ecoregion) %>% 
   levels() %>% 
   setNames(nm = .)
-
+nr <- length(ecoregions)
+mr <- nr/5 # multiplier for figure heights
 age_groups <- create_age_groups()
 
 # fig params --------------------------------------------------------------
 
 line_loc <- c(5.5, 10.5, 15.5) # locations to draw vertical lines on boxplot
 line_loc2 <- 1:2 + 0.5
-height_3p <- 6 # width for 3 panel figures
-width_3p <- 5 # height for 3 panel figures
+
+if(vr == 'r1.0') {
+  height_3p <- 6 # width for 3 panel figures
+  width_3p <- 5 # height for 3 panel figures
+} else if (vr == 'r1.1') {
+  height_3p <- 10 # width for 3 panel figures
+  width_3p <- 5 # height for 3 panel figures
+} else {
+  stop('update needed')
+}
 
 # prepare dataframes ------------------------------------------------------
 
 ba3 <- df_factor(ba3a) %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   arrange(graze, RCP, years)  %>% 
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
          id2 = factor(id2, levels = unique(id2)),
@@ -131,7 +147,7 @@ ba3 <- df_factor(ba3a) %>%
   rename(area_total = area)
 
 area_age_group3 <- area_age_group3 %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   left_join(area_eco, by = join_by(ecoregion)) %>% 
   arrange(graze, RCP, years)  %>% 
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
@@ -142,7 +158,7 @@ area_age_group3 <- area_age_group3 %>%
   df_factor()
   
 area_age_group4_pw <- area_age_group3_pw %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   left_join(area_eco, by = join_by(ecoregion)) %>% 
   arrange(graze, RCP, years)  %>% 
   mutate(age_group = factor(age_group, levels = rev(names(age_groups))),
@@ -190,7 +206,7 @@ sei_pcent_gcm2 <- sei_pcent_gcm1 %>%
 sei_pcent_gcm3 <- ba_gcm1 %>% 
   rename(ba_area = area) %>% 
   select(-type, -run2) %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   left_join(rename(area_eco, total_area = area), by = 'ecoregion') %>% 
   mutate(ba_area_perc = ba_area/total_area*100) %>% 
   rename(region = ecoregion) %>% 
@@ -203,8 +219,6 @@ sei_pcent_gcm3 <- ba_gcm1 %>%
   arrange(rcp_year, GCM, graze) # arranging for geom_path
 
 
-
-
 # ** by SEI class ---------------------------------------------------------
 
 # pixelwise summaries across gcms
@@ -214,7 +228,7 @@ c3eco_smry1 <- c3eco_sei2_smry %>%
             join_by(c3, region, RCP, years, graze, summary))  %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
          rcp_year_c3 = paste0(rcp_year, c3)) %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   df_factor() %>% 
   select(-type) %>% 
   arrange(rcp_year, c3, graze) # order matters for geom_path
@@ -247,7 +261,7 @@ c3eco_gcm1 <- c3eco_sei2_gcm %>%
             join_by(c3, region, RCP, years, graze, GCM))  %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
          rcp_year_c3_gcm = paste0(rcp_year, c3, GCM)) %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   df_factor() %>% 
   select(-type) %>% 
   arrange(rcp_year, c3, graze) # order matters for geom_path
@@ -274,7 +288,7 @@ c3eco_gcm3 <- c3eco_gcm2 %>%
 # * drivers of fire change ------------------------------------------------
 
 dom_drivers2 <- driver_l$dominant_driver1 %>% 
-  filter_clim_extremes() %>% 
+  filter_clim_extremes(years = years) %>% 
   select(-id) %>% 
   rename(dom_driver = dominant_driver) %>% 
   filter(run == !!run) %>% 
@@ -304,7 +318,7 @@ one_change_prep <- function(df) {
   df %>% 
     left_join(weights1, by = 'site', relationship = 'many-to-many') %>% 
     rename(pred_var = pred_var_cur) %>% 
-    filter_clim_extremes() %>% 
+    filter_clim_extremes(years = years) %>% 
     filter(run == !!run) %>% 
     mutate(pred_var = str_replace(pred_var, 'psp', 'PSP'),
            pred_var = driver2factor(pred_var))
@@ -365,11 +379,12 @@ plots <- remove_y_titles(plots, index_keep_y = 3,
                          index_keep_y_sec = 4)
 
 g <- patchwork::wrap_plots(plots) +
-  plot_layout(guides = 'collect', ncol = 2)
+  plot_layout(guides = 'collect', axes = 'collect', ncol = 2)
 
 g2 <- g&theme(legend.position = 'bottom')
 
-jpeg(paste0("figures/fire/area/expected_ba_dotplot_", suffix, '.jpg'),
+jpeg(paste0("figures/fire/area/expected_ba_dotplot_", 
+            v, vr_name, yr_lab, '_', run, '.jpg'),
      units = 'in', width = width_3p, height = height_3p, res = 600)
 g2
 dev.off()
@@ -391,7 +406,12 @@ fig_area_by_scenario_group <- function(df, total_area) {
     scale_color_manual(values = cols_graze, name = 'Grazing') +
     facet_wrap(~age_group, nrow = 1) +
     theme(axis.text.x = element_text(angle = 25, hjust = 1,
-                                     size = rel(0.8))) +
+                                     size = rel(0.8)),
+          plot.subtitle = element_text(size = rel(0.7),
+                                      margin  = margin(4, 0, 2, 0)),
+          strip.text = element_text(size = rel(0.7),
+                                    margin = margin(0, 0, 0, 0)),
+          plot.margin = margin(0, 0, 0, 0)) +
     labs(x = NULL,
          y = 'Expected area in age class (ha/yr)') +
     scale_y_continuous(sec.axis = sec_axis(transform = \(x) x/total_area*100,
@@ -408,15 +428,24 @@ plots0 <- map(ecoregions, function(region) {
   df <- area_age_group3  %>% 
     filter(ecoregion == region) 
   
+  # only keep axis text in bottom row
+  tmp_theme <- if(region == ecoregions[[length(ecoregions)]]) {
+    theme()
+  } else {
+    theme(axis.text.x = element_blank(),
+          axis.title.x = element_blank())
+  }
   g1 <- df %>% 
     filter(age_group != old_group) %>% 
     fig_area_by_scenario_group(total_area = total_area) + 
-    labs(subtitle = region)
+    labs(subtitle = region) +
+    tmp_theme
   
   
   g2 <- df %>% 
     filter(age_group == old_group) %>% 
-    fig_area_by_scenario_group(total_area = total_area)
+    fig_area_by_scenario_group(total_area = total_area) +
+    tmp_theme
   
   list(g1, g2)
 })
@@ -424,14 +453,15 @@ plots0 <- map(ecoregions, function(region) {
 plots <- reduce(plots0, c)
 g <- patchwork::wrap_plots(plots, ncol = 2, guides = 'collect',
                            tag_level = 'keep',byrow = TRUE, widths = c(3, 1)) +
-  plot_layout(axis_titles = 'collect')
+  plot_layout(axes = 'collect')
 
 g2 <- g&theme(legend.position = 'bottom',
               axis.title.y = element_text(),
               axis.title.y.right = element_text()
 )
 
-jpeg(paste0("figures/fire/area/area_age_group_scen-grouping_", suffix, '.jpg'),
+jpeg(paste0("figures/fire/area/area_age_group_scen-grouping_",
+            v, vr_name, yr_lab, "_", run,'.jpg'),
      units = 'in', width = 6, height = 12, res = 600)
 g2
 dev.off()
@@ -456,76 +486,25 @@ map(rcps, function(rcp){
     adjust_graze_x_axis() +
     scale_fill_manual(values = rev(cols_agegroup),
                       name = lab_agegroup) +
-    labs(y = lab_areaperc0b)
+    labs(y = lab_areaperc0b) +
+    theme(strip.text = element_text(size = rel(0.7)))
   
-  filename <- paste0("figures/fire/area/area_age_group_by-region_bar_", rcp, "_", 
+  filename <- paste0("figures/fire/area/area_age_group_by-region_bar_", rcp, 
+                     yr_lab, "_", 
                      suffix, '.png')
-  ggsave(filename, g, height = 8, width = 4, dpi = 600)
+  ggsave(filename, g, height = 2+6*mr, width = 4, dpi = 600)
 })
 
   
 # trade-offs ba vs core ---------------------------------------------------
 
-
 # *dotplot ----------------------------------------------------------------
 
-
-
-g1 <- ggplot(sei_pcent3, aes(percent_csa_median, ba_area_median_perc))
-
-g2_error <- g1 +
-  geom_errorbar(aes(ymin = ba_area_low_perc, ymax = ba_area_high_perc, group = rcp_year),
-                alpha = 0.2) +
-  geom_errorbarh(aes(xmin = percent_csa_low, xmax = percent_csa_high, group = rcp_year),
-                 alpha = 0.2) +
-  base_tradeoff()
-
-g2_noerror <- g1 + base_tradeoff()
-g2_error <- g1 + base_tradeoff()
-
-
-
-ggsave_tradeoff(
-  g = g2_noerror + facet_wrap(~region, scales = 'fixed'),
-  prefix = 'noerr-fix' # no error, fixed scales
-)
-
-ggsave_tradeoff(
-  g = g2_noerror + facet_wrap(~region, scales = 'free'),
-  prefix = 'noerr-free' # no error, fixed scales
-)
-
-ggsave_tradeoff(
-  g = g2_error + facet_wrap(~region, scales = 'fixed'),
-  prefix = 'err-fix' # no error, fixed scales
-)
-
-ggsave_tradeoff(
-  g = g2_error + facet_wrap(~region, scales = 'free'),
-  prefix = 'err-free' # no error, fixed scales
-)
-
+# see pre 8/7/2025 commits
 
 # ** gcm level ------------------------------------------------------------
 
-g <- sei_pcent_gcm3 %>% 
-  filter(graze %in% c('Moderate', 'Very Heavy'),
-         RCP != 'RCP85') %>% 
-  ggplot(aes(percent_csa, ba_area_perc, group = GCM, color = graze)) +
-  base_tradeoff(group = "rcp_year_GCM") +
-  labs(caption = 'Results plotted seperately for individual GCMs')
-
-
-ggsave_tradeoff(
-  g = g + facet_wrap(~region, scales = 'fixed'),
-  prefix = 'by-GCM-fix' # no error, fixed scales
-)
-
-ggsave_tradeoff(
-  g = g + facet_wrap(~region, scales = 'free'),
-  prefix = 'by-GCM-free' # no error, fixed scales
-)
-
+# see pre 8/7/2025 commits
 
 # ** median and GCM level --------------------------------------------------
 # figure that shows the median results, and then faint GCM lines
@@ -533,7 +512,6 @@ ggsave_tradeoff(
 # (they're correlated so direction of effect isn't actually as uncertain
 # as they suggest)
 
-# continue here--make for core + grow and just core
 args <- list(
   rcp = c(rcps, rcps),
   xvar = c('percent_csa', 'percent_csa', 'percent_csagoa', 'percent_csagoa')
@@ -541,6 +519,7 @@ args <- list(
 
 xlabs <- c(percent_csa = '% Core Sagebrush Area',
            percent_csagoa = '% CSA + GOA')
+
 pmap(args, function(rcp, xvar) {
   df_med <- sei_pcent3 %>% 
     filter(RCP %in% c('Current', rcp))
@@ -557,14 +536,17 @@ pmap(args, function(rcp, xvar) {
               show.legend = FALSE) + # b/ different linewidth get's double plotted on legend +
     base_tradeoff(linetypes_scen = linetypes_scen,
                   xlab = xlabs[xvar]) +
-    facet_manual_region(legend.position.inside = c(.1, 0.15)) +
+    facet_manual_region(legend.position.inside = c(.1, 0.15),
+                        v = vr) +
     make_legend_small()
-  
+  g
   
   ggsave_tradeoff(
     g = g,
     xvar = str_replace(xvar, "percent_", ""),
-    prefix = paste0('med-GCM-fix-', rcp)
+    prefix = paste0('med-GCM-fix-', rcp, yr_lab),
+    height = 4.5*mr,
+    width = 7*mr
   )
 })
 
@@ -576,6 +558,21 @@ pmap(args, function(rcp, xvar) {
 args <- expand_grid(rcp = rcps,
                     # also show lines for each GCM
                     gcm_path = c(TRUE, FALSE))
+
+width_tradeoff <- 8
+height_tradeoff <- 7
+if(nr == 9) {
+  remove_x = 1:6
+  remove_y = c(2, 3, 5 , 6, 8, 9)
+} else if(nr == 5) {
+  remove_x = c(2, 3)
+  remove_y = c(2, 3, 5)
+  width_tradeoff <- 7
+  height_tradeoff <- 5
+} else {
+  stop('update')
+}
+
 pmap(args, function(rcp, gcm_path) {
   
   df_smry <- c3eco_smry3 %>% 
@@ -595,21 +592,23 @@ pmap(args, function(rcp, gcm_path) {
   bar_l <- area_bar_map(df_smry)
   plotsl1 <- tradeoff_lines_map(df_smry = df_smry,
                                 df_gcm = df_gcm,
+                                v = vr,
                                 gcm_path = gcm_path)
-  plotsl1 <- remove_axis_labels(plotsl1)
+
+  
+  plotsl1 <- remove_axis_labels(plotsl1, remove_x = remove_x, 
+                                remove_y = remove_y)
   plotsl2 <- map2(plotsl1, bar_l, tradeoff_add_inset) 
   
-  
-  comb <- combine_5_panels_labs(plotsl2,
+  comb <- combine_panels_labs(plotsl2,
                                 xlab = 'Mean Sagebrush Ecological Integrity',
                                 ylab = 'Expected burned area (%/year)')
   
   prefix <- if(gcm_path) '' else 'noGCM_'
 
   ggsave(paste0("figures/sei/tradeoff/", "sei", "-scd-adj-vs-ba_perc_dotplot_", 
-              'c3eco_', prefix, rcp, "_", suffix, ".png"), 
-         plot = comb, dpi = 600,
-         width = 7, height = 5)
+              'c3eco_', prefix, rcp, yr_lab, "_", suffix, ".png"), 
+         plot = comb, dpi = 600, width = width_tradeoff, height = height_tradeoff)
 })
 
 
@@ -709,7 +708,7 @@ plots <- map(rcp_year, function(x) {
 })
 
 pdf(paste0("figures/fire/area/expected_ba_vs_driver_by-GCM_", suffix, '.pdf'),
-    width = 13, height = 10)
+    width = 13, height = 10*mr)
 print(plots)
 dev.off()
 
@@ -877,7 +876,8 @@ pmap(args, function(rcp, region) {
   }
   
   ggsave(paste0("figures/fire/area/comb_ba-age-driver_", 
-                words2abbrev(region), "_", rcp, "_", v, "_", runv, '.png'),
+                words2abbrev(region), vr_name, "_", rcp, yr_lab, "_", v, "_", 
+                runv, '.png'),
          plot = g,
          height = 9, width = 5, dpi = 600)
 })

@@ -1356,9 +1356,15 @@ weight2area <- function(x) {
 }
 
 # extracts the first letter each word, to create abbreviations
+# keeps existing abbrevionts (WY Basin becomes 'WYB')
 words2abbrev <- function(x) {
-  stringr::str_extract_all(x, "\\b\\w") %>%
-    purrr::map_chr(~ paste0(toupper(.x), collapse = ""))
+  str_split(x, "\\s+") %>%
+    map_chr(~ {
+      abbrev <- map_chr(.x, function(word) {
+        if (str_detect(word, "^[A-Z]{2,}$")) word else str_to_upper(str_sub(word, 1, 1))
+      })
+      str_c(abbrev, collapse = "")
+    })
 }
 
 same_elem <- function(x, y) {

@@ -451,6 +451,7 @@ area_bar_map <- function(df_smry) {
 
 # make the tradeoff lines/point plot 
 tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim,
+                           v,
                            gcm_path = TRUE) {
   
   cols2 <- setNames(c3Palette, relable_c3_current(names(c3Palette)))
@@ -463,7 +464,8 @@ tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim,
     g <- g + geom_path(data = df_gcm_region, aes(group = rcp_year_c3_gcm, linetype = rcp_year),
                        linewidth = 0.2, alpha = 0.5) 
   }
-    
+  region_labeller <- region_labeller_factory(v = vr)
+  subtitle <- region_labeller(region)[[1]]
   g +  
     geom_path(aes(group = rcp_year_c3, linetype = rcp_year),
               linewidth = 1, alpha = 1) +
@@ -475,13 +477,13 @@ tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim,
     scale_shape_manual(values = unname(shapes_scen)[1:2], name = 'Climate scenario') +
         labs(x = 'Mean SEI',
          y = 'Expected burned area (%/year)',
-         subtitle = region_label(region))  +
+         subtitle = subtitle)  +
     coord_cartesian(xlim = xlim, ylim = ylim) +
     make_legend_small()
 }
 
 # map over region
-tradeoff_lines_map <- function(df_smry, df_gcm, gcm_path = TRUE) {
+tradeoff_lines_map <- function(df_smry, df_gcm, v, gcm_path = TRUE) {
   x <- df_smry$SEI_mean
   y <- df_smry$expected_ba_perc
   if(gcm_path) {
@@ -499,7 +501,7 @@ tradeoff_lines_map <- function(df_smry, df_gcm, gcm_path = TRUE) {
     df_gcm_region <- df_gcm %>% 
       filter(region == !!region)
     tradeoff_lines(df_smry_region, df_gcm_region, xlim = xlim, ylim = ylim,
-                   gcm_path = gcm_path)
+                   v = v, gcm_path = gcm_path)
   })
 }
 
@@ -559,15 +561,28 @@ combine_5_panels <- function(plots) {
                 axis_titles = 'collect')
 }
 
-# combine 5 panels, and add seperate plots that are
+combine_more_panels <- function(plots) {
+  stopifnot(length(plots) > 5)
+  l1 <- plots
+  comb <- wrap_plots(l1, nrow = 3, guides = 'collect') +
+    # thise axis collect only works if plots are not
+    # already patchwork combinations (e.g. plot with inset)
+    plot_layout(axes = 'collect',
+                axis_titles = 'collect')
+  
+  comb&theme(legend.position = 'right')
+}
+
+# combine panels, and add seperate plots that are
 # the y and x axis labels
 # this requires the axis labels of the individual
 # plots to already have been removed as needed
-combine_5_panels_labs <- function(plots, xlab, ylab) {
+combine_panels_labs <- function(plots, xlab, ylab) {
   y <- ylab_plot(ylab)
   x <- xlab_plot(xlab)
   
-  panels <- combine_5_panels(plots)
+  f <- if(length(plots) == 5) combine_5_panels else combine_more_panels
+  panels <- f(plots)
   
   # Combine y label + panels
   main <- wrap_plots(y, panels, ncol = 2, widths = c(0.02, 1))
@@ -1017,21 +1032,21 @@ png20panel <- function(filename) {
 }
 
 
-ggsave_tradeoff <- function(g, prefix, width = 7,
+ggsave_tradeoff <- function(g, prefix, width = 7, height = 4.5,
                             xvar = "csa") {
   ggsave(paste0("figures/sei/tradeoff/", xvar, "-scd-adj-vs-ba_perc_dotplot_", 
                 prefix, '_', suffix, ".png"), 
          plot = g, dpi = 600,
-         width = width, height = 4.5)
+         width = width, height = height)
 }
 
 ggsave_delta_prob <- function(plot, rcp, smry) {
   filename <- paste0('figures/fire/delta-prob/delta-prob_vs_delta-pred_', 
-                     smry, "_", rcp, "_", runv, '.png')
+                     smry, "_", vr_name, rcp, yr_lab, "_", runv, '.png')
   ggsave(
     filename = filename,
     plot = plot,
-    width = 13, height = 10,
+    width = 13, height = 10*mr,
     dpi = 600
   )
 }
