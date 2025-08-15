@@ -761,6 +761,16 @@ scaled_change_2var <- function(df,
   out
 }
 
+# helper: proportional change 
+prop_change <- function(fut, cur) {
+  stopifnot('SpatRaster' %in% class(fut))
+  diff <- fut - cur
+  prop <- diff/cur
+  # want 0/0 to be 0 (i.e. zero change when cur is 0)
+  prop <- ifel(diff == 0, 0, prop)
+  prop
+}
+
 # outliers ----------------------------------------------------------------
 
 #' remove outliers (mostly for plotting boxplots)

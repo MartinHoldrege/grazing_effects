@@ -26,6 +26,9 @@ ref_graze <- 'Moderate'
 rcps <- unique(scen_l$RCP)
 years <- opt$years
 
+# default should be true, false if just want to create output tables
+create_figs <- TRUE 
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -125,8 +128,37 @@ c3_graze_delta <- sei_pcent1 %>%
          delta_area_perc = delta_area/c3_area_ref*100)
 
 
-# boxplots ----------------------------------------------------------------
+# *format for output ------------------------------------------------------
+# versions for saving to output as summary stats
 
+c3_clim_delta_wide <- c3_clim_delta %>% 
+  mutate(delta_area_perc = round(delta_area_perc, digits = 1)) %>% 
+  pivot_wider(id_cols = c(region, run, graze, c3, RCP, years, c3_area_cur),
+              values_from = c(c3_area, delta_area, delta_area_perc),
+              names_from = summary) %>% 
+  arrange(RCP, years, region, graze, c3)
+
+c3_graze_delta_wide <- c3_graze_delta %>% 
+  mutate(delta_area_perc = round(delta_area_perc, digits = 1)) %>% 
+  pivot_wider(id_cols = c(region, run, graze, c3, RCP, years, c3_area_ref),
+              values_from = c(c3_area, delta_area, delta_area_perc),
+              names_from = summary) %>% 
+  arrange(RCP, years, region, graze, c3)
+
+
+# *save tables ------------------------------------------------------------
+
+p1 <- paste0('data_processed/area/c3/c3_clim_delta-area_', vr, '_', years, '_',
+            runv, '.csv')
+write_csv(c3_clim_delta_wide, p1)
+
+p2 <- paste0('data_processed/area/c3/c3_graze_delta-area_', vr, '_', years, '_',
+             runv, '.csv')
+write_csv(c3_graze_delta_wide, p2)
+
+
+# boxplots ----------------------------------------------------------------
+if(create_figs) {
 pfts <- c("Sagebrush", 'Pherb', 'Aherb')
 
 
@@ -425,3 +457,4 @@ plots1
 plots2
 dev.off()
 
+} # end create figs
