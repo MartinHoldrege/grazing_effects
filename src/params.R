@@ -14,7 +14,7 @@ option_list <- list(
   # version of region polygons to use (summaries made by regions)
   # r1.0 is 4 regions
   # r1.1 is 8 regions
-  optparse::make_option("--vr", type = "character", default = "r1.1"),
+  optparse::make_option("--vr", type = "character", default = "r1.0"),
   optparse::make_option("--years", type = "character", default = "2030-2060"),
   # included --test_run with no value forst test_run to be true
   # otherwise leave it out

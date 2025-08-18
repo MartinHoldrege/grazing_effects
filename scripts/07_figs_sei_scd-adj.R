@@ -5,8 +5,6 @@
 # Author: Martin Holdrege
 # Script Started: May 13, 2025
 
-# STOP still need to run for mid r1.1
-
 # params ------------------------------------------------------------------
 
 source("src/params.R")
@@ -132,19 +130,22 @@ c3_graze_delta <- sei_pcent1 %>%
 # versions for saving to output as summary stats
 
 c3_clim_delta_wide <- c3_clim_delta %>% 
-  mutate(delta_area_perc = round(delta_area_perc, digits = 1)) %>% 
+  mutate(delta_area_perc = round(delta_area_perc, digits = 1),
+         across(.cols = c(delta_area, c3_area, c3_area_cur),
+                             .fns = round)) %>% 
   pivot_wider(id_cols = c(region, run, graze, c3, RCP, years, c3_area_cur),
               values_from = c(c3_area, delta_area, delta_area_perc),
               names_from = summary) %>% 
   arrange(RCP, years, region, graze, c3)
 
 c3_graze_delta_wide <- c3_graze_delta %>% 
-  mutate(delta_area_perc = round(delta_area_perc, digits = 1)) %>% 
+  mutate(delta_area_perc = round(delta_area_perc, digits = 1),
+         across(.cols = c(delta_area, c3_area, c3_area_ref),
+                .fns = round)) %>% 
   pivot_wider(id_cols = c(region, run, graze, c3, RCP, years, c3_area_ref),
               values_from = c(c3_area, delta_area, delta_area_perc),
               names_from = summary) %>% 
   arrange(RCP, years, region, graze, c3)
-
 
 # *save tables ------------------------------------------------------------
 
@@ -155,7 +156,6 @@ write_csv(c3_clim_delta_wide, p1)
 p2 <- paste0('data_processed/area/c3/c3_graze_delta-area_', vr, '_', years, '_',
              runv, '.csv')
 write_csv(c3_graze_delta_wide, p2)
-
 
 # boxplots ----------------------------------------------------------------
 if(create_figs) {
@@ -295,6 +295,27 @@ map(rcps, function(rcp) {
          dpi = 600, height = height10, width = width10)
 
 })
+
+
+
+# *stacked bar ------------------------------------------------------------
+
+# dimensions (match your style above) -----------------------------------
+widthr  <- if (nr <= 6) 6.3 else 7
+heightr <- if (nr <= 6) 6 else 7
+
+# build & save for each target RCP --------------------------------------
+purrr::walk(rcps, function(rcp) {
+  suffix2 <- paste0(vr, "_", rcp, '_', years,   "_", runv)
+  g_stack <- make_stacked_c3_panels(sei_pcent1, rcp = rcp, vr = vr)
+  
+  ggsave(
+    filename = paste0("figures/sei/c3_area/c3-bar-stack_abs-area_by-region_", suffix2, ".png"),
+    plot = g_stack,
+    dpi = 600, height = heightr, width = widthr
+  )
+})
+
 
 # c9 area barcharts -------------------------------------------------------
 

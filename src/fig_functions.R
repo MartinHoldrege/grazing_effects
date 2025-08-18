@@ -275,6 +275,9 @@ weighted_violin1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
 }
 
 
+
+
+
 #' side-by side boxplots of absolute and change values by PFT, by grazing intensity
 #'
 #' @param df_abs dataframe of historical conditions
@@ -351,6 +354,105 @@ box_abs_diff <- function(df_abs,
   comb&theme(legend.position = "bottom")
 }
 
+# *stacked bar ------------------------------------------------------------
+
+# Stacked bars (% left axis, area right axis), dodged by grazing scenario.
+# One row per ecoregion; within the row, two panels: Current vs chosen RCP.
+# Each panel gets its own right-side axis transform using its area_region.
+
+
+#' @title Build a stacked bar panel of SEI classes
+#' @description Creates a stacked bar chart for one region × climate facet (e.g. Current or RCP scenario),
+#' with left axis showing % of region and right axis showing area in ha.
+#' @param df_panel Data frame filtered to one region and one climate facet. Must contain:
+#'   \code{graze}, \code{c3_percent} (0–100), \code{c3} (SEI class), and \code{area_region}.
+#' @param area_total Numeric, total area of the region in ha.
+#' @param legend.position.inside Numeric vector of length 2 giving legend position inside plot.
+stacked_panel <- function(df_panel,  area_total,
+                          legend.position.inside = c(0.08, 0.2)) {
+  # df_panel: filtered to one region & one climate facet (Current or future)
+  # expects columns: graze, c3_percent, c3, area_region
+  df_panel$c3 <- forcats::fct_rev(df_panel$c3) # so CSA at bottom of stack
+  ggplot(df_panel, aes(x = graze, y = c3_percent, fill = c3)) +
+    geom_col(position = 'stack') +
+    adjust_graze_x_axis() +
+    scale_fill_manual(values = cols_c3, name = lab_c3) +
+    scale_y_continuous(
+      name = NULL,
+      expand = expansion(mult = c(0, 0.02)),
+      sec.axis = sec_axis(~ . * area_total / 100,
+                          name = NULL,
+                          labels = \(x) x/1e6 # convert to millions ha
+      )  
+    ) +
+    theme(
+      legend.position = "bottom",
+      legend.direction = "vertical",
+      # shrink subtitle
+      plot.subtitle = element_text(size = 9, margin = margin(b = 1)),
+      # move facet strip text closer to plot
+      strip.text = element_text(size = 8, margin = margin(b = 1, t = 1)),
+      # reduce panel spacing between facets
+      panel.spacing.x = unit(0, "lines"),
+      panel.spacing.y = unit(0, "lines"),
+      # shrink plot margins
+      plot.margin = margin(2, 3, 2, 2)
+    )+
+    facet_wrap(~rcp_year) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    labs(x = NULL)
+}
+
+# main builder for one RCP across all regions 
+#' @title Build stacked SEI class panels for all regions
+#' @description Builds a patchwork of stacked_panel plots for each region, showing Current vs selected RCP scenario.
+#' @param rcp Character, the RCP scenario to plot (must be present in \code{sei_pcent1}).
+#' @return A patchwork object combining all regions  with a shared legend.
+make_stacked_c3_panels <- function(df, rcp, vr) {
+  
+  # filter to median summary and to Current vs selected rcp
+  df0 <- df %>%
+    filter(summary == "median",
+           RCP %in% c("Current", rcp)) %>%
+    arrange(region, graze, RCP, years)
+  
+  # collect region order & labels
+  regions <- levels(df0$region)
+  region_label <- region_label_factory(v = vr)
+  # build per-region patchwork rows
+  plots <- purrr::map(regions, function(rr) {
+    
+    # split to current and selected future for this region
+    d_reg <- filter(df0, region == rr)
+    area_total <- unique(d_reg$area_region)
+    stopifnot(length(area_total) == 1)
+    # two panels for this region
+    g1 <- stacked_panel(df_panel = d_reg, area_total = area_total)
+    
+    title <- region_label(rr)
+    g1 + 
+      labs(subtitle = title)
+  })
+  
+  if(nr == 9) {
+    remove_x = 1:6
+    remove_y = c(2, 3, 5, 6, 8, 9)
+  } else if (nr == 5) {
+    remove_x = c(2, 3)
+    remove_y = c(2, 3, 5)
+  } else {
+    remove_x = NULL
+    remove_y = NULL
+  }
+  
+  plots <- remove_axis_labels(plots, remove_x = remove_x, 
+                              remove_y = remove_y)
+  
+  combine_panels_labs(plots, xlab = lab_graze, ylab = lab_areaperc0b, 
+                      ylab_sec = lab_areaha0,
+                      axes = NULL)
+  
+}
 
 # dot plots ---------------------------------------------------------------
 
@@ -550,24 +652,25 @@ combine_grid_panels1 <- function(l, remove_y_axis_labels = TRUE) {
 }
 
 
-combine_5_panels <- function(plots) {
+combine_5_panels <- function(plots, axes = 'collect') {
   stopifnot(length(plots) == 5)
   l1 <- c(plots[1:3], list(patchwork::guide_area()),
           plots[4:5])
   wrap_plots(l1, nrow = 2, guides = 'collect') +
     # thise axis collect only works if plots are not
     # already patchwork combinations (e.g. plot with inset)
-    plot_layout(axes = 'collect',
+    plot_layout(axes = axes,
                 axis_titles = 'collect')
 }
 
-combine_more_panels <- function(plots) {
+combine_more_panels <- function(plots, axes = 'collect',
+                                guides = 'collect') {
   stopifnot(length(plots) > 5)
   l1 <- plots
-  comb <- wrap_plots(l1, nrow = 3, guides = 'collect') +
+  comb <- wrap_plots(l1, nrow = 3, guides = guides) +
     # thise axis collect only works if plots are not
     # already patchwork combinations (e.g. plot with inset)
-    plot_layout(axes = 'collect',
+    plot_layout(axes = axes,
                 axis_titles = 'collect')
   
   comb&theme(legend.position = 'right')
@@ -577,16 +680,31 @@ combine_more_panels <- function(plots) {
 # the y and x axis labels
 # this requires the axis labels of the individual
 # plots to already have been removed as needed
-combine_panels_labs <- function(plots, xlab, ylab) {
+combine_panels_labs <- function(plots, xlab, ylab, ylab_sec = NULL, ...) {
   y <- ylab_plot(ylab)
   x <- xlab_plot(xlab)
   
   f <- if(length(plots) == 5) combine_5_panels else combine_more_panels
-  panels <- f(plots)
+  panels <- f(plots, ...)
   
   # Combine y label + panels
-  main <- wrap_plots(y, panels, ncol = 2, widths = c(0.02, 1))
-  
+  if(!is.null(ylab_sec)) {
+    y_sec <- ylab_plot(ylab_sec, secondary = TRUE)
+    if(length(plots) == 5) {
+      main <- wrap_plots(y, panels, y_sec, ncol = 3, widths = c(0.02, 1, 0.02))
+    } else {
+      panels <- f(plots, guides = NULL, ...)
+      main <- patchwork::wrap_plots(
+        y, panels, y_sec, patchwork::guide_area(),
+        ncol = 4,
+        widths = c(0.02, 1, 0.02, 0.14),
+        guides = "collect"
+      ) & theme(legend.position = "right")
+    }
+
+  } else {
+    main <- wrap_plots(y, panels, ncol = 2, widths = c(0.02, 1))
+  }
   # Combine with x label
   final <- wrap_plots(main, x, ncol = 1, heights = c(1, 0.02))
   final
@@ -636,7 +754,7 @@ remove_axis_labels <- function(plots,
   })
   
   plots[remove_y] <- map(plots[remove_y], function(g) {
-    g + theme(axis.text.y = element_blank())
+    g + theme(axis.text.y.left = element_blank())
   })
   # remove all axis titles
   plots <- map(plots, function(g) {
@@ -656,16 +774,20 @@ xlab_plot <- function(xlab = '', ...) {
     )
 }
 
-ylab_plot <- function(ylab = '', ...) {
-  ggplot() + 
-    theme_void() + 
+ylab_plot <- function(ylab = '', secondary = FALSE, ...) {
+  ggplot() +
+    theme_void() +
     labs(y = ylab) +
     theme(
       plot.margin = margin(0, 0, 0, 0),
-      axis.title.y = element_text(angle = 90),
+      axis.title.y = element_text(
+        angle = if (secondary) 270 else 90
+      ),
       ...
     )
 }
+
+
 
 # funs for scatterplots ---------------------------------------------------
 

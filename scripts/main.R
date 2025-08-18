@@ -63,8 +63,8 @@ uu <- function(x) unname(unlist(x))
 # callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_end)) 
 
 for(script in scripts_vr_yr) {
-  callr::rscript(script, cmdargs = uu(arg_list_end))
-  callr::rscript(script, cmdargs = uu(arg_list_mid))
+  # callr::rscript(script, cmdargs = uu(arg_list_end))
+  # callr::rscript(script, cmdargs = uu(arg_list_mid))
   callr::rscript(script, cmdargs = uu(arg_list_r1.0_end))
   callr::rscript(script, cmdargs = uu(arg_list_r1.0_mid))
 }
