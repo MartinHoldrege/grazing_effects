@@ -99,11 +99,27 @@ stopifnot(all.equal(sum(test), 1))
 
 stopifnot(isTRUE(same.crs(r_prob_gcm1, vect(eco1))))
 
-# expected burned area ----------------------------------------------------
+# area by ecoregion -------------------------------------------------------
 
 area <- cellSize(r_prob_gcm1[[1]], unit = 'ha', transform = FALSE)
 varnames(area) <- 'cellSize'
 
+# for % of area calculations
+mask <- r_prob_gcm1[[1]]
+mask[!is.na(mask)] <- 1
+area_masked <- mask(area, mask)
+
+area_eco <- terra::extract(
+  area_masked,
+  vect(eco1),         
+  fun = sum,
+  na.rm = TRUE, 
+  touches = FALSE
+)
+area_eco$ecoregion <- eco1$ecoregion
+area_eco$ID <- NULL
+
+# expected burned area ----------------------------------------------------
 
 # * gcm-wise --------------------------------------------------------------
 
@@ -156,13 +172,17 @@ ba_eco_smry2 <- ba_eco_smry1 %>%
                names_to = 'id',
                values_to = 'area') %>% 
   left_join(info_smry1, by = 'id') %>% 
-  select(-id)
+  select(-id) %>% 
+  left_join(area_eco, by = 'ecoregion', suffix = c('', '_total')) %>% 
+  mutate(area_perc = area/area_total*100) 
+
 
 ba_eco_smry3 <- ba_eco_smry2 %>% 
-  pivot_wider(values_from = 'area',
-              names_from = 'summary',
-              names_prefix = 'area_') %>% 
+  pivot_wider(values_from = c('area', 'area_perc'),
+              names_from = 'summary') %>% 
   select(-type)
+
+stopifnot(all(!is.na(ba_eco_smry3$area_perc_median)))
 
 # * by current SEI class --------------------------------------------------
 
@@ -282,22 +302,6 @@ area_age_group3_pw <- area_age_group2_pw %>%
   pivot_wider(values_from = 'area',
               names_from = 'summary',
               names_prefix = 'area_')
-
-# area by ecoregion -------------------------------------------------------
-# for % of area calculations
-mask <- r_prob_gcm1[[1]]
-mask[!is.na(mask)] <- 1
-area_masked <- mask(area, mask)
-
-area_eco <- terra::extract(
-  area_masked,
-  vect(eco1),         
-  fun = sum,
-  na.rm = TRUE, 
-  touches = FALSE
-)
-area_eco$ecoregion <- eco1$ecoregion
-area_eco$ID <- NULL
 
 
 # save output -------------------------------------------------------------
