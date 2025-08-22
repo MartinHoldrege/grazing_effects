@@ -18,7 +18,8 @@ scripts_vr_yr <- c(
 scripts_vr <- c(
   # 'scripts/04_interpolation_weights.R'
   # 'scripts/04_summarize_fire_drivers.R'
-  'scripts/06_fire_area.R'
+  #'scripts/06_fire_area.R',
+  'scripts/07_fire_area_summaries.R'
 )
 
 # to run for all combinations of vr and years
