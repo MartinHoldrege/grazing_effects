@@ -25,7 +25,7 @@ rcps <- unique(scen_l$RCP)
 years <- opt$years
 
 # default should be true, false if just want to create output tables
-create_figs <- TRUE 
+create_figs <- FALSE
 
 # dependencies ------------------------------------------------------------
 
@@ -35,7 +35,7 @@ source("src/fig_params.R")
 source("src/fig_functions.R")
 source("src/general_functions.R")
 source("src/SEI_functions.R")
-
+source('src/mapping_functions.R')
 theme_set(theme_custom1())
 
 # Read in data ------------------------------------------------------------
@@ -70,6 +70,11 @@ ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_",
 # percent core and grow areas by region for low, median, and high SEI (across GCMs)
 sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name, yr_lab,
                              '_sei-class-pcent-long_scd-adj_summaries_by-ecoregion.csv'))
+
+# % core and grow by GCM
+c3_gcm1 <- read_csv(paste0("data_processed/raster_means/", 
+                            runv, yr_lab, vr_name, 
+                            "_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv"))
 
 # create in "scripts/06_summarize_sei_scd-adj.R"
 # area in each of 9 climate caused SEI class change categories
@@ -112,18 +117,58 @@ c3_clim_delta <- sei_pcent1 %>%
          # % change in area each c3 class
          delta_area_perc = delta_area/c3_area_cur*100)
 
-# change in area of each sei class relative to reference grazing level
-c3_graze_delta <- sei_pcent1 %>% 
+# * change in area of each sei class relative to reference grazing level
+c3_gcm2 <- c3_gcm1 %>% 
+  mutate(percent_ora = 100 - percent_csa - percent_goa) %>% 
+  pivot_longer(cols = matches('percent_'),
+               names_to = 'c3',
+               values_to = 'c3_percent') %>% 
+  mutate(c3 = str_to_upper(str_extract(c3, '[a-z]{3}$')),
+         c3_area = c3_percent * area) %>% 
+  select(-SEI_mean, -area, -group, -type, -id, -c3_percent)
+
+c3_gcm3 <- c3_gcm2 %>% 
   filter(graze == ref_graze) %>% 
-  select(-area_region, -c3_percent, -graze) %>% 
-  right_join(
-    filter(sei_pcent1, graze != ref_graze),
-    by = c('region', 'c3', 'run', 'RCP', 'years', 'rcp_year', 'summary'),
-    suffix = c('_ref', '')) %>% 
-  select(-c3_percent) %>% 
+  select(-graze) %>% 
+  right_join(filter(c3_gcm2, graze != ref_graze),
+         by = c('region', 'c3', 'run', 'RCP', 'years', 'GCM'),
+         suffix = c('_ref', '')) %>% 
+  # across grazing delta
   mutate(delta_area = c3_area - c3_area_ref,
-         # % change in area each c3 class
-         delta_area_perc = delta_area/c3_area_ref*100)
+         delta_area_perc = (delta_area)/c3_area_ref*100) 
+
+# summarize across gcms
+# gcm-wise summaries b/ comparing within a climate scenario
+c3_graze_delta0 <- c3_gcm3 %>% 
+  group_by(region, run, RCP, years, c3, graze) %>% 
+  summarise(across(.cols = c('delta_area_perc'),
+                   .fns = list(
+                     'median' = median,
+                     'low' = calc_low,
+                     'high' = calc_high
+                   )),
+            .groups = 'drop') %>% 
+  pivot_longer(cols = matches('delta_area_perc'),
+               values_to = 'delta_area_perc',
+               names_to = 'summary',
+               names_prefix = 'delta_area_perc_') %>% 
+  df_factor() %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE, 
+                              add_newline = TRUE))
+
+# joining in the absolute values that correspond to the % change summaries
+# across GCMs [this approach means the summary applies to % change
+# the other numbers (absolute area change) are secondary]
+c3_graze_delta <- c3_graze_delta0 %>% 
+  left_join(c3_gcm3, 
+            by = join_by(region, run, RCP, years, c3, graze, delta_area_perc))
+
+
+stopifnot(
+  # check for for any multiple to one matches
+  nrow(c3_graze_delta) == nrow(c3_graze_delta0),
+  # check that all % change values are their 
+          all(!is.na(filter(c3_graze_delta, RCP != 'Current'))))
 
 
 # *format for output ------------------------------------------------------
@@ -149,11 +194,13 @@ c3_graze_delta_wide <- c3_graze_delta %>%
 
 # *save tables ------------------------------------------------------------
 
-p1 <- paste0('data_processed/area/c3/c3_clim_delta-area_', vr, '_', years, '_',
+# pixelwise summaries across GCMs
+p1 <- paste0('data_processed/area/c3/c3_clim_delta-area_pw_', vr, '_', years, '_',
             runv, '.csv')
 write_csv(c3_clim_delta_wide, p1)
 
-p2 <- paste0('data_processed/area/c3/c3_graze_delta-area_', vr, '_', years, '_',
+# gcm-wise (gw)
+p2 <- paste0('data_processed/area/c3/c3_graze_delta-area_gw_', vr, '_', years, '_',
              runv, '.csv')
 write_csv(c3_graze_delta_wide, p2)
 
