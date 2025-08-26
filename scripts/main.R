@@ -7,11 +7,6 @@
 
 # list scripts ------------------------------------------------------------
 
-# scripts that need to be run for different time-periods
-scripts_vr_yr <- c(
-  'scripts/05_interpolated_summarize_sei_scd-adj.R'
-  # 'scripts/06_summarize_sei_scd-adj.R',
-)
 
 # scripts the need to be run seperately for each version of the
 # ecoregions, # but not years
@@ -19,13 +14,15 @@ scripts_vr <- c(
   # 'scripts/04_interpolation_weights.R'
   # 'scripts/04_summarize_fire_drivers.R'
   #'scripts/06_fire_area.R',
-  'scripts/07_fire_area_summaries.R'
+  # 'scripts/07_fire_area_summaries.R'
 )
 
 # to run for all combinations of vr and years
 scripts_vr_yr <- c(
+  #'scripts/05_interpolated_summarize_sei_scd-adj.R'
+  # 'scripts/06_summarize_sei_scd-adj.R',
   # 'scripts/07_bio_figs_weighted.R',
-  #'scripts/07_figs_sei_scd-adj.R'
+  'scripts/07_figs_sei_scd-adj.R'
   #'scripts/08_fire_area_figs.R'
 )
 

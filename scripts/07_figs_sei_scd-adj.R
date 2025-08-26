@@ -25,7 +25,7 @@ rcps <- unique(scen_l$RCP)
 years <- opt$years
 
 # default should be true, false if just want to create output tables
-create_figs <- FALSE
+create_figs <- TRUE
 
 # dependencies ------------------------------------------------------------
 
@@ -152,7 +152,6 @@ c3_graze_delta0 <- c3_gcm3 %>%
                values_to = 'delta_area_perc',
                names_to = 'summary',
                names_prefix = 'delta_area_perc_') %>% 
-  df_factor() %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE, 
                               add_newline = TRUE))
 
@@ -161,7 +160,8 @@ c3_graze_delta0 <- c3_gcm3 %>%
 # the other numbers (absolute area change) are secondary]
 c3_graze_delta <- c3_graze_delta0 %>% 
   left_join(c3_gcm3, 
-            by = join_by(region, run, RCP, years, c3, graze, delta_area_perc))
+            by = join_by(region, run, RCP, years, c3, graze, delta_area_perc)) %>% 
+  df_factor()
 
 
 stopifnot(
@@ -187,7 +187,7 @@ c3_graze_delta_wide <- c3_graze_delta %>%
   mutate(delta_area_perc = round(delta_area_perc, digits = 1),
          across(.cols = c(delta_area, c3_area, c3_area_ref),
                 .fns = round)) %>% 
-  pivot_wider(id_cols = c(region, run, graze, c3, RCP, years, c3_area_ref),
+  pivot_wider(id_cols = c(region, run, graze, c3, RCP, years, rcp_year),
               values_from = c(c3_area, delta_area, delta_area_perc),
               names_from = summary) %>% 
   arrange(RCP, years, region, graze, c3)
@@ -239,8 +239,8 @@ dev.off()
 
 base_bar <- function() {
   list(geom_bar(aes(x = graze, 
-                    fill = c3), 
-                stat = 'identity', position = position_dodge2()),
+                    fill = c3), width = 0.75,
+                stat = 'identity', position = position_dodge2(padding = 0)),
        adjust_graze_x_axis(),
        scale_fill_manual(values = cols_c3,
                          name = lab_c3)
@@ -313,37 +313,48 @@ map(rcps, function(rcp) {
   
   # change in c3 area relative to moderate grazing 
   # within a climate scenario
-  df <- c3_graze_delta %>% 
-    filter(RCP %in% c('Current', rcp),
-           summary == 'median') 
+  df <- c3_graze_delta_wide %>% 
+    filter(RCP %in% c('Current', rcp)) 
   
-  g <- ggplot(df, aes(y = delta_area)) +
-    hline()+
-    base_bar() +
-    facet_grid(region ~rcp_year, scales = 'free_y') +
-    labs(y = paste('Change in SEI class area relative to',
-                   str_to_lower(ref_graze), 'grazing (ha)'))
-  
-  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area_by-region',
-                suffix, '.png'),
-         plot = g,
-         dpi = 600, height = height10, width = width10)
-  
-  g <- ggplot(df, aes(y = delta_area_perc)) +
+  # g <- ggplot(df, aes(y = delta_area)) +
+  #   hline()+
+  #   base_bar() +
+  #   facet_grid(region ~rcp_year, scales = 'free_y') +
+  #   labs(y = paste('Change in SEI class area relative to',
+  #                  str_to_lower(ref_graze), 'grazing (ha)'))
+  # 
+  # ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area_by-region',
+  #               suffix, '.png'),
+  #        plot = g,
+  #        dpi = 600, height = height10, width = width10)
+
+  g <- ggplot(df, aes(y = delta_area_perc_median)) +
     hline()+
     base_bar() +
     facet_grid(region ~rcp_year) +
     labs(y = paste('Change in SEI class area relative to',
                    str_to_lower(ref_graze), 'grazing (%)'))
-  
-  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area-perc_by-region',
+
+  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area-perc-gw_by-region',
                 suffix, '.png'),
          plot = g,
          dpi = 600, height = height10, width = width10)
+  
+  g <- df %>% 
+    filter(region == levels(region)[1]) %>% 
+    ggplot(aes(y = delta_area_perc_median)) +
+    hline()+
+    base_bar() +
+    facet_grid(~rcp_year) +
+    labs(y = paste('Change in SEI class area relative to',
+                   str_to_lower(ref_graze), 'grazing (%)'))
+  
+  ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area-perc-gw_entire_', 
+                rcp, yr_lab, "_", runv, '.png'),
+         plot = g,
+         dpi = 600, height = 5, width = 7)
 
 })
-
-
 
 # *stacked bar ------------------------------------------------------------
 
