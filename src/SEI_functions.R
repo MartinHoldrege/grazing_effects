@@ -375,4 +375,36 @@ load_scd_q <- function() {
   terra::rast('data_processed/scd/SEI-Q_v11_2017-2020_1000.tif')
 }
 
-
+#' relativize proportional change in q
+#'
+#' @param qprop proportional change in q
+#' @param sei_diff change in sei (for those same scenarios)
+#' @param info info for the qprop layers, so can group
+#' @param id name of the id column in info
+#'
+#' @returns
+#' spatraster showing relative (0-1) proportional change
+#' in q, change is 0 if in opposite direction of SEI change
+relativize_q_prop <- function(qprop, sei_diff, info, id) {
+  q <- qprop
+  s <- sei_diff
+  stopifnot(nlyr(s) == nlyr(q))
+  # only considering proportional change in Q when 
+  # it is in the same direction as the change in SEI (i.e.
+  # it contributed to that directional sei change)
+  q2 <- ifel((q > 0 & s > 0)| (q < 0 & s < 0), q, 0)
+  q3 <- abs(q2)
+  
+  info %>% 
+    group_by(run, RCP, years, GCM, graze) %>% 
+    group_split() %>% 
+    map(function(df) {
+      r <- q3[[df[[id]]]]
+      stopifnot(nlyr(r) == 3)
+      r_sum <- app(r, fun = sum, na.rm = TRUE)
+      # reletavize the proportional change in Q
+      # (so max is 1)
+      r/r_sum
+    }) %>% 
+    rast()
+}
