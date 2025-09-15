@@ -17,12 +17,18 @@ scripts_vr <- c(
   # 'scripts/07_fire_area_summaries.R'
 )
 
+# scripts that need to be run seperately for each set of years
+# but not ecoregion versions
+scripts_yr <- c(
+  "scripts/06_sei_attribution.R"
+)
+
 # to run for all combinations of vr and years
 scripts_vr_yr <- c(
   #'scripts/05_interpolated_summarize_sei_scd-adj.R'
   # 'scripts/06_summarize_sei_scd-adj.R',
   # 'scripts/07_bio_figs_weighted.R',
-  'scripts/07_figs_sei_scd-adj.R'
+  #'scripts/07_figs_sei_scd-adj.R'
   #'scripts/08_fire_area_figs.R'
 )
 
@@ -46,24 +52,18 @@ uu <- function(x) unname(unlist(x))
 
 # run scripts -------------------------------------------------------------
 
-# scripts that have years compontent (i.e. are run for only one time-period,
-# at a time
-# callr::rscript(scripts_vr_yr, cmdargs = uu(arg_list_end)) 
-#callr::rscript(scripts_vr_yr, cmdargs = uu(arg_list_mid))
-
-
-
-# have run
-# callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_end)) 
-# callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) 
-# callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
-# callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) # done
-# callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_end)) 
 
 if(length(scripts_vr) > 0) {
   for(script in scripts_vr) {
     callr::rscript(script, cmdargs = uu(arg_list_r1.0_end))
     callr::rscript(script, cmdargs = uu(arg_list_end))
+  }
+}
+
+if(length(scripts_yr) > 0) {
+  for(script in scripts_yr) {
+    callr::rscript(script, cmdargs = uu(arg_list_end))
+    callr::rscript(script, cmdargs = uu(arg_list_mid))
   }
 }
 
@@ -75,11 +75,3 @@ if(length(scripts_vr_yr) > 0) {
     callr::rscript(script, cmdargs = uu(arg_list_r1.0_mid))
   }
 }
-# r1.0 --------------------------------------------------------------------
-
-arg_list_mid$vr <- "--vr=r1.0"
-# callr::rscript('scripts/05_interpolated_summarize_sei_scd-adj.R', 
-#                cmdargs = uu(arg_list_r1.0_mid)) 
-# callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
-# callr::rscript('scripts/06_summarize_sei_scd-adj.R', cmdargs = uu(arg_list_mid))
-#callr::rscript('scripts/07_figs_sei_scd-adj.R', cmdargs = uu(arg_list_mid)) 

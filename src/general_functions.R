@@ -1386,3 +1386,9 @@ replace_from_to <- function(x, from, to) {
   out[is.na(out)] <- x[is.na(out)]
   out
 }
+
+names_replace <- function(x, pattern, replacement) {
+  nms <- names(x)
+  names(x) <- stringr::str_replace(nms, pattern, replacement)
+  x
+}

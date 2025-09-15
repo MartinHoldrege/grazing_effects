@@ -10,7 +10,7 @@ source("src/params.R")                     # defines opt (run, v_interp, years, 
 v_interp <- opt$v_interp
 run      <- opt$run
 years    <- opt$years
-test_run <- TRUE # opt$test_run
+test_run <- opt$test_run
 yr_lab   <- opt$yr_lab                     # empty by default (see params.R)
 runv     <- paste0(run, v_interp)
 
@@ -94,10 +94,9 @@ info_pair_sei_clim <- info_sei %>%
 # Q
 info_pair_gref <- info %>%
   filter(graze == graze_ref) %>%
-  select(-graze) %>% 
+  select(-graze, -id_noGCM) %>% 
   right_join(filter(info, graze != graze_ref),suffix = c('_ref', ''),
-            by = join_by(run, PFT, RCP, years, GCM)) %>% 
-  select(-matches('id_noGCM'))
+            by = join_by(run, PFT, RCP, years, GCM)) 
 
 # SEI
 info_pair_sei_gref <- info_sei %>% 
@@ -124,13 +123,10 @@ q_prop1 <- prop_change(fut = r_q[[info_pair$id_fut]],
                        cur = r_q[[info_pair$id_cur]])
 
 info_pair2 <- info_pair_sei_clim %>% 
-  select(-id_cur) %>% 
+  select(-id_cur, -id_noGCM) %>% 
   rename(id_fut_sei = id_fut) %>% 
   right_join(info_pair, 
              by = join_by(run, graze, RCP, years, GCM))
-
-q <- q_prop1[[info_pair2$id_fut]]
-s <- sei_delta_clim1[[info_pair2$id_fut_sei]]
 
 # only considering proportional change in Q when 
 # it is in the same direction as the change in SEI (i.e.
@@ -141,6 +137,12 @@ q_prop_rel1 <- relativize_q_prop(
   sei_diff = sei_delta_clim1[[info_pair2$id_fut_sei]],
   info = info_pair2,
   id = 'id_fut')
+
+# calculating the mean instead of median as in Holdrege et al. b/ 
+# then each sums to 1 (for RGB map making)
+q_prop_rel_smry <- info_pair2 %>% 
+  rename(id = id_fut) %>% 
+  raster_gcm_smry(r = q_prop_rel1,fun = 'mean')
 
 # sei change mask (within climate) --basing on median change
 info_sei_diff_clim_smry <- create_rast_info(sei_diff_clim_smry1, 
@@ -160,7 +162,7 @@ q_prop_gref1 <- prop_change(fut = r_q[[info_pair_gref$id]],
                        cur = r_q[[info_pair_gref$id_ref]])
 
 info_pair_gref2 <- info_pair_sei_gref %>% 
-  select(-id_ref) %>% 
+  select(-id_ref, -id_noGCM) %>% 
   rename(id_sei = id) %>% 
   right_join(info_pair_gref, 
              by = join_by(run, graze, RCP, years, GCM))
@@ -173,18 +175,14 @@ q_prop_rel_gref1 <- relativize_q_prop(
   info = info_pair_gref2,
   id = 'id')
 
+# calculating the mean instead of median as in Holdrege et al. b/ 
+# then each sums to 1 (for RGB map making)
+q_prop_rel_gref_smry <- raster_gcm_smry(info_pair_gref, r = q_prop_rel_gref1,
+                                        fun = 'mean')
+
 # median SEI change in response grazing
-sei_diff_gref_smry <- info_pair_sei_gref %>% 
-  group_by(id_noGCM) %>% 
-  group_split() %>% 
-  map(\(df) {
-    stopifnot(nrow(df) %in% c(1, 13))
-    r <- sei_delta_gref1[[df$id]]
-    out <- app(r, 'median')
-    names(out) <- unique(df$id_noGCM)
-    out
-  }) %>% 
-  rast()
+sei_diff_gref_smry <- raster_gcm_smry(info = info_pair_sei_gref, r = sei_delta_gref1, 
+                        fun = 'median')
 
 
 sei_diff_gref_mask <- ifel(abs(sei_diff_gref_smry) >= diff_cutoff, 1, 0)
@@ -197,32 +195,10 @@ sei_diff_gref_mask <- ifel(abs(sei_diff_gref_smry) >= diff_cutoff, 1, 0)
 
 info_fut_l <- prepare_info_dom(info_fut)  
 
-q_dom1 <- map(info_fut_l, function(df) {
-  r <- q_prop3[[df$id]]
-    # warnings here are normal
-  out <- which.max(r)
-  names(out) <- unique(df$id_noPFT)
-  out
-})
-
-q_dom2 <- rast(q_dom1)
-
-
 # **mode across GCMs -------------------------------------------------------
 
-info_fut_dom_l <- bind_rows(info_fut_l) %>% 
-  select(-PFT, -id, -id_noGCM) %>% 
-  distinct() %>% 
-  group_by(id_noGCMPFT) %>% 
-  group_split()
-
-q_dom3 <- map(info_fut_dom_l, \(df) {
-  stopifnot(nrow(df) == 13)
-  r <- modal(q_dom2[[df$id_noPFT]])
-  names(r) <- unique(df$id_noGCMPFT)
-  r
-}) %>% 
-  rast()
+# calculate dominant driver and then take the mode
+q_dom3 <- dom_driver_mode(info_fut_l, q_prop_rel1)
 
 # then mask locations with less than 0.01 change in SEI
 tmp <- filter(info_sei_diff_clim_smry, summary == 'median',
@@ -230,7 +206,7 @@ tmp <- filter(info_sei_diff_clim_smry, summary == 'median',
   select(RCP, years, graze, id) %>% 
   rename(id_sei = id)
 
-info_fut_dom_smry <- info_fut_dom_l %>% 
+info_fut_dom_smry <- prepare_info_dom_mode(info_fut_l) %>% 
   bind_rows() %>% 
   select(run, RCP, years, graze, id_noGCMPFT) %>% 
   distinct() %>% 
@@ -262,40 +238,17 @@ names(q_dom5) <- names(q_dom4)
 
 info_gref_l <- prepare_info_dom(info_pair_gref2)
 
-q_dom_gref1 <- map(info_gref_l, function(df) {
-  r <- q_prop_rel1[[df$id]]
-  # warnings here are normal
-  out <- which.max(r)
-  names(out) <- unique(df$id_noPFT)
-  out
-})
-
-q_dom2 <- rast(q_dom1)
-
-
 # **mode across GCMs -------------------------------------------------------
 
-info_fut_dom_l <- bind_rows(info_fut_l) %>% 
-  select(-PFT, -id, -id_noGCM) %>% 
-  distinct() %>% 
-  group_by(id_noGCMPFT) %>% 
-  group_split()
-
-q_dom3 <- map(info_fut_dom_l, \(df) {
-  stopifnot(nrow(df) == 13)
-  r <- modal(q_dom2[[df$id_noPFT]])
-  names(r) <- unique(df$id_noGCMPFT)
-  r
-}) %>% 
-  rast()
+q_dom_gref3 <- dom_driver_mode(info_gref_l, q_prop_rel_gref1)
 
 # then mask locations with less than 0.01 change in SEI
-tmp <- filter(info_sei_diff_clim_smry, summary == 'median',
-              variable == 'SEI') %>% 
-  select(RCP, years, graze, id) %>% 
-  rename(id_sei = id)
+tmp <- info_pair_sei_gref %>% 
+  select(RCP, years, graze, id_noGCM) %>% 
+  rename(id_sei = id_noGCM) %>% 
+  distinct()
 
-info_fut_dom_smry <- info_fut_dom_l %>% 
+info_gref_dom_smry <- prepare_info_dom_mode(info_gref_l) %>% 
   bind_rows() %>% 
   select(run, RCP, years, graze, id_noGCMPFT) %>% 
   distinct() %>% 
@@ -305,50 +258,45 @@ info_fut_dom_smry <- info_fut_dom_l %>%
             by = c('RCP', 'years', 'graze'))
 
 # '4' means no dominant driver, b/ negligible sei change
-q_dom4 <- ifel(sei_diff_clim_mask == 1,
-               q_dom3[[info_fut_dom_smry$id_noGCMPFT]], 4)
+q_dom_gref4 <- ifel(sei_diff_gref_mask[[info_gref_dom_smry$id_sei]] == 1,
+               q_dom_gref3[[info_gref_dom_smry$id_noGCMPFT]], 4)
 
-# helper to stamp the same labels onto every layer
-pfts <- unique(as.character(info_fut_l[[1]]$PFT))
-stopifnot(length(pfts) ==3)
-pfts2 <- c(pfts, 'None')
-set_pft_levels <- function(x, pfts) {
-  lev <- data.frame(value = seq_along(pfts), PFT = c(pfts))
-  for (i in seq_len(nlyr(x))) {
-    levels(x)[[i]] <- lev
-  }
-  x
-}
-
-q_dom5 <- set_pft_levels(q_dom4, pfts2)
-names(q_dom5) <- names(q_dom4)
-
+q_dom_gref5 <- set_pft_levels(q_dom_gref4, pfts2)
+names(q_dom_gref5) <- names(q_dom_gref4)
 
 # --- write outputs ------------------------------------------------------------
-
+if (!test_run) {
 # Categorical raster: primary driver mode across GCMs (values 1=Sagebrush, 2=Pherb, 3=Aherb, 4 = None)
 # this is w/ respect to historical conditions under the same grazing level
 # (i.e. within grazing level comparison)
 writeRaster(
-  q_dom5,
+  names_replace(q_dom5, 'SEI_SEI-rdiff-cref', 'SEI_dom-driver'),
   # cref means 'climate reference'
   filename = file.path(dir_out, paste0(runv, '_', years, "_dom-driver-sei_cref-mode.tif")),
   overwrite = TRUE
 )
 
-
-
-# (2) Continuous rasters: mean proportional change across GCMs for each PFT
-#     (These three bands can be used as RGB input for visualization)
+#gref --grazing reference (i.e. across grazing trmt comparison,
+  #relative to moderate grazing)
 writeRaster(
-  qprop_mean_all,
-  filename = file.path(dir_out, paste0(runv, "_Qprop-cref_meanGCM.tif")),
+  names_replace(q_dom_gref5, 'SEI_SEI', 'SEI_dom-driver'),
+  filename = file.path(dir_out, paste0(runv, '_', years, "_dom-driver-sei_gref-mode.tif")),
   overwrite = TRUE
 )
 
-# (Optional) write a legend CSV for categorical values
-legend_df <- data.frame(
-  value = c(1L, 2L, 3L),
-  PFT   = c("Sagebrush", "Pherb", "Aherb")
+# (2) Continuous rasters: mean proportional change across GCMs for each PFT
+#     (These three bands can be used as RGB input for visualization)
+# climate effect
+writeRaster(
+  names_replace(q_prop_rel_smry, '_biomass_', '_qprop_'),
+  filename = file.path(dir_out, paste0(runv, '_', years, "_qprop-cref_mean.tif")),
+  overwrite = TRUE
 )
-write_csv(legend_df, file.path(dir_out, paste0(runv, "_primary-driver_Qprop-cref_modeGCM_legend.csv")))
+# grazing effect
+writeRaster(
+  names_replace(q_prop_rel_gref_smry, '_biomass_', '_qprop_'),
+  filename = file.path(dir_out, paste0(runv, '_', years, "_qprop-gref_mean.tif")),
+  overwrite = TRUE
+)
+
+}
