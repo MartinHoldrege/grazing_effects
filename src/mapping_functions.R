@@ -376,6 +376,14 @@ downsample <- function(r, n = 100) {
   spatSample(r, size = n, method = 'regular',as.raster = TRUE)
 }
 
+global_smry <- function(r) {
+  global_vals <- terra::values(r)
+  out <- list()
+  out$mean <- mean(global_vals, na.rm = TRUE)
+  out$sd   <- sd(global_vals,   na.rm = TRUE)
+  out
+}
+
 # maps --------------------------------------------------------------------
 
 
@@ -881,6 +889,8 @@ load_wafwa_ecoregions <- function(total_region = FALSE,
                                   wafwa_only = FALSE,
                                   v = 'r1.0') {
   
+  stopifnot(str_detect(v, '^r\\d+\\.\\d+$'),
+            is.logical(wafwa_only))
 
   # file created by the 01_ecoregions.R script
   if(v == 'r1.0') {
@@ -888,7 +898,7 @@ load_wafwa_ecoregions <- function(total_region = FALSE,
   } else {
     path <- paste0('data_processed/ecoregions/regions_', v, '.gpkg')
     stopifnot(file.exists(path),
-              # wafwa only doesn't work with newer 
+              # wafwa_only doesn't work with newer 
               !wafwa_only)
     shp1 <- sf::st_read(path)
   }

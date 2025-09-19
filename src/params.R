@@ -42,6 +42,6 @@ if(years == '2070-2100') {
 } else if (years == '2030-2060') {
   opt$yr_lab <- '_mid'
 }
-
+opt$runv <- paste0(run, v_interp)
 print(opt)
 

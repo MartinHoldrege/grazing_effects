@@ -375,6 +375,44 @@ load_scd_q <- function() {
   terra::rast('data_processed/scd/SEI-Q_v11_2017-2020_1000.tif')
 }
 
+# overlay of sei class (c3) and ecoregions
+load_c3eco <- function(v) {
+
+  sei <- load_scd_q()[['SEI']]
+  c3  <- sei2c3(sei)                   # ideally has cats() with labels
+  eco <- load_wafwa_ecoregions_raster(v = v)  # factor/categorical with cats()
+  
+  # align & mask
+  c3 <- mask(c3, eco)
+  
+  # encode (tens=c3, ones=eco+1)
+  out <- c3 * 10 + (as.numeric(eco) + 1L)
+  names(out) <- "c3eco"
+  
+  ## ----- build and attach RAT (categories) -----
+  # eco levels (assume first non-ID column is the name/label)
+  eco_lvls <- cats(eco)[[1]]
+  if(is.null(eco_lvls)) {
+    stop("Ecoregion raster has no categories; please ensure it's a factor with cats().")
+  }
+  eco_lvls$eco_code <- eco_lvls$ID + 1L  # because we added +1 in the encoding
+  stopifnot(min(eco_lvls$eco_code) == 1)
+  rat0 <- expand_grid(c3_code = 1:3, eco_code = eco_lvls$eco_code)
+  rat0$region <- eco_lvls$ecoregion[rat0$eco_code]
+  rat0$ID <- rat0$c3_code*10 + rat0$eco_code
+  rat <- rat0
+  rat$c3 <- as.character(c3_factor(rat0$c3_code))
+  rat$c3_code <- NULL
+  rat$eco_code <- NULL
+  rat <- rat %>% 
+    select(ID, everything())
+  
+  levels(out) <- as.data.frame(rat)
+  levels(out)
+  out
+}
+
+
 #' relativize proportional change in q
 #'
 #' @param qprop proportional change in q
