@@ -4,19 +4,14 @@
 # fire probabilities across GCMs. Within each ecoregion also seperately
 # calculating means by SEI class ('c3')
 
-
 # params ------------------------------------------------------------------
 
 source('src/params.R')
-pfts <- c('Sagebrush', 'Aherb', 'Pherb')
-
-date <- '20250228' # date associated w/ the climate data (this date, in file name,
-# would be updated if new climate data source, or sites, etc. were used. )
 v_interp <- opt$v_interp
 run <- opt$run
-test_run <- TRUE # opt$test_run
 vr <- opt$vr
 vr_name <- opt$vr_name
+pfts <- c('Sagebrush', 'Aherb', 'Pherb')
 
 # dependencies ------------------------------------------------------------
 
@@ -28,96 +23,56 @@ source('src/SEI_functions.R')
 
 # read in data ------------------------------------------------------------
 
-# * climate ---------------------------------------------------------------
+# weights for sites (how many cells each site interpolated to by ecoregion
+# and sei class)
+# output from "scripts/05_interpolation_weights.R"
+wt_c3eco <- read_csv(
+  paste0('data_processed/interpolation_data/interpolation_weights_c3_', 
+         v_interp, '_', vr, '.csv'))
 
-read_csv(paste0('data_processed/interpolation_data/interpolation_weights_', 
-       v_interp, vr_name, '.csv'))
+# list dataframes of stepwat2 output created in "scripts/02_summarize_bio.R" 
+bio <- readRDS('data_processed/site_means/summarize_bio.RDS') 
 
-# data up-scaled for each GCM
-clim_files <- list.files(
-  file.path("data_processed/interpolated_rasters/climate", v_interp),
-  pattern = paste0('climate.*', date, '_', v_interp, '.tif'),
-  full.names = TRUE)
-length(clim_files)
+# combine dataframes ------------------------------------------------------
 
-# this is kind of a 'raster stack', where each layers is a tif
-# it's not actually loaded into memory
-r_clim1 <- terra::rast(clim_files) # class SpatRast
+clim_long <- bio$clim_all2 %>% 
+  pivot_longer(cols = c('MAP', 'MAT', 'psp'),
+               names_to = 'variable')
 
-# * biomass -----------------------------------------------------------------
-regex <- paste0(run, ".*(", paste(pfts, collapse = "|"), ').*.tif')
-bio_files <- list.files(
-  file.path("data_processed/interpolated_rasters/biomass", v_interp),
-  pattern = regex,
-  full.names = TRUE)
+bio_long <- bio$pft5_bio1 %>%
+  ungroup() %>% 
+  select(-indivs, -utilization, -id) %>% 
+  filter(PFT %in% pfts,
+         run %in% !! run) %>% 
+  rename(value = biomass,
+         variable = PFT) %>% 
+  mutate(variable = as.character(variable))
 
-r_bio1 <- rast(bio_files)
+comb1 <- bind_rows(bio_long, clim_long)
 
+# weighted means ----------------------------------------------------------
+# weighted by area
 
+# mean across SEI class and ecoregions
+means_c3eco1 <- comb1 %>%
+  select(-run) %>% 
+  right_join(wt_c3eco,   relationship = "many-to-many",
+             by = 'site') %>% 
+  group_by(years, RCP, graze, GCM, region, variable, c3) %>% 
+  summarize(mean = weighted.mean(value, w = weight),
+            weight = sum(weight),
+            .groups = 'drop_last')
 
-# interpolation locations -------------------------------------------------
-
-interp1 <- rast(paste0('data_processed/interpolation_data/', 
-                        'interp_locations_200sites_', v_interp, '.tif'))
-
-
-# *ecoregions -------------------------------------------------------------
-
-c3eco <- load_c3eco(v = vr)
-
-if (test_run) {
-  r_clim1 <- downsample(r_clim1)
-  r_bio1 <- downsample(r_bio1)
-  c3eco <- downsample(c3eco)
-}
-r_comb1 <- c(r_clim1, r_bio1)
-
-
-# getting 'weights' by c3eco ----------------------------------------------
-# site level 'weight' for each combination of c3eco and 
-
-# names of layers --------------------------------------------------
-
-into_clim <- c("variable", "type", "RCP", "years", "GCM", 'date', 'version')
-
-info_clim1 <- create_rast_info(r_clim1, into = into_clim, run_regex = '^') %>% 
-  # the ordering is important for later creation of spatraster dataset
-  arrange(id) %>% 
-  select(-date, -run, -version)
-
-info_bio1 <- create_rast_info(r_bio1) %>% 
-  rename(variable = PFT) %>% 
-  select(-run, -run2) # only 1 run, so not relevant
-
-info_comb1 <- bind_rows(info_clim1, info_bio1)
-
-
-# calculate means by ecoregions -------------------------------------------
-
-# taking pixel means is ok, because we're using an equal area projection
-
-means_c3eco1 <- zonal(r_comb1, c3eco, fun = 'mean')
-
-# mean by ecoregion
-eco_mean_l1 <- map(info_comb1$id, function(id) {
-  terra::extract(r_comb1[[id]], vect(eco1), fun = mean,  na.rm = TRUE)
-})
-
-eco_mean1 <- map(eco_mean_l1, function(x) {
-  x$ecoregion <- eco1$ecoregion[x$ID]
-  x$ID <- NULL
-  
-  x %>% 
-    pivot_longer(cols = -ecoregion,
-                 names_to = 'id',
-                 values_to = 'mean') 
-  
-}) %>% 
-  bind_rows() %>% 
-  left_join(info_comb1, by = 'id')
+# mean across regions
+means_eco1 <- means_c3eco1 %>% 
+  summarize(mean = weighted.mean(mean, w = weight),
+            .groups = 'drop')
 
 # save output -------------------------------------------------------------
 
-write_csv(eco_mean1, paste0('data_processed/raster_means/', run, vr_name,
-                            '_fire-driver-means_by-ecoregion.csv'))
+write_csv(means_eco1, paste0('data_processed/raster_means/', run, vr_name,
+                             '_fire-driver-means_by-ecoregion.csv'))
+
+write_csv(means_c3eco1, paste0('data_processed/raster_means/', run, '_', vr,
+                               '_fire-driver-means_by-ecoregion-c3.csv'))
 
