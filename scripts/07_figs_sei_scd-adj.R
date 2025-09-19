@@ -57,7 +57,7 @@ sei_byGCM1 <- read_csv(paste0('data_processed/raster_means/',
                              '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv'))
 
 # average of climatic drivers, per gcm and region
-# file output by 04_summarize_fire_drivers.R
+# file output by 05_summarize_fire_drivers.R
 drivers1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
                   '_fire-driver-means_by-ecoregion.csv'))
 

@@ -1,7 +1,8 @@
 # Purpose:
 # calculate average of fire probability drivers (for each ecoregion) for each GCM
 # downstream this will be used for helping understand the widespread
-# fire probabilities across GCMs
+# fire probabilities across GCMs. Within each ecoregion also seperately
+# calculating means by SEI class ('c3')
 
 
 # params ------------------------------------------------------------------
@@ -13,19 +14,24 @@ date <- '20250228' # date associated w/ the climate data (this date, in file nam
 # would be updated if new climate data source, or sites, etc. were used. )
 v_interp <- opt$v_interp
 run <- opt$run
-test_run <- opt$test_run
+test_run <- TRUE # opt$test_run
 vr <- opt$vr
 vr_name <- opt$vr_name
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
 library(terra)
 source('src/general_functions.R')
 source('src/mapping_functions.R')
+source('src/SEI_functions.R')
 
 # read in data ------------------------------------------------------------
 
 # * climate ---------------------------------------------------------------
+
+read_csv(paste0('data_processed/interpolation_data/interpolation_weights_', 
+       v_interp, vr_name, '.csv'))
 
 # data up-scaled for each GCM
 clim_files <- list.files(
@@ -47,18 +53,28 @@ bio_files <- list.files(
 
 r_bio1 <- rast(bio_files)
 
-if (test_run) {
-  r_clim1 <- downsample(r_clim1)
-  r_bio1 <- downsample(r_bio1)
-}
 
-r_comb1 <- c(r_clim1, r_bio1)
+
+# interpolation locations -------------------------------------------------
+
+interp1 <- rast(paste0('data_processed/interpolation_data/', 
+                        'interp_locations_200sites_', v_interp, '.tif'))
 
 
 # *ecoregions -------------------------------------------------------------
 
-eco1 <- load_wafwa_ecoregions(total_region = TRUE, v = vr)
-eco2 <- vect(eco1)
+c3eco <- load_c3eco(v = vr)
+
+if (test_run) {
+  r_clim1 <- downsample(r_clim1)
+  r_bio1 <- downsample(r_bio1)
+  c3eco <- downsample(c3eco)
+}
+r_comb1 <- c(r_clim1, r_bio1)
+
+
+# getting 'weights' by c3eco ----------------------------------------------
+# site level 'weight' for each combination of c3eco and 
 
 # names of layers --------------------------------------------------
 
@@ -79,6 +95,8 @@ info_comb1 <- bind_rows(info_clim1, info_bio1)
 # calculate means by ecoregions -------------------------------------------
 
 # taking pixel means is ok, because we're using an equal area projection
+
+means_c3eco1 <- zonal(r_comb1, c3eco, fun = 'mean')
 
 # mean by ecoregion
 eco_mean_l1 <- map(info_comb1$id, function(id) {
