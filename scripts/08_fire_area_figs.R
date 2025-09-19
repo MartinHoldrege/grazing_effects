@@ -23,7 +23,7 @@ explanatory_figures <- TRUE
 rcps <- c('RCP45', 'RCP85') # figures seperately made for both RCPs
 years <- opt$years
 entire <- 'Entire study area' # name of factor level for entire study
-
+create_figs <- TRUE # if false just create intermediate csv output
 # dependencies ------------------------------------------------------------
 
 library(terra)
@@ -141,10 +141,8 @@ ba3 <- df_factor(ba3a) %>%
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
          id2 = factor(id2, levels = unique(id2)),
          rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
-  left_join(area_eco, by = 'ecoregion') %>% 
-  mutate(across(matches("^area_"), .fns = \(x) x/area*100,
-                .names = '{.col}_perc')) %>% 
-  rename(area_total = area)
+  mutate(across(matches("^area_"), .fns = \(x) x/area_total*100,
+                .names = '{.col}_perc')) 
 
 area_age_group3 <- area_age_group3 %>% 
   filter_clim_extremes(years = years) %>% 
@@ -352,6 +350,14 @@ one_change_gcm_sas1 <- one_change_gcm2 %>%
   create_sas()%>% 
   mutate(rcp_year_gcm = paste(rcp_year, GCM))
 
+
+# * write files -------------------------------------------------------------
+
+write_csv(c3eco_gcm3, paste0('data_processed/raster_means/', 
+                             runv, '_', vr, "_", years, 
+       '_sei-mean_ba_by-GCM-region-c3.csv'))
+
+if(create_figs){
 # expected burned area figs --------------------------------------------------
 
 plots <- map(ecoregions, function(region) {
@@ -921,3 +927,5 @@ if (explanatory_figures) {
   print(g)
   dev.off()
 }
+
+} # end create figs
