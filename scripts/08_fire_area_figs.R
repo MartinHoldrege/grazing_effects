@@ -23,7 +23,7 @@ explanatory_figures <- TRUE
 rcps <- c('RCP45', 'RCP85') # figures seperately made for both RCPs
 years <- opt$years
 entire <- 'Entire study area' # name of factor level for entire study
-create_figs <- TRUE # if false just create intermediate csv output
+create_figs <- FALSE # if false just create intermediate csv output
 # dependencies ------------------------------------------------------------
 
 library(terra)
@@ -71,7 +71,7 @@ area_age_group3_pw <- read_csv(
 area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v, vr_name,
                             ".csv"))
 
-# created in the 04_summarize_fire_drivers.R script
+# created in the 05_summarize_fire_drivers.R script
 # means, by ecoregion, of the drivers of fire probability
 drivers1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
                             '_fire-driver-means_by-ecoregion.csv'))
@@ -675,13 +675,13 @@ ba_gcm4 <- drivers2 %>%
   df_factor() %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
 
-driver_vars <- c("MAP", "MAT", "PSP", "Aherb", "Pherb", "Sagebrush")
+driver_vars <- driver2factor(return_levels = TRUE, include_sagebrush = TRUE)
 ba_gcm5 <- ba_gcm4 %>% 
   pivot_longer(cols = all_of(driver_vars),
                values_to = 'mean_driver',
                names_to = 'driver') %>% 
   mutate(GCM = factor(GCM, levels = c('Current', names(cols_GCM1))),
-         driver = factor(driver, levels = driver_vars)) %>% 
+         driver = driver2factor(driver, include_sagebrush = TRUE)) %>% 
   df_factor()
 
 ba_current <- ba_gcm5 %>% 

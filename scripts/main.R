@@ -20,16 +20,18 @@ scripts_vr <- c(
 # scripts that need to be run seperately for each set of years
 # but not ecoregion versions
 scripts_yr <- c(
-  "scripts/06_sei_attribution.R"
+  # "scripts/06_sei_attribution.R"
 )
 
 # to run for all combinations of vr and years
 scripts_vr_yr <- c(
   #'scripts/05_interpolated_summarize_sei_scd-adj.R'
   # 'scripts/06_summarize_sei_scd-adj.R',
+  # 'scripts/06_summarize_fire_drivers.R',
   # 'scripts/07_bio_figs_weighted.R',
   #'scripts/07_figs_sei_scd-adj.R'
-  #'scripts/08_fire_area_figs.R'
+  # 'scripts/08_fire_area_figs.R',
+  'scripts/09_tradeoff_slope_figs.R'
 )
 
 # parameters --------------------------------------------------------------
@@ -69,8 +71,8 @@ if(length(scripts_yr) > 0) {
 
 if(length(scripts_vr_yr) > 0) {
   for(script in scripts_vr_yr) {
-    callr::rscript(script, cmdargs = uu(arg_list_end))
-    callr::rscript(script, cmdargs = uu(arg_list_mid))
+    # callr::rscript(script, cmdargs = uu(arg_list_end))
+    # callr::rscript(script, cmdargs = uu(arg_list_mid))
     callr::rscript(script, cmdargs = uu(arg_list_r1.0_end))
     callr::rscript(script, cmdargs = uu(arg_list_r1.0_mid))
   }

@@ -256,11 +256,15 @@ region2wafwa <- function(x, v = NULL) {
 
 summary2factor <- var2factor_factory( c('low', 'median', 'high'))
 
-driver2factor <-  function(x, include_none = FALSE) {
+driver2factor <-  function(x = NULL, include_none = FALSE,
+                           return_levels = FALSE,
+                           include_sagebrush = FALSE) {
+  levels <- c('MAT', 'MAP', 'PSP', 'Pherb', 'Aherb')
+  if(include_sagebrush) levels <- c(levels, 'Sagebrush')
+  if(include_none) levels <- c(levels, 'None')
+  if(return_levels) return(levels)
   x <- as.character(x)
   x <- str_replace(x, 'psp', 'PSP')
-  levels <- c('MAT', 'MAP', 'PSP', 'Pherb', 'Aherb')
-  if(include_none) levels <- c(levels, 'None')
   stopifnot(x %in% levels)
   factor(x, levels)
 }
