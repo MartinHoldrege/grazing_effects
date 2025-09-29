@@ -9,6 +9,13 @@ slope_to_deg <- function(m) {
   out
 }
 
+calc_slope <- function(x, y) {
+  mod <- lm(y ~ x)
+  coefs <- coef(mod)
+  stopifnot(length(coefs) ==2)
+  slope <- coefs[[2]]
+  slope
+}
 
 #' fit lm and convert slope to degrees
 #'
@@ -18,9 +25,6 @@ slope_to_deg <- function(m) {
 #' @returns
 # slope of the model y~x in terms of degrees (-90 to 90)
 calc_slope_deg <- function(x, y) {
-  mod <- lm(y ~ x)
-  coefs <- coef(mod)
-  stopifnot(length(coefs) ==2)
-  slope <- coefs[[2]]
+  slope <- calc_slope(x, y)
   slope_to_deg(slope)
 }

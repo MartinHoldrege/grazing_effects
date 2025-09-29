@@ -90,25 +90,70 @@ slopes1 <- c3eco2 %>%
   select(-rcp_year_c3_gcm) %>% 
   group_by(run, RCP, years, rcp_year, GCM, region, c3) %>% 
   nest() %>% 
-  mutate(slope_deg = map_dbl(data, .f = \(df) {
-    calc_slope_deg(x = df$SEI_norm, y = df$ba_norm)
-  })) %>% 
-  select(-data) %>% 
-  ungroup()
+  mutate(
+    slope_deg0 = map_dbl(data, .f = \(df) {
+      stopifnot(nrow(df) == 4)
+      calc_slope_deg(x = df$SEI_norm, y = df$ba_norm)
+    }),
+    range_SEI = map_dbl(data, \(df) max(df$SEI_norm) - min (df$SEI_norm)),
+    range_ba = map_dbl(data, \(df) max(df$ba_norm) - min(df$ba_norm)),
+    # change in burned area (normalized) when go from lowest to highest grazing
+    # negative number means grazing reduces fire
+    delta_ba = map_dbl(data, \(df) {
+      stopifnot(is.factor(df$graze))
+      lev <- levels(df$graze)
+      # burned area for lowest grazing level
+      ba_low <- df$ba_norm[df$graze == lev[1]] 
+      # burned area for highest grazing level
+      ba_high <- df$ba_norm[df$graze == lev[length(lev)]] 
+      ba_high - ba_low 
+    })
+  ) %>% 
+  # select(-data) %>% 
+  # ungroup() %>% 
+  group_by(.row = 1:n()) %>% 
+  # maximum absolute range in sei or ba in units of SD
+  mutate(range_max = max(c(abs(range_SEI), abs(range_ba)))) %>% 
+  ungroup() %>% 
+  select(-.row)
 
+hist(slopes1$range_max)
 
+# adjusting the slopes, so that negative slopes mean that fire increased
+# with more grazing
+# slopes that were calculated as negative, but where grazing reduces fire
+# will become positive and calculated as 180 + (the negative slope)
+# as a result previous slopes that were for example -89 (near vertical line)
+# will be +91, meaning that fire reduces and sei slightly increases with
+# more grazing
+delta_cutoff <- 0.1 # if changes are < 0.1 SD then don't use the slope
+slopes2 <- slopes1 %>% 
+  mutate(
+    slope_deg = ifelse(range_max < delta_cutoff, NA, slope_deg0),
+    # making the 'good' tradeoff (theoretically) go from 0 - 180
+    slope_deg = ifelse(delta_ba < 0 & slope_deg < 0, 180 + slope_deg, slope_deg),
+    # enforcing sign
+    # the 'worst' trade-offs are now negative
+    slope_deg = ifelse(delta_ba > 0, -1*abs(slope_deg), abs(slope_deg))
+         
+  )
+hist(slopes2$slope_deg)
+plot(slopes2$slope_deg0, slopes2$slope_deg)
 # combine data ------------------------------------------------------------
-slopes2 <- driver1 %>% 
+slopes3 <- driver1 %>% 
   # climate variables don't have separate values per grazing level
   # and graze is NA, otherwise just choosing moderate b/ it's the reference
   # grazing level, could also have taken an average across grazing trms
   filter(is.na(graze) | graze == 'Moderate') %>% 
   select(-graze) %>% 
-  right_join(slopes1, by = join_by(years, RCP, GCM, region, c3)) %>% 
+  right_join(slopes2, by = join_by(years, RCP, GCM, region, c3)) %>% 
   df_factor() %>% 
   mutate(GCM = factor(GCM, levels = c('Current', names(cols_GCM1)),
                       labels = c('Historical', names(cols_GCM1))),
          variable = driver2factor(variable, include_sagebrush = TRUE))
+
+slopes3 %>% 
+  filter(slope_deg > 120) %>% View()
 
 # figures -----------------------------------------------------------------
 
@@ -116,7 +161,7 @@ rcps <- c('RCP45', 'RCP85')
 
 
 for(rcp in rcps) {
-  df <- slopes2 %>% 
+  df <- slopes3 %>% 
     filter(RCP %in% c('Current', rcp))
   g <- ggplot(df, aes(mean, slope_deg)) +
     geom_smooth(aes(linetype = c3), se = FALSE,
