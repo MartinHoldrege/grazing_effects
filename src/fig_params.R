@@ -61,6 +61,10 @@ cols_GCM2 <-  c('Historical' = 'black', cols_GCM1)
 #                     'Western Intermountain' = "#41ae76",
 #                     "Eastern Intermountain" = "#005824")
 
+cols_wafwa_region <- c("Great Plains" = "#DB9E27",
+                       "Intermountain West" = "#0E9A72",
+                       "Southern Great Basin" = "#0E72AD")
+
 get_cols_ecoregion <- function(v = 'r1.0') {
   if(v == 'r1.0') {
     cols <- c("Great Plains" = "#ECA130",

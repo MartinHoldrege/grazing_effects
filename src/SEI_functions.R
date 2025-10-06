@@ -21,7 +21,7 @@ q_curves_cover <- list(Sagebrush = structure(list(cover = c(0, 0.02, 0.03, 0.05,
     1, 1, 1, 1, 0.75, 0.55, 0.4, 0.2, 0, 0)), row.names = c(NA, 
     -11L), class = "data.frame"))
 
-q_curves_cover2 <- map(q_curves_cover, function(x) {
+q_curves_cover2 <- lapply(q_curves_cover, function(x) {
   x %>% rename("Great Plains" = 'great_plains',
                "Intermountain West" = 'intermountain', 
                 "Southern Great Basin" = 'great_basin')
