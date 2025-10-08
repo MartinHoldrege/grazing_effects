@@ -167,3 +167,99 @@ for(rcp in rcps) {
 
 
 
+# conceptual figure -------------------------------------------------------
+# conceptual figure showing how the trade-off slope is calculated,
+# using artificial data
+
+z <- function(x) {
+  m <- mean(x)
+  sd = sd(x)
+  (x - m)/sd
+}
+df <- tibble(
+  graze = c(
+    'Light', 'Moderate', 'Heavy', 'Very Heavy',
+    'Light', 'Moderate', 'Heavy', 'Very Heavy',
+    'Light', 'Moderate', 'Heavy', 'Very Heavy'
+  ),
+  SEI = c(
+    c(-0.3, -0.1, -0.1, -0.3) ,
+    rev(c(-0.3, 0, 0.3, 0.6)),
+    rev(c(0.2, 0.4, 0.6, 0.8))
+  ),
+  ba = c(
+    1, 0.7, 0.3, 0,
+    0.7, 0.2, -0.1, -0.4,
+    -0.5, -0.5, -0.5, -0.5
+  ),
+  c3 = c(
+    rep('ORA', 4),
+    rep('GOA', 4),
+    rep('CSA', 4)
+  )
+)
+
+df2 <- df %>% 
+  df_factor() %>% 
+  mutate(ba = z(ba),
+         SEI = z(SEI),
+         graze_num = as.numeric(graze)) 
+
+range <- range(c(df2$ba, df2$SEI))
+g <- ggplot(df2, aes(SEI, ba, group = c3)) +
+  geom_path() +
+  geom_point(aes(color = graze)) +
+  scale_color_graze() +
+  labs(y = 'Burned area (normalized)',
+       x = 'Mean SEI (normalized)') +
+  coord_cartesian(xlim = range,
+                  ylim = range)
+
+ggsave('figures/sei/tradeoff/conceptual/SEI_vs_ba_conceptual.png', 
+       plot = g,
+       width = 6, height = 4, dpi = 300)
+
+s1 <- df2 %>% 
+  group_by(c3) %>% 
+  nest() %>% 
+  mutate(slope_SEI = map_dbl(data, .f = \(df) calc_slope(df$graze_num, df$SEI)),
+         slope_ba = map_dbl(data, .f = \(df) calc_slope(df$graze_num, df$ba)),
+         slope_deg = slope_to_deg(-1*slope_ba/abs(slope_SEI))) %>% 
+  select(-data)
+  
+df_l <- df2 %>% 
+  group_by(c3) %>% 
+  group_split()
+
+plot_graze <- function(df, y, y_title) {
+  ggplot(df, aes(graze_num, .data[[y]])) +
+    geom_smooth(method = 'lm', se = FALSE, color = 'gray') +
+    geom_point(aes(color = graze)) +
+    coord_cartesian(ylim = range) +
+    theme(axis.text = element_blank()) +
+    labs(x = 'Grazing',
+         y = y_title) +
+    scale_color_graze() +
+    theme(legend.position = 'none')
+}
+
+
+map(df_l, \(df) {
+  y <- 'SEI'
+  g <- plot_graze(df, y = y, y_title = y)
+  file <- paste0('figures/sei/tradeoff/conceptual/',
+                 y, '_vs_graze_', unique(df$c3), '.png')
+  ggsave(file, 
+         plot = g,
+         width = 1.2, height = 1.2, dpi = 300)
+})
+
+map(df_l, \(df) {
+  y <- 'ba'
+  g <- plot_graze(df, y = y, y_title = 'Burned Area')
+  file <- paste0('figures/sei/tradeoff/conceptual/',
+                 y, '_vs_graze_', unique(df$c3), '.png')
+  ggsave(file, 
+         plot = g,
+         width = 1.2, height = 1.2, dpi = 300)
+})
