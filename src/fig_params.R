@@ -43,13 +43,14 @@ cols_pft3 <- c("Aherb" = "#f6e8c3",
 cols_firep <- RColorBrewer::brewer.pal(11, "RdYlBu")[9:2]
 
 
-# colors from the SEI repository, same colors as used in appendix
-# of Holdrege et al 2024 REM, cool colors are GCMs with lower temperatures
-# across 200 stepwat sites, and warmer colors are the hotter GCMs 
+# colors are based on ordering by median MAT based on MAT at the 200 sites
+# weighted by the number of pixels interpolated in the curren study area
+# under RCP4.5 2071-2100 (slightly different than ordered in the appendix
+# of Holdrege et al 2024 REM, b/ the study area is a little different)
 cols_GCM1 <- c(inmcm4 = "#313695", `GISS-E2-R` = "#416AAE", `MRI-CGCM3` = "#649AC7", 
                `FGOALS-s2` = "#8FC3DC", `FGOALS-g2` = "#BCE1ED", `CSIRO-Mk3-6-0` = "#E5F4EE", 
-               `CESM1-CAM5` = "#FFFFBF", MIROC5 = "#FEE597", `IPSL-CM5A-MR` = "#FDBE70", 
-               `HadGEM2-CC` = "#F88D52", CanESM2 = "#EA5839", `HadGEM2-ES` = "#CE2826", 
+               `CESM1-CAM5` = "#FFFFBF", `IPSL-CM5A-MR` = "#FEE597", MIROC5 = "#FDBE70", 
+               CanESM2 = "#F88D52", `HadGEM2-CC` = "#EA5839", `HadGEM2-ES` = "#CE2826", 
                `MIROC-ESM` = "#A50026")
 
 cols_GCM2 <-  c('Historical' = 'black', cols_GCM1)
@@ -61,9 +62,18 @@ cols_GCM2 <-  c('Historical' = 'black', cols_GCM1)
 #                     'Western Intermountain' = "#41ae76",
 #                     "Eastern Intermountain" = "#005824")
 
+# colors used in Doherty et al. 2022
 cols_wafwa_region <- c("Great Plains" = "#DB9E27",
                        "Intermountain West" = "#0E9A72",
                        "Southern Great Basin" = "#0E72AD")
+
+
+# using other colors, to make them look more different than SEI class colors
+cols_wafwa_region2 <- c(
+  "Great Plains" = "#7570b3",        
+  "Intermountain West" = "#1b9e77",  
+  "Southern Great Basin" = "#d95f02" 
+)
 
 get_cols_ecoregion <- function(v = 'r1.0') {
   if(v == 'r1.0') {

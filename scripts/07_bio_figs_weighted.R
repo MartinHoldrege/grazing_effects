@@ -4,17 +4,6 @@
 
 # Started: April 11, 2025
 
-# params ------------------------------------------------------------------
-
-source('src/params.R')
-yr_lab <- opt$yr_lab
-years <- opt$years
-runv <- paste0(run, v_interp)
-q_curve_fig <- FALSE # create figure showing the 'biomass' q curves
-v <- '_v2'
-suffix <- paste0(run, v, vr_name, yr_lab) # for figures
-pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
-
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -25,6 +14,18 @@ source('src/general_functions.R')
 source('src/SEI_functions.R')
 source('src/mapping_functions.R')
 theme_set(theme_custom1())
+
+# params ------------------------------------------------------------------
+
+source('src/params.R')
+yr_lab <- opt$yr_lab
+years <- opt$years
+runv <- paste0(run, v_interp)
+q_curve_fig <- FALSE # create figure showing the 'biomass' q curves
+v <- '_v2'
+suffix <- paste0(run, v, vr_name, yr_lab) # for figures
+pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
+entire <- region_factor(v = vr, return_levels = TRUE)[1]
 
 # read in data ------------------------------------------------------------
 
@@ -53,9 +54,14 @@ seifire1 <- read_csv(paste0('data_processed/raster_means/',
                            '_sei-by-fire-bin_scd-adj_summaries_by-ecoregion.csv'),
                     show_col_types = FALSE)
 
+# weighted means and percentiles of change biomass and climate variables
+# created in "scripts/06_summarize_fire_drivers.R"
+driver1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
+                  '_delta-fire-driver_by-ecoregion.csv'))
+
 # combine site level and weights ------------------------------------------
 w1 <- df_factor(w1)
-entire <- levels(w1$region)[1] # entire study region
+
 bio3 <- bio2 %>% 
   left_join(w1, by = 'site',relationship = "many-to-many") %>% 
   filter_clim_extremes(years = years) %>% 
@@ -109,9 +115,25 @@ bio_pcent1 <- bio4 %>%
             .groups = 'drop_last') %>% 
   mutate(util_pcent = util_median/sum(util_median)*100)
 
+# setup so can plot climate variables against biomass variables
+driver_bio1 <- driver1 %>% 
+  filter(variable %in% pfts)
+
+driver2 <- driver1 %>% 
+  filter(!variable %in% pfts) %>% 
+  select(-graze, -weight) %>% 
+  right_join(driver_bio1, by = c('years', 'RCP', 'GCM', 'region'),
+             suffix = c('_clim', '_bio'),
+             relationship = "many-to-many") %>% 
+  df_factor() %>% 
+  mutate(variable_clim = driver2factor(variable_clim),
+         variable_bio = driver2factor(variable_bio, include_sagebrush = TRUE)) %>% 
+  droplevels() %>% 
+  arrange(region, RCP, years)
+
 # calculate Q's and SEI ---------------------------------------------------
 
-pfts <- c('Sagebrush', 'Pherb', 'Aherb')
+
 
 # need to calculate for GCM wise q values and SEI, and then summaryies
 # b/ SEI is multiplicative median sei need to be from median Q values
@@ -144,7 +166,7 @@ sei2 <- sei1 %>%
   bind_rows(sei1) %>% 
   df_factor()
 
-# for use in the 06_fire_area_figs.R script
+# for use in the 08_fire_area_figs.R script
 saveRDS(sei2, paste0('data_processed/temp_rds/sei_df', vr_name, yr_lab, '.rds'))
 
 q1 <- q_gcm1 %>% 
@@ -216,7 +238,7 @@ pmap(args, function(pfts, RCP) {
 
 
 
-# testing -----------------------------------------------------------------
+# *testing -----------------------------------------------------------------
 
 # this code can be deleted (used to confirm that these
 # numbers correspond to the Core area figure)
@@ -362,6 +384,48 @@ if(q_curve_fig) {
   ggsave('figures/sei/q-curves-biomass_v1.png', plot = g, dpi = 600,
          width = 6, height = 4)
 }
+
+
+# clim vs bio by GCM ------------------------------------------------------
+# show the 25th to 75 percentiles of biomass (y axis) and climate variables 
+# (x axis)
+
+rcps <- unique(driver1$RCP)
+
+for (rcp in rcps) {
+  df <- driver2 %>% 
+    filter(years == !!years,
+           RCP == rcp,
+           graze == 'Moderate',
+           region == entire) %>% 
+    mutate(GCM = factor(GCM, levels = names(cols_GCM1)))
+  
+  stopifnot(str_detect(df$region, 'ntire'))
+  
+  g <- ggplot(df) +
+    geom_hline(yintercept = 0, alpha = 0.5, linetype = 2) +
+    geom_segment(aes(x = median_clim, y = p25_bio, yend = p75_bio,
+                     color = GCM)) +
+    geom_segment(aes(x = p25_clim, xend = p75_clim, y = median_bio,
+                     color = GCM)) +
+    geom_point(aes(x = median_clim, y = median_bio, color = GCM)) +
+    #geom_smooth(aes(x = median_clim, y = median_bio), se = FALSE, method = lm) +
+    facet_grid(variable_bio ~ variable_clim, scales = 'free', 
+               switch = 'x', 
+               labeller = labeller(variable_clim = driver_labeller(delta = TRUE))) +
+    scale_color_manual(values = cols_GCM1) +
+    theme(strip.placement.x = 'outside') +
+    labs(x = NULL, y = lab_bio1,
+         subtitle = rcp_label(rcp, years, include_parenth = FALSE))
+  filename <- paste0('figures/biomass/by_gcm/bio_vs_clim_crossplot_',
+                     rcp, '_', years, '_', vr, '_', words2abbrev(entire),
+                     '_', runv, '.png')
+  ggsave(filename, plot = g,
+         width = 7, height = 5.5, dpi = 600)
+}
+
+  
+
 
 
 # comparing to fire -------------------------------------------------------

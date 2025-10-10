@@ -53,25 +53,69 @@ comb1 <- bind_rows(bio_long, clim_long)
 # weighted means ----------------------------------------------------------
 # weighted by area
 
+summarize_weighted <- function(df, varname) {
+  df %>% 
+    summarize(mean = weighted.mean(.data[[varname]], w = weight),
+              p25 = as.numeric(Hmisc::wtd.quantile(.data[[varname]], weights = weight, 
+                                                   probs = 0.25)),
+              median = as.numeric(Hmisc::wtd.quantile(.data[[varname]], weights = weight, 
+                                                      probs = 0.50)),
+              p75 = as.numeric(Hmisc::wtd.quantile(.data[[varname]], weights = weight, 
+                                                   probs = 0.75)),
+              weight = sum(weight),
+              .groups = 'drop')
+}
 # mean across SEI class and ecoregions
-means_c3eco1 <- comb1 %>%
+comb2 <- comb1 %>%
   select(-run) %>% 
   right_join(wt_c3eco,   relationship = "many-to-many",
-             by = 'site') %>% 
+             by = 'site') 
+
+#summarize across sei class
+comb2_eco <- comb2 %>% 
+  group_by(site, years, RCP, graze, GCM, region, variable) %>% 
+  summarise(
+    # not really doing anything, taking the mean of equal values
+    # at a site (i.e. if a site was interpolated to areas with differen SEI classes)
+    value = mean(value),
+    weight = sum(weight),
+    .groups = 'drop') 
+means_c3eco1 <- comb2 %>% 
   group_by(years, RCP, graze, GCM, region, variable, c3) %>% 
-  summarize(mean = weighted.mean(value, w = weight),
-            weight = sum(weight),
-            .groups = 'drop_last')
+  summarize_weighted(varname = 'value')
 
 # mean across regions
-means_eco1 <- means_c3eco1 %>% 
-  summarize(mean = weighted.mean(mean, w = weight),
-            .groups = 'drop')
+means_eco1 <- comb2_eco %>% 
+  group_by(years, RCP, graze, GCM, region, variable) %>% 
+  summarize_weighted(varname = 'value')
+
+
+# change relative to current ----------------------------------------------
+
+
+delta1 <- comb2_eco %>% 
+  mutate(region = region_factor(region)) %>% 
+  # for current conditions just want the site value 
+  filter(RCP == 'Current', region == levels(region)[1]) %>% 
+  select(-weight, -years, -RCP, -GCM, -region) %>% # only care about the weight under future conditions
+  right_join(filter(comb2_eco, RCP != 'Current'),
+             by = join_by(variable, site, graze),
+             suffix = c('_cur', '_fut'),
+             relationship = "many-to-many") %>% 
+  mutate(delta = value_fut - value_cur)
+
+smry_delta_eco1 <- delta1 %>% 
+  group_by(years, RCP, graze, GCM, region, variable) %>% 
+  summarize_weighted(varname = 'delta')
+  
 
 # save output -------------------------------------------------------------
 
 write_csv(means_eco1, paste0('data_processed/raster_means/', run, vr_name,
                              '_fire-driver-means_by-ecoregion.csv'))
+
+write_csv(smry_delta_eco1, paste0('data_processed/raster_means/', run, vr_name,
+                             '_delta-fire-driver_by-ecoregion.csv'))
 
 write_csv(means_c3eco1, paste0('data_processed/raster_means/', run, '_', vr,
                                '_fire-driver-means_by-ecoregion-c3.csv'))

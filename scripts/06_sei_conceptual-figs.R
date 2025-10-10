@@ -194,24 +194,8 @@ map2(lyrs_cov, names(lyrs_cov), function(lyr, pft) {
 # sei map -----------------------------------------------------------------
 
 r_c3 <- sei2c3(r_sei1)
-r_c3 <- downsample(r_c3)
+# r_c3 <- downsample(r_c3)
 
-plot_map2(r_c3) +
-  scale_fill_c3()
-
-scale_fill_c3 <- function(...) {
-  vals <- unname(c3Palette)
-  names(vals) <- c("1","2","3")   # <-- keys equal to your raster values
-  scale_fill_manual(
-    values = vals,
-    breaks = c("1","2","3"),
-    labels = c("CSA","GOA","ORA"),
-    na.value = "transparent",
-    na.translate = FALSE,
-    name = "SEI class",
-    ...
-  )
-}
 s <- stars::st_as_stars(r_c3)
 nm <- names(s)
 s[[nm]] <- factor(s[[nm]], levels = c(1,2,3))  # just treat 1/2/3 as categories
@@ -249,8 +233,8 @@ map2(q_long, names(q_long), function(df, pft) {
   xlim <- xlim_l[[pft]]
   df$cover <- df$cover*100 #convert to percent
   g <- ggplot(df, aes(x = cover, y = Q)) +
-    geom_line(mapping = aes(color = region), alpha = 0.5,) +
-    scale_color_manual(values = cols_wafwa_region,
+    geom_line(mapping = aes(color = region), alpha = 0.7,) +
+    scale_color_manual(values = cols_wafwa_region2,
                        name = NULL) +
     geom_point(data = d7, 
                mapping = aes(x = .data[[paste0(pft , '_cover')]],

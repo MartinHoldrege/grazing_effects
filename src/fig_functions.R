@@ -1038,6 +1038,24 @@ region_labeller_factory <- function(region_letters = NULL,
 
 region_labeller <- region_labeller_factory(fig_letters)
   
+driver_labeller <- function(delta = FALSE) {
+  lookup_md <- c(
+    "MAT" = "MAT (\u00b0C)",
+    "MAP" = "MAP (mm)",
+    "PSP" = "PSP",
+    "psp" = "PSP",
+    "Aherb" = "Aherb (g/m<sup>2</sup>)",
+    "Pherb" = "Pherb (g/m<sup>2</sup>)",
+    "Sagebrush" = "Sagebrush (g/m<sup>2</sup>)"
+  )
+  if(delta) {
+    nms <- names(lookup_md)
+    lookup_md <- paste("\u0394", lookup_md)
+    names(lookup_md) <- nms
+  }
+  
+  as_labeller(lookup_md)
+}
 
 # legends -----------------------------------------------------------------
 
