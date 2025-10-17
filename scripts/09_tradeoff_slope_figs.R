@@ -266,7 +266,7 @@ df <- tibble(
     'Light', 'Moderate', 'Heavy', 'Very Heavy'
   ),
   SEI = c(
-    c(-0.3, -0.1, -0.1, -0.3) ,
+    c(-0.3, -0.23, -0.23, -0.3) ,
     rev(c(-0.3, 0, 0.3, 0.6)),
     rev(c(0.2, 0.4, 0.6, 0.8))
   ),
@@ -379,6 +379,6 @@ map(df_l, \(df) {
 print(select(s1, -data))
 # c3    slope_SEI      slope_ba slope_ratio   slope_deg intercept
 # <fct>     <dbl>         <dbl>       <dbl>       <dbl>     <dbl>
-# 1 ORA   -4.97e-17 -0.628           1.26e+16 90           1.14e+16
-# 2 GOA   -7.70e- 1 -0.665           8.64e- 1 40.8         1.16e- 1
-# 3 CSA   -5.13e- 1  0.0000000185   -3.60e- 8 -0.00000206 -9.71e- 1
+# 1 ORA    7.45e-17 -0.628           8.43e+15 90           8.14e+15
+# 2 GOA   -7.36e- 1 -0.665           9.04e- 1 42.1         6.79e- 2
+# 3 CSA   -4.91e- 1  0.0000000185   -3.77e- 8 -0.00000216 -9.71e- 1
