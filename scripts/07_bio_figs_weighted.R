@@ -25,8 +25,8 @@ q_curve_fig <- FALSE # create figure showing the 'biomass' q curves
 v <- '_v2'
 suffix <- paste0(run, v, vr_name, yr_lab) # for figures
 pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
-entire <- region_factor(v = vr, return_levels = TRUE)[1]
-
+regions <- region_factor(v = vr, return_levels = TRUE)
+entire <- regions[1]
 # read in data ------------------------------------------------------------
 
 path_rds <- 'data_processed/site_means/summarize_bio.RDS'
@@ -389,44 +389,118 @@ if(q_curve_fig) {
 # clim vs bio by GCM ------------------------------------------------------
 # show the 25th to 75 percentiles of biomass (y axis) and climate variables 
 # (x axis)
-
+linewidth <- 0.3
 rcps <- unique(driver1$RCP)
 
-for (rcp in rcps) {
-  df <- driver2 %>% 
-    filter(years == !!years,
-           RCP == rcp,
-           graze == 'Moderate',
-           region == entire) %>% 
-    mutate(GCM = factor(GCM, levels = names(cols_GCM1)))
+for (rcp in rcps) { 
+  for (reg in regions) {
+
+    df <- driver2 %>% 
+      filter(years == !!years,
+             RCP == rcp,
+             graze == 'Moderate',
+             region == reg) %>% 
+      mutate(GCM = factor(GCM, levels = names(cols_GCM1)))
+    
+
+    subtitle <- rcp_label(rcp, years, include_parenth = FALSE)
+    if(reg != entire) {
+      subtitle <- paste0(subtitle, ', ', reg)
+    }
+    
+    # Get per-facet x-ranges (so geom_vline only plotted in som panels)
+    ranges <- df |>
+      dplyr::group_by(variable_clim, variable_bio) |>
+      dplyr::summarise(xmin = min(c(p25_clim, median_clim, p75_clim), na.rm = TRUE),
+                       xmax = max(c(p25_clim, median_clim, p75_clim), na.rm = TRUE),
+                       .groups = "drop") |>
+      dplyr::filter(xmin <= 0 & xmax >= 0)  # keep only panels that include 0
   
-  stopifnot(str_detect(df$region, 'ntire'))
-  
-  g <- ggplot(df) +
-    geom_hline(yintercept = 0, alpha = 0.5, linetype = 2) +
-    geom_segment(aes(x = median_clim, y = p25_bio, yend = p75_bio,
-                     color = GCM)) +
-    geom_segment(aes(x = p25_clim, xend = p75_clim, y = median_bio,
-                     color = GCM)) +
-    geom_point(aes(x = median_clim, y = median_bio, color = GCM)) +
-    #geom_smooth(aes(x = median_clim, y = median_bio), se = FALSE, method = lm) +
-    facet_grid(variable_bio ~ variable_clim, scales = 'free', 
-               switch = 'x', 
-               labeller = labeller(variable_clim = driver_labeller(delta = TRUE))) +
-    scale_color_manual(values = cols_GCM1) +
-    theme(strip.placement.x = 'outside') +
-    labs(x = NULL, y = lab_bio1,
-         subtitle = rcp_label(rcp, years, include_parenth = FALSE))
-  filename <- paste0('figures/biomass/by_gcm/bio_vs_clim_crossplot_',
-                     rcp, '_', years, '_', vr, '_', words2abbrev(entire),
-                     '_', runv, '.png')
-  ggsave(filename, plot = g,
-         width = 7, height = 5.5, dpi = 600)
+    g <- ggplot(df) +
+      geom_hline(yintercept = 0, alpha = 0.3, linetype = 2, 
+                 linewidth = linewidth) +
+      # add geom_vline only for panels that include 0
+      geom_vline(
+        data = ranges,
+        mapping = aes(xintercept = 0),
+        alpha = 0.3, linetype = 2, linewidth = linewidth
+      ) +
+      geom_segment(aes(x = median_clim, y = p25_bio, yend = p75_bio,
+                       color = GCM), linewidth = linewidth) +
+      geom_segment(aes(x = p25_clim, xend = p75_clim, y = median_bio,
+                       color = GCM), linewidth = linewidth) +
+      geom_point(aes(x = median_clim, y = median_bio, color = GCM, shape = GCM)) +
+      #geom_smooth(aes(x = median_clim, y = median_bio), se = FALSE, method = lm) +
+      facet_grid(variable_bio ~ variable_clim, scales = 'free', 
+                 switch = 'x', 
+                 labeller = labeller(variable_clim = driver_labeller(delta = TRUE))) +
+      scale_color_manual(values = cols_GCM1) +
+      scale_shape_manual(values = shapes_GCM1) +
+      theme(strip.placement.x = 'outside') +
+      labs(x = NULL, y = lab_bio1,
+           subtitle = subtitle)
+
+    filename <- paste0('figures/biomass/by_gcm/bio_vs_clim_crossplot_',
+                        vr, '_', words2abbrev(reg), '_', rcp, '_', 
+                       years, '_', runv, '.png')
+    ggsave(filename, plot = g,
+           width = 7, height = 5.5, dpi = 600)
+  }
 }
 
+
+
+# clim vs clim by GCM ------------------------------------------------------
+# crossplots comparing interquartile ranges of delta climate
+# variables, separately by GCM
+
+
+vars <- tibble(var1 = c('MAT', 'MAT', 'MAP'),
+               var2 = c('MAP', 'PSP', 'PSP'))
+for (rcp in rcps) { 
+  for (reg in regions) {
+    
+    df <- driver2 %>% 
+      filter(years == !!years,
+             RCP == rcp,
+             graze == 'Moderate',
+             region == reg) %>% 
+      mutate(GCM = factor(GCM, levels = names(cols_GCM1)))
+    
+    
+    subtitle <- rcp_label(rcp, years, include_parenth = FALSE)
+    if(reg != entire) {
+      subtitle <- paste0(subtitle, ', ', reg)
+    }
+    
+    df_wide <- df %>% 
+      select(-matches('_bio')) %>% 
+      filter(!duplicated(.)) %>% 
+      pivot_wider(
+        names_from = variable_clim,
+        values_from = c(median_clim, p25_clim, p75_clim, mean_clim),
+        names_glue = "{variable_clim}_{.value}"
+      ) %>% 
+      rename_with(.fn = \(x) str_replace(x, '_clim$', ''))
   
-
-
+    plots <- pmap(vars, function(var1, var2) {
+      crossplot_1panel(df_wide = df_wide, var1 = var1, var2 = var2)
+    })
+    
+    p <- wrap_plots(c(plots, list(patchwork::guide_area())),
+                 nrow = 2, guides = 'collect')
+    
+    p2 <- p & guides(color=guide_legend(ncol = 2),
+             linetype= guide_legend(ncol = 2))
+    
+    p3 <- p2 + plot_annotation(subtitle = subtitle)
+    filename <- paste0('figures/climate/by_gcm/clim_vs_clim_crossplot_',
+                       vr, '_', words2abbrev(reg), '_', rcp, '_',
+                       years, '_', runv, '.png')
+    ggsave(filename, plot = p3,
+           width = 6, height = 5.5, dpi = 600)
+  }
+}
 
 # comparing to fire -------------------------------------------------------
 

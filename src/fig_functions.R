@@ -846,6 +846,48 @@ scatter_light <- function(pft, # for subtitle
 }
 
 
+# crossplots --------------------------------------------------------------
+
+# make a single panel, plantting IQR of two variables
+# (for plotting climate variables agains each other)
+crossplot_1panel <- function(df_wide, var1, var2) {
+    g <- ggplot(data = df_wide) 
+  # adding vertical and horizontal lines, as long as it doesn't
+  # extend the axes
+  if(min(df_wide[[paste0(var1, '_p25')]]) < 0) {
+    g <- g + geom_vline(
+      mapping = aes(xintercept = 0),
+      alpha = 0.3, linetype = 2, linewidth = linewidth
+    ) 
+  }
+  if(min(df_wide[[paste0(var2, '_p25')]]) < 0) {
+    g <- g + geom_hline(
+      mapping = aes(yintercept = 0),
+      alpha = 0.3, linetype = 2, linewidth = linewidth
+    ) 
+  }
+  labeller <- driver_labeller(delta = TRUE)
+  g <- g + 
+    geom_segment(aes(x = .data[[paste0(var1, '_median')]], 
+                     y = .data[[paste0(var2, '_p25')]], 
+                     yend = .data[[paste0(var2, '_p75')]],
+                     color = GCM), linewidth = linewidth) +
+    geom_segment(aes(x = .data[[paste0(var1, '_p25')]], 
+                     xend = .data[[paste0(var1, '_p75')]], 
+                     y = .data[[paste0(var2, '_median')]],
+                     color = GCM), 
+                 linewidth = linewidth) +
+    geom_point(aes(x = .data[[paste0(var1, '_median')]], 
+                   y = .data[[paste0(var2, '_median')]], 
+                   color = GCM, shape = GCM)) +
+    scale_color_manual(values = cols_GCM1) +
+    scale_shape_manual(values = shapes_GCM1) +
+    labs(x = labeller(var1),
+         y = labeller(var2))
+  g
+
+}
+
 # facet functions ---------------------------------------------------------
 
 facet_manual_region <- function(v = 'r1.0', 
