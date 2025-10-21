@@ -25,8 +25,10 @@ q_curve_fig <- FALSE # create figure showing the 'biomass' q curves
 v <- '_v2'
 suffix <- paste0(run, v, vr_name, yr_lab) # for figures
 pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
+
 regions <- region_factor(v = vr, return_levels = TRUE)
 entire <- regions[1]
+
 # read in data ------------------------------------------------------------
 
 path_rds <- 'data_processed/site_means/summarize_bio.RDS'
@@ -389,6 +391,7 @@ if(q_curve_fig) {
 # clim vs bio by GCM ------------------------------------------------------
 # show the 25th to 75 percentiles of biomass (y axis) and climate variables 
 # (x axis)
+
 linewidth <- 0.3
 rcps <- unique(driver1$RCP)
 
