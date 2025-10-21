@@ -863,6 +863,179 @@ plot_c3c9_gref <- function(r_c3, r_c9, info_c3, info_c9) {
   
 }
 
+# map of (continuous) change in SEI
+plot_delta_sei <- function(r, panel_tag = NULL,
+                           legend_title = '\u0394SEI') {
+  # same brake points used in Holdrege et al 2024, REM
+  b <- c(0.2, 0.1, 0.05, 0.02, 0.01)
+  breaks2 <- c(-1, -b, rev(b), 1) 
+  labels2 <- label_creator(breaks2)
+  
+  fill_diff <- function(name = legend_title) {
+    scale_fill_manual(name = name,
+                      values = cols_delta_sei,
+                      labels = c(labels2, ""), # empty label for NA
+                      na.value = 'transparent',
+                      drop = FALSE) 
+  }
+  s <- stars::st_as_stars(r)
+  
+  s2 <- cut(s, breaks2)
+  
+  plot_map2(s2, panel_tag = panel_tag) +
+    fill_diff() +
+    theme(legend.position = 'right')
+}
+
+# categorical map showing the primary driver of SEI change
+plot_sei_driver <- function(r, panel_tag = NULL,
+                            legend_title = 'Primary driver \nof \u0394SEI') {
+  plot_map2(r, panel_tag = panel_tag) +
+    scale_fill_manual(
+      name = legend_title,
+      values = cols_sei_driver,
+      labels = c(names(cols_sei_driver), ""), # empty label for NA
+      na.value = 'transparent',
+      drop = FALSE
+    ) +
+    theme(legend.position = 'right')
+}
+
+return_delta_plot_fun <- function(type) {
+  if(str_detect(type, 'driver')) {
+    return(plot_sei_driver)
+  } else if(str_detect(type, 'SEI')) {
+    return(plot_delta_sei)
+  } else {
+    error('type not recognized')
+  }
+}
+
+# 12 panel plot where top two rows show change in SEI, relative
+# to moderate grazing for historical and future conditions (rows)
+# next two rows are the same structure but showing the primary driver 
+# of change
+plot_dsei_drvr_gref <- function(info, r) {
+  stopifnot(nrow(info) == 12)
+  info2 <- info %>% 
+    arrange(type, RCP, graze) %>% 
+    mutate(panel_tag = fig_letters[1:n()])
+  
+  legend_titles <- list(
+    'dom-driver' = "Primary driver of \u0394SEI",
+    'SEI-rdiff-gref' = "\u0394SEI relative \nto moderate grazing"
+  )
+  stopifnot(info$type %in% names(legend_titles))
+  
+  # letters in order of: figures, legends, column labels, row labels
+  layout <- '
+  #NOP#
+  QABCM
+  RDEFM
+  SGHIM
+  TJKLM
+  '
+  
+  info_plot1 <- info2 %>% 
+    mutate(plot = pmap(list(id, type, panel_tag), function(id, type, panel_tag) {
+      f <- return_delta_plot_fun(type)
+      r <- r[[id]]
+      f(r = r, panel_tag = panel_tag,
+        legend_title = legend_titles[type])
+    }))
+  
+  names4leftside <- list(
+    'dom-driver' = "(Driver of \u0394SEI)",
+    'SEI-rdiff-gref' = "(\u0394SEI)"
+  )
+  
+  
+  label_left <- info_plot1 %>% 
+    filter(.data$graze == levels(.data$graze)[1]) %>% 
+    mutate(rcp_year = rcp_label(.data$RCP, .data$years,
+                                include_parenth = FALSE),
+           label_left = paste0(rcp_year, '\n', names4leftside[type])) %>% 
+    pull(label_left) %>% 
+    map(label_left_plot)
+  
+  label_top <- paste0(unique(info_plot1$graze[1:3]), '\nGrazing') %>% 
+    map(label_top_plot)
+  
+  comb <- c(info_plot1$plot, list(patchwork::guide_area()),
+            label_top, label_left)
+  
+  p <- patchwork::wrap_plots(comb, ncol = 5,
+                             widths = c(0.15, 1, 1, 1, 0.7), 
+                             heights = c(0.15, rep(1, 4)),
+                             design = layout) + 
+    patchwork::plot_layout(guides = 'collect')
+  
+  p2 <- p & make_legend_small() & theme(plot.tag.position = 'topleft',
+                                        plot.tag.location = 'panel')
+  p2
+}
+
+# 8 panel plot, showing (left column) the change in sei
+# and (right column) the driver of the change
+# relative to historical climate ('climate reference 'cref')
+# rows are grazing levels
+plot_dsei_drvr_cref <- function(info, r) {
+  stopifnot(nrow(info) == 8)
+  info2 <- info %>% 
+    arrange(graze, type) %>% 
+    mutate(panel_tag = fig_letters[1:n()])
+  
+  legend_titles <- list(
+    'dom-driver' = "Primary driver of \u0394SEI",
+    'SEI-rdiff-cref' = "\u0394SEI"
+  )
+  stopifnot(info$type %in% names(legend_titles))
+  
+  # letters in order of: figures, legends, column labels, row labels
+  layout <- '
+  #JK#
+  LABI
+  MCDI
+  NEFI
+  OGHI
+  '
+  
+  info_plot1 <- info2 %>% 
+    mutate(plot = pmap(list(id, type, panel_tag), function(id, type, panel_tag) {
+      f <- return_delta_plot_fun(type)
+      r <- r[[id]]
+      f(r = r, panel_tag = panel_tag,
+        legend_title = legend_titles[type])
+    }))
+  
+  rcp_year <- rcp_label(unique(info$RCP), unique(info$years),
+                        include_parenth = FALSE)
+  labels4top <- list(
+    'dom-driver' = "Primary driver\nof \u0394SEI",
+    'SEI-rdiff-cref' = paste0("\u0394SEI \n(", rcp_year, 
+                              "\nrelative to historical climate)")
+  )
+  
+  label_top <- map(labels4top[unique(info_plot1$type)], label_top_plot)
+  
+  label_left <- paste0(unique(info_plot1$graze), '\nGrazing') %>% 
+    map(label_left_plot)
+  
+  comb <- c(info_plot1$plot, list(patchwork::guide_area()),
+            label_top, label_left)
+  
+  p <- patchwork::wrap_plots(comb, ncol = 5,
+                             widths = c(0.19, 1, 1, 0.7), 
+                             heights = c(0.3, 1, 1, 1, 1),
+                             design = layout) + 
+    patchwork::plot_layout(guides = 'collect')
+  
+  p2 <- p & make_legend_small() & theme(plot.tag.position = 'topleft',
+                                        plot.tag.location = 'panel')
+  p2
+}
+
+
 # crs -----------------------------------------------------------------------
 
 # the crs to be used for the sagebrush conservation design (this is the same

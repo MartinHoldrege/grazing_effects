@@ -1099,6 +1099,52 @@ driver_labeller <- function(delta = FALSE) {
   as_labeller(lookup_md)
 }
 
+#' create legend labels
+#'
+#' @param x numeric vector of break points
+#'
+#' @return character vector, where last category is just
+#' > x[n-1] instead of showing a range
+
+#' @examples
+#' label_creator(1:5)
+label_creator <- function(x, convert2percent = FALSE) {
+  if(convert2percent) x <- x*100
+  
+  n <- length(x)
+  labels <- vector(mode = 'character', length = n-1)
+  
+  for (i in 1:(n-1)) {
+    if(i < n -1) {
+      labels[i] <- paste(x[i], "to", x[i+1])
+    } else {
+      labels[i] <- paste(">", x[i])
+    }
+  }
+  labels[1] <- paste0('< ', x[2])
+  
+  labels
+}
+
+
+# * plots -----------------------------------------------------------------
+
+# 'ggplot' label plot for left side
+label_left_plot <- function(x) {
+  ggplot() +
+    theme_void() +
+    annotate("text", x = 1, y = 1, label = x, angle = 90, size = 3) +
+    theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+}
+
+# 'ggplot' label plot for top
+label_top_plot <- function(x) {
+  ggplot() +
+    theme_void() +
+    annotate("text", x = 1, y = 1, label = x, size = 3) +
+    theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+}
+
 # legends -----------------------------------------------------------------
 
 make_legend_small <- function(pointSize = 2, textSize = 7, spaceLegend = 0.2,

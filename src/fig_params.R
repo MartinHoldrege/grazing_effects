@@ -97,6 +97,9 @@ cols_seicont = c("#eee1ba", "#a6611a", "#78c679", "#006837", "#2166ac", "#053061
 # these are the SEI category break points
 vals_seicont = c(0, 0.173, 0.174, 0.431, 0.432, 1)
 
+cols_delta_sei <- RColorBrewer::brewer.pal(11, 'RdBu')
+cols_delta_sei[6] <- 'lightgrey'
+
 # colors for summary across GCMs
 cols_smry <-   c(low = "#ffffcc", 'median' = "#a1dab4",
                  'high' = "#2c7fb8")
@@ -163,10 +166,15 @@ cols_pred <- list(
   afg = c(low = '#f7fcb9', high = '#004529')
 )
 
-# for maps showing primary driver of change
+# for maps showing primary driver of fire change
 cols_pred_vars <- c(MAP = "#1f78b4", MAT = "#e31a1c", PSP = "#a6cee3", 
                     Aherb = "#b2df8a", Pherb = "#33a02c")
 
+# drivers of SEI change
+cols_sei_driver <- c(Sagebrush = '#d95f02', 
+                     Pherb = "#1b9e77",
+                     Aherb = "#7570b3", 
+                     'None' = 'lightgrey')
 
 # shapes ------------------------------------------------------------------
 

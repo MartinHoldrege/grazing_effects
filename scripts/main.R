@@ -21,6 +21,7 @@ scripts_vr <- c(
 # but not ecoregion versions
 scripts_yr <- c(
   # "scripts/06_sei_attribution.R"
+  # "scripts/07_sei_attrib_figs.R"
 )
 
 # to run for all combinations of vr and years

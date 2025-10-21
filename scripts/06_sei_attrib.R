@@ -114,6 +114,13 @@ sei_delta_clim1 <- r_sei1[[info_pair_sei_clim$id_fut]] - r_sei1[[info_pair_sei_c
 
 sei_delta_gref1 <- r_sei1[[info_pair_sei_gref$id]] - r_sei1[[info_pair_sei_gref$id_ref]]
 
+
+# ** median delta gref  ---------------------------------------------------
+
+# not used here but created for other scripts
+sei_delta_gref_smry1 <- summarize_gcms_raster(sei_delta_gref1,
+                                              info = info_pair_sei_gref,
+                                              include_low_high = FALSE)
 # * proportional Q |change| ---------------------------------------------------
 
 
@@ -299,4 +306,10 @@ writeRaster(
   overwrite = TRUE
 )
 
+# change in SEI (grazing reference)
+writeRaster(
+  names_replace(sei_delta_gref_smry1, '_SEI_SEI_', '_SEI_SEI-rdiff-gref_'),
+  filename = file.path(dir_out, paste0(runv, '_', years, "_delta-SEI-gref_smry.tif")),
+  overwrite = TRUE
+)
 }
