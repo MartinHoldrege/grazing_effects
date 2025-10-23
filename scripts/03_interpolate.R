@@ -23,7 +23,7 @@ version <- 'v4'
 # v4-- criteria same as v3, but new study area mask used (more restrictive)
 run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
-run_fire <- TRUE
+run_fire <- FALSE
 # interpolate data showing which vars caused changes in fire?
 run_fire_attribution <- TRUE 
 run_util <- FALSE # utilization
@@ -226,12 +226,14 @@ fire_w1 <- bio$fire0 %>%
               names_from = "id",
               values_from = "fire_prob") %>% 
   join_subsetcells(sc_dat = sc1, subset_in_target = subset_in_target)
+
 }
 
 
 # * fire attribution ------------------------------------------------------
 
 if (run_fire_attribution) {
+  # climate effect
   one_change_w1 <- attrib$one_change_smry1 %>% 
     filter_scenarios(run = run2run, years = years2run) %>% 
     mutate(id = paste0(run, v2paste, "_","fire-delta-", 
@@ -255,6 +257,31 @@ if (run_fire_attribution) {
   # combine
   fire_attrib_w <- dominant_driver_w1 %>% 
     left_join(one_change_w1, by = 'cellnumber')
+  
+  # grazing effect
+  one_change_gref_w1 <- attrib$one_change_gref_smry1 %>% 
+    filter_scenarios(run = run2run, years = years2run) %>% 
+    mutate(id = paste0(run, v2paste, "_","fire-delta-gref-", 
+                       pred_var_ref, "_", id, "_median")) %>% 
+    dplyr::select(site, id, delta_1var) %>% 
+    pivot_wider(id_cols = "site",
+                names_from = "id",
+                values_from = "delta_1var")%>% 
+    join_subsetcells(sc_dat = sc1, subset_in_target = subset_in_target)
+  
+  dominant_driver_gref_w1 <- attrib$dominant_driver_gref1 %>% 
+    filter_scenarios(run = run2run, years = years2run) %>% 
+    mutate(id = paste0(run, v2paste, "_","fire-dom-driver-gref", "_", id, "_mode"),
+           dominant_driver = as.numeric(dominant_driver)) %>% 
+    dplyr::select(site, id, dominant_driver) %>% 
+    pivot_wider(id_cols = "site",
+                names_from = "id",
+                values_from = "dominant_driver") %>% 
+    join_subsetcells(sc_dat = sc1, subset_in_target = subset_in_target)
+  
+  # combine
+  fire_attrib_gref_w <- dominant_driver_gref_w1 %>% 
+    left_join(one_change_gref_w1, by = 'cellnumber')
   
 }
 
@@ -464,6 +491,14 @@ if(run_fire_attribution) {
   path_attrib <- file.path("data_processed/interpolated_rasters/fire_attrib", version)
 
   run_interpolatePoints(df = fire_attrib_w,
+                        match = match1,
+                        template = template,
+                        path = path_attrib,
+                        min_size = min_size,
+                        rerun = rerun,
+                        exclude_poor_matches = exclude_poor_matches)
+  
+  run_interpolatePoints(df = fire_attrib_gref_w,
                         match = match1,
                         template = template,
                         path = path_attrib,

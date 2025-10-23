@@ -1,6 +1,7 @@
 # Purpose: Determine which predictor variables of the fire equation
 # are most responsible the change in fire probability at a given site
-# under a given climate scenario
+# under a given climate scenario (and fixed grazing)
+# or the change relative to moderate grazing under a fixed climate (i.e. 'gref')
 
 # Author: Martin Holdrege
 
@@ -12,7 +13,7 @@
 # if change less than 1 fire per 500 years then 
 # don't consider the driver of change
 delta_fire_prob_cutoff <- 0.2 # percentage point change
-
+ref_graze <- 'Moderate'
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -120,6 +121,57 @@ one_change <- bio_cur3 %>%
   pivot_wider(values_from = value, names_from = pred_var_fut) 
 
 
+# * grazing reference -----------------------------------------------------
+# here 'ref' refers to the reference grazing level, and 'grz' refers
+# to any other grazing level. 
+
+bio_ref1 <- bio3 %>% 
+  filter(graze == ref_graze)
+
+bio_grz <- bio3 %>% 
+  filter(graze != ref_graze)
+
+
+bio_ref2 <- bio_ref1 %>% 
+  pivot_longer(cols = all_of(pred_vars),
+               names_to = 'pred_var_ref',
+               values_to = "value_ref")  %>% 
+  ungroup() %>% 
+  select(-graze,  -id) 
+
+# columns labeled with the pred vars, are the 'reference' values
+bio_ref3 <- bio_ref2 %>% 
+  full_join(bio_grz, by = c('run', 'site', 'years', 'GCM', 'RCP'),
+            relationship = "many-to-many")
+
+# change in predictor variable (within a climate scenario)
+delta_pred_var_gref1 <- bio_grz %>% 
+  pivot_longer(cols = all_of(pred_vars),
+               names_to = 'pred_var_grz',
+               values_to = "value_grz") %>% 
+  left_join(bio_ref2, by = c('run', 'site', 'years', 'GCM', 'RCP',
+                             'pred_var_grz' = 'pred_var_ref')) %>% 
+  mutate(delta_pred_value = value_grz - value_ref) %>% 
+  rename(pred_var = pred_var_grz)
+
+
+# all pred vars (columns) are equal to value for given grazing level, 
+# except the one named in pred_var_ref column, where the
+# value for the reference grazing level is used is instead used
+one_change_gref <- bio_ref3 %>% 
+  pivot_longer(cols = all_of(pred_vars),
+               names_to = 'pred_var_grz',
+               values_to = 'value_grz') %>% 
+  # replacing one pred var at a time, with the current value
+  mutate(value = ifelse(pred_var_grz == pred_var_ref, value_ref, value_grz)) %>% 
+  select(-value_ref, -value_grz) %>% 
+  pivot_wider(values_from = value, names_from = pred_var_grz) %>% 
+  # only biomass variables are different between grazing levels 
+  # (climate is fixed)
+  filter(pred_var_ref %in% c('Aherb', 'Pherb'))
+
+
+
 # predict fire probability ------------------------------------------------
 
 predict_fire_with <- function(df) {
@@ -156,6 +208,38 @@ one_change2b <- delta_pred_var1 %>%
          pred_var_cur = pred_var) %>% 
   right_join(one_change2, by = c("run", "years", "graze", "site",  "RCP", 
                                  "GCM", 'pred_var_cur', "id")) 
+
+
+# * grazing reference ----------------------------------------------------
+
+# predicted fire probability when 1 variable changed to the current value
+one_change_gref$fire_prob_1var <- predict_fire_with(one_change_gref)
+
+# predicted fire probability under future conditions
+bio_grz2 <- bio_grz
+bio_grz2$fire_prob_grz <- predict_fire_with(bio_grz2)
+
+# predicted fire probability under current conditions
+bio_ref1b <- bio_ref1
+bio_ref1b$fire_prob_ref <- predict_fire_with(bio_ref1b)
+
+# combine
+one_change_gref2 <- bio_ref1b %>% 
+  ungroup() %>% 
+  select(run, site, RCP, GCM, years, fire_prob_ref) %>% 
+  right_join(one_change_gref) %>% 
+  select(-all_of(pred_vars)) %>% 
+  left_join(select(bio_grz2, run, years, RCP, GCM, graze, id, site, fire_prob_grz)) %>% 
+  # How much different is fire probability, when 1 variable isn't changed
+  # (i.e. 1 variable changed to current value)
+  mutate(delta_1var = fire_prob_grz - fire_prob_1var ,
+         rcp_years = rcp_label(RCP, years, include_parenth = FALSE)) 
+
+one_change_gref2b <- delta_pred_var_gref1 %>% 
+  rename(pred_value_grz = value_grz, pred_value_ref = value_ref,
+         pred_var_ref = pred_var) %>% 
+  right_join(one_change_gref2, by = c("run", "years", "graze", "site",  "RCP", 
+                                 "GCM", 'pred_var_ref', "id")) 
 
 
 # summarize results -------------------------------------------------------
@@ -195,6 +279,52 @@ one_change3 <- one_change2b %>%
             .groups = 'drop') %>% 
   mutate(pred_var_cur = factor(pred_var_cur, levels = !!pred_vars))
 
+
+# *grazing reference ------------------------------------------------------
+
+dominant_driver_gref0 <- one_change_gref2b %>% 
+  rename(dominant_driver = pred_var_ref) %>% 
+  # if change less than 1 fire per 500 years then 
+  # don't consider the driver of change
+  mutate(delta_fire_prob = fire_prob_grz - fire_prob_ref,
+         dominant_driver = ifelse(abs(delta_fire_prob) < delta_fire_prob_cutoff, 
+                                  'None', dominant_driver)) %>% 
+  group_by(run, site, graze, RCP, years, id, GCM) %>% 
+  filter(abs(delta_1var) == max(abs(delta_1var))) %>% 
+  mutate(n = n()) 
+
+
+# if n>1 that means there were ties for the dominant driver
+# and these would need to be dealt with
+# but it is ok if the 'multiple' dominant drivers are all 'None'
+test <- dominant_driver_gref0$dominant_driver[dominant_driver_gref0$n > 1]
+stopifnot(all(test == 'None'))
+
+# summary across GCMs
+set.seed(1234)
+dominant_driver_gref1 <- dominant_driver_gref0 %>% 
+  group_by(run, site, graze, RCP, years, id) %>% 
+  summarize(dominant_driver = mode_rand(dominant_driver),
+            .groups = 'drop') %>% 
+  mutate(dominant_driver = factor(dominant_driver,
+                                  levels = c(!!pred_vars, 'None')))
+
+tmp <- bio3a %>% 
+  pivot_wider(id_cols = c('run', 'years', 'RCP', 'GCM', 'site'),
+              values_from = all_of(pred_vars),
+              names_from = 'graze')
+with(tmp, plot(Aherb_Heavy, Aherb_Light))
+
+# summarize across GCMs
+one_change_gref3 <- one_change_gref2b %>% 
+  group_by(run, site, graze, years, RCP, id, pred_var_ref) %>% 
+  summarize(across(.cols = c('fire_prob_grz', "fire_prob_ref", "delta_1var", 
+                             "pred_value_grz", "pred_value_ref", "delta_pred_value"),
+                   .fns = median),
+            delta_1var_abs = median(abs(delta_1var)),
+            .groups = 'drop') %>% 
+  mutate(pred_var_ref = factor(pred_var_ref, levels = !!pred_vars))
+
 # checks ------------------------------------------------------------------
 
 test <- dominant_driver1 %>% 
@@ -203,12 +333,22 @@ test <- dominant_driver1 %>%
   pull(n)
 stopifnot(all(test == 200))  
 
+test <- dominant_driver_gref1 %>% 
+  group_by(run, id) %>% 
+  summarize(n = n()) %>% 
+  pull(n)
+stopifnot(all(test == 200))  
+
+
 # output ------------------------------------------------------------------
 
 out <- list(
   one_change_smry1 = one_change3,
   one_change_gcm1 = one_change2b,
+  one_change_gref_smry1 = one_change_gref3,
+  one_change_gref_gcm1 = one_change_gref2b,
   dominant_driver1 = dominant_driver1,
+  dominant_driver_gref1 = dominant_driver_gref1,
   pred_vars = pred_vars,
   pred_vars2 = levels(dominant_driver1$dominant_driver)
 )
