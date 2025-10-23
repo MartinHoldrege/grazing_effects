@@ -23,7 +23,7 @@ runs <- opt$run #c('fire1_eind1_c4grass0_co20_2503', 'fire1_eind1_c4grass1_co20_
 # some terra operations can be done in parallel and need 
 # to know num of cores
 num.cores <- parallel::detectCores(logical = FALSE) 
-
+ref_graze <- opt$ref_graze
 
 for (run in runs) {
 print(run)
@@ -130,13 +130,12 @@ names(diff_cref2) <- map(diff_cref1, names) %>%
   unlist()
 
 
-# change relative to light grazing of same gcm -------------------------
+# change relative to referenc grazing of same gcm -------------------------
 
-# e.g. this shows percentage point change when going from light grazing, to heavy
-# grazing for RCP 8.5 end of century
+# this shows percentage point change when going from reference grazing level, to heavy
+# another grazing level, under a fixed climate scenario
 # (wgcm = comparisons are  'within gcm')
 id_noGraze <- unique(rast_info$id_noGraze)
-ref_graze <- 'Light'
 
 diff_wgcm_graze_gcm <- map(id_noGraze, function(id) {
   info <- rast_info %>% 
@@ -163,7 +162,8 @@ diff_wgcm_graze_med <- map(id_noGCM_noref, function(id) {
   
   r <- diff_wgcm_graze_gcm[[info$id]]
   med <- median(r)
-  names(med) <- id
+  names(med) <- id %>% 
+    str_replace("fire-prob", "fire-prob-rdiff-gref")
   med
 }) %>% 
   rast()
@@ -185,7 +185,7 @@ writeRaster(comb1,
                       paste0(run, "_fire-prob_future_summary_across_GCMs.tif")),
             overwrite = TRUE)
 
-# difference in biomass (raw) relative to current conditions (within a grazing level)
+# difference in fire (raw) relative to current conditions (within a grazing level)
 writeRaster(diff_cref2, 
             file.path("data_processed/interpolated_rasters", 
                       paste0(run, "_fire-prob-rdiff-cref_median.tif")),

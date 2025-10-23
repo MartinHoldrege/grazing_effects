@@ -18,7 +18,9 @@ option_list <- list(
   optparse::make_option("--years", type = "character", default = "2070-2100"),
   # included --test_run with no value forst test_run to be true
   # otherwise leave it out
-  optparse::make_option("--test_run", action = "store_true", default = FALSE)
+  optparse::make_option("--test_run", action = "store_true", default = FALSE),
+  # reference grazing level
+  optparse::make_option("--ref_graze", type = "character", default = "Moderate")
 )
 
 opt_parser <-optparse::OptionParser(option_list = option_list)
