@@ -887,6 +887,25 @@ plot_delta_sei <- function(r, panel_tag = NULL,
     theme(legend.position = 'right')
 }
 
+# map of (continuous) change in SEI
+plot_delta_fire <- function(r, panel_tag = NULL, 
+                            limits = NULL,
+                            legend_title = '\u0394 #fires/century') {
+  
+  if(is.null(limits)) {
+    limits <- range_raster(r, absolute = TRUE)
+  }
+  colors <- rev(cols_map_bio_d2)
+  
+  plot_map2(r, panel_tag = panel_tag) +
+    scale_fill_gradientn(na.value = 'transparent',
+                         limits = limits,
+                         name = legend_title,
+                         colors = colors) +
+    theme(legend.position = 'right')
+ 
+}
+
 # categorical map showing the primary driver of SEI change
 plot_sei_driver <- function(r, panel_tag = NULL,
                             legend_title = 'Primary driver \nof \u0394SEI') {

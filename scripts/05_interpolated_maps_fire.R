@@ -5,7 +5,7 @@
 # Purpose: Map and examine interpolated fire probability
 # code adapted from SEI/scripts/sw_results/01_examine_sw_results_fire.R
 
-
+# NOTE--this script is currently failing
 # dependencies ------------------------------------------------------------
 
 library(terra)
@@ -25,7 +25,7 @@ v_out <- "v1" # version appended to output
 years <- opt$years
 yr_lab <- opt$years
 graze_levels <- c("grazL" = "Light")
-ref_graze <- 'Light' # reference graze level for within gcm comparisons
+ref_graze <- 'Light' # opt$ref_graze
 
 # Read in data ------------------------------------------------------------
 
@@ -288,7 +288,6 @@ for (run in runs) {
   info_wgcm1 <- create_rast_info(r,
                                  into = c("type", 'RCP', 'years', 'graze')) %>% 
     mutate(id_noGraze = str_replace(id, '_[[:alpha:]]+$', '')) %>% 
-    filter_clim_extremes() %>% 
     arrange(RCP, years, graze)
   
   info_wgcm_l <- split(info_wgcm1, info_wgcm1$id_noGraze)

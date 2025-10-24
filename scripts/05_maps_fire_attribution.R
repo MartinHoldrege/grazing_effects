@@ -23,7 +23,7 @@ source('src/params.R')
 v_out <- "v1" # version appended to output
 graze_levels <- c("grazL" = "Light", "grazVH" = "Very Heavy")
 run <- opt$run
-test_run <- opt$test_run # TRUE # 
+test_run <- TRUE # opt$test_run # 
 pfts <- c("Pherb", "Aherb")
 ref_graze <- opt$ref_graze
 # Read in data ------------------------------------------------------------
@@ -51,12 +51,10 @@ info_rdiff1 <- info_rdiff0 %>%
 
 # raw difference relative to grazing reference
 # gr = 'grazing reference'
-path_rdiff_gr<- file.path(path_r,
+path_rdiff_gr <- file.path(path_r,
                           paste0(run, "_fire-prob-wgcmDiff-", ref_graze, 
                                  "_median.tif"))
 rdiff_gr1 <- rast(path_rdiff_gr)
-
-info_rdiff_gr1 <- create_rast_info(rdiff_gr1, into = into)
 
 # * drivers of fire change ----------------------------------------------
 # files created in # "scripts/03_interpolate.R"
@@ -108,6 +106,7 @@ bio_diff1 <- bio_diff1[[info_bio_diff1$id]]
 
 if(test_run) {
   rdiff1 <- downsample(rdiff1)
+  rdiff_gr1 <- downsample(rdiff_gr1)
   r_dom1 <- downsample(r_dom1)
   r_delta_driver1 <- downsample(r_delta_driver1)
   clim_diff1 <- downsample(clim_diff1)
@@ -138,24 +137,29 @@ info_dom1 <- create_rast_info(r_dom2, into = into_attrib) %>%
 
 info_delta1 <- create_rast_info(r_delta_driver1, into = into_attrib) %>% 
   # incorrect file naming using, so manually parsing
-  mutate(pred_var = str_extract(type, "(?<=fire-delta-)[[:alpha:]]+"),
+  mutate(pred_var = str_extract(type, "(?<=\\-)[[:alpha:]]+$"),
          type = str_replace(type, pred_var, "pred"),
          reference = ifelse(str_detect(id, 'gref'), 'gref', 'cref')) %>% 
   dplyr::select(-summary_stat)
 
+info_rdiff_gr1 <- create_rast_info(rdiff_gr1, into = into) %>% 
+  mutate(reference = 'gref',
+         pred_var = 'total')
+
 # actual change in fire probability 
 info_rdiff1 <- create_rast_info(rdiff1,
                                into = c("type", "RCP", "years", "graze")) %>% 
-  mutate(pred_var = 'total')
+  mutate(pred_var = 'total',
+         reference = 'cref')
 
-info_delta2 <- bind_rows(info_delta1, info_rdiff1)%>% 
+info_delta2 <- bind_rows(info_delta1, info_rdiff1, info_rdiff_gr1)%>% 
   # filter_clim_extremes() %>% 
   # filter(graze %in% graze_levels) %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
          pred_var = factor(pred_var, levels = c('total', pred_vars),
                            labels = c("total", pred_vars2)))
 
-r_delta2 <- c(r_delta_driver1, rdiff1)[[info_delta2$id]]
+r_delta2 <- c(r_delta_driver1, rdiff1, rdiff_gr1)[[info_delta2$id]]
 
 
 # * delta pred vars -------------------------------------------------------
@@ -402,3 +406,15 @@ map(info_plots_l, function(df) {
   ggsave(filename, plot = g,
          width = 6, height = 14.5, dpi = 900)
 })
+
+
+# Maps --grazing reference ------------------------------------------------
+
+info_delta_gr1 <- info_delta2 %>% 
+  filter(reference == 'gref')
+
+
+r_delta2
+
+# continue here (use the plot_delta_fire function, consider, color
+# classes instead of continuous). 
