@@ -4,7 +4,7 @@
 
 # Purpose: Maps that examine what variables are most responsible for 
 # the changes in projected fire probability. 
-
+# TO DO--update to run all RCP/years combos
 
 # dependencies ------------------------------------------------------------
 
@@ -22,9 +22,10 @@ source('src/fig_functions.R')
 source('src/params.R')
 v_out <- "v1" # version appended to output
 graze_levels <- c("grazL" = "Light", "grazVH" = "Very Heavy")
-
-test_run <- FALSE
+run <- opt$run
+test_run <- opt$test_run # TRUE # 
 pfts <- c("Pherb", "Aherb")
+ref_graze <- opt$ref_graze
 # Read in data ------------------------------------------------------------
 
 # selecting which rasters to load
@@ -34,6 +35,7 @@ path_r <- "data_processed/interpolated_rasters"
 # * median fire probability (across GCMs) --------------------------------------------
 
 # *median delta fire-prob ---------------------------------------------------
+# files created in "scripts/04_interpolated_summarize_fire.R"
 
 # raw difference relative to historical climate conditions
 path_rdiff <- file.path(path_r,
@@ -42,13 +44,24 @@ rdiff1 <- rast(path_rdiff)
 
 into <- c("type", "RCP", "years", 
           "graze")
-info_rdiff0 <- create_rast_info(rdiff1, into = into)%>% 
-  filter_clim_extremes()
+info_rdiff0 <- create_rast_info(rdiff1, into = into)
 
 info_rdiff1 <- info_rdiff0 %>% 
   filter(graze %in% graze_levels) 
 
+# raw difference relative to grazing reference
+# gr = 'grazing reference'
+path_rdiff_gr<- file.path(path_r,
+                          paste0(run, "_fire-prob-wgcmDiff-", ref_graze, 
+                                 "_median.tif"))
+rdiff_gr1 <- rast(path_rdiff_gr)
+
+info_rdiff_gr1 <- create_rast_info(rdiff_gr1, into = into)
+
 # * drivers of fire change ----------------------------------------------
+# files created in # "scripts/03_interpolate.R"
+
+# both climate and grazing reference
 
 # dominant driver of change
 paths_dom <- list.files(
@@ -119,14 +132,15 @@ names(r_dom2) <- names(r_dom1)
 into_attrib <- c("type", "RCP", "years", "graze", "summary_stat")
 
 info_dom1 <- create_rast_info(r_dom2, into = into_attrib) %>% 
-  filter_clim_extremes() %>% 
-  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
-  arrange(RCP, graze)
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
+         reference = ifelse(str_detect(id, 'gref'), 'gref', 'cref')) %>% 
+  arrange(reference, RCP, graze)
 
 info_delta1 <- create_rast_info(r_delta_driver1, into = into_attrib) %>% 
   # incorrect file naming using, so manually parsing
   mutate(pred_var = str_extract(type, "(?<=fire-delta-)[[:alpha:]]+"),
-         type = str_replace(type, pred_var, "pred")) %>% 
+         type = str_replace(type, pred_var, "pred"),
+         reference = ifelse(str_detect(id, 'gref'), 'gref', 'cref')) %>% 
   dplyr::select(-summary_stat)
 
 # actual change in fire probability 
@@ -135,8 +149,8 @@ info_rdiff1 <- create_rast_info(rdiff1,
   mutate(pred_var = 'total')
 
 info_delta2 <- bind_rows(info_delta1, info_rdiff1)%>% 
-  filter_clim_extremes() %>% 
-  filter(graze %in% graze_levels) %>% 
+  # filter_clim_extremes() %>% 
+  # filter(graze %in% graze_levels) %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
          pred_var = factor(pred_var, levels = c('total', pred_vars),
                            labels = c("total", pred_vars2)))
@@ -149,35 +163,29 @@ r_delta2 <- c(r_delta_driver1, rdiff1)[[info_delta2$id]]
 info_pred_diff1 <- bind_rows(info_bio_diff1, info_clim_diff1) %>% 
   filter(pred_var %in% pred_vars,
          graze %in% graze_levels | is.na(graze)) %>% 
-  mutate(pred_var = driver2factor(pred_var)) %>% 
-  filter_clim_extremes()
+  mutate(pred_var = driver2factor(pred_var)) 
+  # filter_clim_extremes()
 
 pred_delta1 <- c(clim_diff1, bio_diff1)[[info_pred_diff1$id]]
 
 # Maps of delta fire prob -------------------------------------------------
 
-# top right map shows absolute difference in fire prob,
-# the remaining maps show change in probability due to a given 
+# code to make the paste0("figures/fire_attribution/maps/fire-delta-driver_", v_out, "_", run, ".pdf")
+# file has been removed (Oct 2025),
+# this now only used for setting up objects for use below
 
-m <- minmax(r_delta2) %>% 
-  unlist() %>% 
-  abs() %>% 
-  max()
-range_delta <- c(-m, m)
+range_delta <- range_raster(r_delta2, absolute = TRUE)
 
 info_delta3 <- info_delta2 %>% 
   mutate(plot = vector(mode = "list", length = n())) %>% 
   arrange(RCP, years, graze, pred_var) %>% 
-  group_by(rcp_year, graze) 
-  
-info_delta_l <- group_split(info_delta3)
+  group_by(rcp_year, graze) %>% 
+  filter(reference != 'gref' | is.na(reference))
 
-pdf(paste0("figures/fire_attribution/maps/fire-delta-driver_", v_out, "_", run, ".pdf"),
-          width = 8, height = 7)  
+info_delta_l <- group_split(info_delta3)
 
 for(df in info_delta_l){
 
-  # plots of biomass
   maps_delta <- pmap(df[c('id', 'pred_var')], function(id, pred_var) {
     
     if(pred_var == 'total') {
@@ -199,29 +207,15 @@ for(df in info_delta_l){
     
   })
   
-  # putting into list for use in other plots
+  # putting into list for use in other plots below
   info_delta3$plot[info_delta3$id %in% df$id] <- maps_delta
-  
-  p <- wrap_plots(maps_delta, ncol = 3) +
-    plot_layout(guides = 'collect') +
-    patchwork::plot_annotation(
-      subtitle = paste0('Attribution of changes in fire probability ',
-                        '(',df$graze[1], " grazing, ",
-                       df$rcp_year[1], ")"),
-      caption = paste(run, "\n Change in fire probability due to a predictor",
-                      "variable calculated by holding that variable at historical",
-                      "levels", 
-                      "\nand calculating difference from future"))
-  
-  p2 <- p&theme(legend.position = 'bottom')
-  
-  print(p2)
-  }
-dev.off()
+}
+
 
 # maps of primary driver of change ----------------------------------------
 
 info_dom_l <- info_dom1 %>% 
+  filter(reference == 'cref') %>% 
   group_by(rcp_year) %>% 
   group_split()
 
@@ -231,11 +225,9 @@ for (df in info_dom_l) {
   maps <- pmap(df[c('id', 'graze')], function(id, graze) {
     
     r <- r_dom2[[id]]
-        lvl <- levels(r)[[1]]
+    lvl <- levels(r)[[1]]
     s <- st_as_stars(r)
-
     s[[1]] <- factor(s[[1]], levels = c(lvl$ID), labels = c(lvl$category))
-    
     plot_map2(
       r = s,
       add_coords = TRUE
@@ -322,9 +314,6 @@ info_plots_l <- info_delta4 %>%
   arrange(RCP, years, graze, pred_var) %>% 
   group_by(RCP, years, graze) %>% 
   group_split()
-
-
-
 
 # * 10 panel --------------------------------------------------------------
 

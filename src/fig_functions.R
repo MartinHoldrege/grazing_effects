@@ -1098,7 +1098,6 @@ driver_labeller <- function(delta = FALSE) {
   
   as_labeller(lookup_md)
 }
-<<<<<<< HEAD
 
 #' create legend labels
 #'
@@ -1145,8 +1144,7 @@ label_top_plot <- function(x) {
     annotate("text", x = 1, y = 1, label = x, size = 3) +
     theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
 }
-=======
->>>>>>> cb3033c189b469639400788c12f7b6a81cd24977
+
 
 # legends -----------------------------------------------------------------
 
