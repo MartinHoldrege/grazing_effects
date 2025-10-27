@@ -23,7 +23,8 @@ source('src/params.R')
 v_out <- "v1" # version appended to output
 graze_levels <- c("grazL" = "Light", "grazVH" = "Very Heavy")
 run <- opt$run
-test_run <- TRUE # opt$test_run # 
+runv <- opt$runv
+test_run <- opt$test_run # TRUE # 
 pfts <- c("Pherb", "Aherb")
 ref_graze <- opt$ref_graze
 # Read in data ------------------------------------------------------------
@@ -409,12 +410,33 @@ map(info_plots_l, function(df) {
 
 
 # Maps --grazing reference ------------------------------------------------
+# 18 panel maps, columns show grazing level, relative to reference
+# rows show historical and future change in fire probability (total, and
+# attributed to annuals and perennials)
 
 info_delta_gr1 <- info_delta2 %>% 
   filter(reference == 'gref')
 
+df_rcp_yr <- expand_grid(
+  rcp = levels(info_delta2$RCP)[-1],
+  years = levels(info_delta2$years)[-1]
+)
 
-r_delta2
+pmap(df_rcp_yr, function(rcp, years) {
+  info <- info_delta_gr1 %>% 
+    filter(RCP %in% c('Current', rcp),
+           years %in% c('Current', !!years))
+  
+  legend_title <-  paste0('\u0394 #fires/century\n',
+                          'relative to ', str_to_lower(ref_graze), '\ngrazing')
+  
+  g <- plot_fire_gref_18panel(info, r= r_delta2, legend_title = legend_title)
+  
+  filename <- paste0("figures/fire_attribution/maps/delta-fire-attrib_gref_18panel_",
+                     rcp, '_', years, "_", runv, ".png")
+  
+  ggsave(filename, plot = g,
+         width = 7, height = 11.3, dpi = 900)
+})
 
-# continue here (use the plot_delta_fire function, consider, color
-# classes instead of continuous). 
+

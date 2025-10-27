@@ -412,7 +412,9 @@ plot_map2 <- function(r, add_coords = TRUE,...)  {
     theme(axis.text = element_blank(),
           axis.ticks = element_blank(),
           axis.text.y = element_blank(),
-          plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
+          plot.margin = unit(c(0, 0, 0, 0), units = 'in'),
+          plot.tag.position = 'topleft',
+          plot.tag.location = 'panel')
   
   map
   
@@ -906,6 +908,82 @@ plot_delta_fire <- function(r, panel_tag = NULL,
  
 }
 
+plot_fire_gref_18panel <- function(info, r, legend_title) {
+  stopifnot(nrow(info) == 18)
+  info2 <- info %>% 
+    arrange(RCP, pred_var, graze)
+  limits <- range_raster(r[[info2$id]], absolute = TRUE)
+  info2 <- info2 %>% 
+    mutate(panel_tag = fig_letters[1:n()],
+           plot = map2(id, panel_tag, function(id, panel_tag) {
+             plot_delta_fire(r[[id]], panel_tag = panel_tag,
+                             limits = limits,
+                             legend_title = legend_title)
+           }))
+  
+  
+  # letters in order of: figures, legends, column labels, row labels
+  layout <- '
+  #TUV#
+  WABC#
+  XDEF#
+  YGHIS
+  ZJKLS
+  aMNOS
+  bPQRS
+  '
+  
+  names4leftside <- list(
+    'Aherb' = "(\u0394fire due to Aherb)",
+    'Pherb' = "(\u0394fire due to Pherb)",
+    'total' = "(Total \u0394fire)"
+  )
+  
+  stopifnot(info2$pred_var %in% names(names4leftside))
+  
+  label_left <- info2 %>% 
+    filter(.data$graze == levels(.data$graze)[1]) %>% 
+    mutate(label_left = paste0(rcp_year, '\n', 
+                               names4leftside[as.character(pred_var)])) %>% 
+    pull(label_left) %>% 
+    map(label_left_plot)
+  
+  label_top <- paste0(unique(info2$graze), '\nGrazing') %>% 
+    map(label_top_plot)
+  
+  layout <- "
+   #123#
+   aABC*
+   bDEF*
+   cGHI*
+   dJKL*
+   eMNO*
+   fPQR*
+  "
+  
+  plots_named <- c(
+    # top labels (3)
+    setNames(label_top,  c("1","2","3")),
+    # left labels (6)
+    setNames(label_left, letters[1:length(label_left)]),
+    # 18 map panels (A–R)
+    setNames(info2$plot, LETTERS[1:nrow(info2)]),
+    # legend (single area spanning right column)
+    list(`*` = patchwork::guide_area())
+  )
+  
+  
+  p <- patchwork::wrap_plots(
+    plotlist = plots_named,
+    design   = layout,
+    widths   = c(0.2, 1, 1, 1, 0.9),
+    heights  = c(0.2, rep(1, 6))
+  ) + patchwork::plot_layout(guides = "collect")
+  
+  p2 <- p #& make_legend_small() 
+  p2
+}
+
 # categorical map showing the primary driver of SEI change
 plot_sei_driver <- function(r, panel_tag = NULL,
                             legend_title = 'Primary driver \nof \u0394SEI') {
@@ -929,6 +1007,8 @@ return_delta_plot_fun <- function(type) {
     error('type not recognized')
   }
 }
+
+
 
 # 12 panel plot where top two rows show change in SEI, relative
 # to moderate grazing for historical and future conditions (rows)
