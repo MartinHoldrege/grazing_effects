@@ -287,52 +287,75 @@ weighted_violin1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
 #' @param ylab_abs label for abs panels
 #' @param ylab_diff label for diff panels
 box_abs_diff <- function(df_abs, 
-                         df_diff,
+                         df_diff_cref,
+                         df_diff_gref,
                          y_abs = 'biomass',
                          y_diff = 'bio_diff',
                          ylab_abs = y_abs,
-                         ylab_diff = y_diff
+                         ylab_diff_cref = y_diff,
+                         ylab_diff_gref = y_diff
 ) {
   
   stopifnot(unique(sort(df_abs$PFT)) == unique(sort(df_diff$PFT)))
-  
-  base <- function() {
-    list(
+  # CONTINUE HERE  TO GET LETTERS IN CORNERS
+  base <- function(add_hline = FALSE, scales = 'free_y') {
+    out <- list(
       geom_boxplot(aes(weight = weight), coef = 10,
                    position = position_dodge2(preserve = 'single')),
       scale_fill_smry(),
-      facet_grid(PFT~rcp_year, scales = 'free_y'),
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      facet_grid(PFT~rcp_year, scales = scales),
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            panel.spacing.x = unit(0, "lines"))
 
     )
+    if(add_hline) {
+      out <- c(out, list(geom_hline(yintercept = 0, alpha = 0.5, linetype = 2)))
+    }
+    out
+  }
+  
+  blank_strip <- function() {
+    theme(strip.background.y = element_blank(), strip.text.y = element_blank())
   }
 
   g1 <- ggplot(df_abs, aes(graze, .data[[y_abs]], fill = summary)) +
     base() +
-    theme(strip.background.y = element_blank(), strip.text.y = element_blank()) +
+    blank_strip() +
     labs(x = lab_graze,
          y = ylab_abs) +
     # add space on the left (for tags)
     # (and adding space to the right, to be symetric)) 
-    scale_x_discrete(expand = expansion(add = c(1, 1))) +
+    #scale_x_discrete(expand = expansion(add = c(1, 1))) +
     guides(fill = 'none') +
     expand_limits(y = 0)
   
-  g2  <- ggplot(df_diff, aes(graze, .data[[y_diff]], fill = summary))+
-    geom_hline(yintercept = 0, alpha = 0.5, linetype = 2)+
-    base() +
-    labs(x = lab_graze,
-         y = ylab_diff) 
   
-  n_scen <- lu(df_diff$rcp_year)
+  df_diff_gref
+  
+  g2  <- ggplot(df_diff_gref, aes(graze, .data[[y_diff]], fill = summary))+
+    base(add_hline = TRUE, scales = 'fixed') +
+    blank_strip() +
+    labs(x = lab_graze,
+         y = ylab_diff_gref) 
+
+  g3  <- ggplot(df_diff_cref, aes(graze, .data[[y_diff]], fill = summary))+
+    base(add_hline = TRUE) +
+    labs(x = lab_graze,
+         y = ylab_diff_cref) 
+  g3
+  
+  
+  n_scen <- lu(df_diff_gref$rcp_year)
   n_pft <- lu(df_abs$PFT)
   
   index_abs <- seq(from = 1, length.out = n_pft,
                    by = n_scen + 1)
   
-  n_panels = n_pft*n_scen + n_pft
+  n_panels = n_pft*n_scen*2 + n_pft
   index_diff <- seq(from = 1, to = n_panels)
   index_diff <- index_diff[!index_diff %in% index_abs]
+  
+  
   
   # adding letters to panels
   g1b <- egg::tag_facet(g1, tag_pool = fig_letters[index_abs],
@@ -348,6 +371,8 @@ box_abs_diff <- function(df_abs,
                         hjust = -0.1,
                         size = 3)+ 
     theme(strip.text = element_text())
+  
+  g3b <- #blah
 
   comb <- g1b + g2b + plot_layout(widths = c(0.33, n_scen),
                           guides = 'collect')

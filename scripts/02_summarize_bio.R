@@ -293,11 +293,13 @@ pft5_es_grefs <- map(levs_graze, function(x) {
 pft5_d_wgcm <- pft5_bio1 %>% 
   scaled_change_2var(by = c("run", "PFT", "RCP", "GCM", "years"), 
                      vars = c("biomass", "indivs", "utilization"),
-                ref_graze = "Light", percent = TRUE, effect_size = FALSE,
+                ref_graze = ref_graze, percent = TRUE, effect_size = FALSE,
                 within_GCM = TRUE) %>% 
   # median across GCMs
   group_by(run, site, years, RCP, PFT, graze, id) %>% 
-  summarise_bio_indivs(suffix = "_diff") %>% 
+  # importantly differences are calculated then high/low (i.e.
+  # want the differences to be within a gcm)
+  summarise_bio_indivs(suffix = "_diff", include_low_high = TRUE) %>% 
   create_id2()
 
 
