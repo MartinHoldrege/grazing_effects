@@ -2,7 +2,8 @@
 
 
 # fire probability, predicted by equation in Holdrege et al. (2024)
-predict_fire <- function(mat, map, psp, afg, pfg, run_checks = TRUE) {
+predict_fire <- function(mat, map, psp, afg, pfg, run_checks = TRUE,
+                         qm_afg = NULL, qm_pfg = NULL) {
   # these checks don't work if input is a raster,
   # so set to false in that case
   if(run_checks) {
@@ -12,6 +13,15 @@ predict_fire <- function(mat, map, psp, afg, pfg, run_checks = TRUE) {
     if (any(psp<0 | psp>1)) {
       stop('psp has a range of 0-1')
     }
+  }
+  
+  # quantile mapping, if quantile mapping functions provided
+  # otherwise assume that the bias correction has already be done
+  if(!is.null(qm_afg)) {
+    afg <- qm_afg(afg)
+  }
+  if(!is.null(qm_pfg)) {
+    pfg <- qm_pfg(pfg)
   }
 
   mat <-  mat + 273.15

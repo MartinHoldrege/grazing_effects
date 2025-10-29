@@ -13,7 +13,8 @@
 # if change less than 1 fire per 500 years then 
 # don't consider the driver of change
 delta_fire_prob_cutoff <- 0.2 # percentage point change
-ref_graze <- 'Moderate'
+source('src/params.R')
+ref_graze <-  opt$ref_graze
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -28,8 +29,6 @@ source("src/fig_functions.R")
 l <- readRDS('data_processed/site_means/summarize_bio.RDS') 
 
 clim_all2 <- l$clim_all2
-
-bio1 <- l$pft5_bio1
 
 # quantiles used in STEPWAT2 for quantile mapping in fire equation
 # created in scripts/bio_matching/02_quantile_matching_simple.R
@@ -49,6 +48,17 @@ qm_Pherb <- qm_quant_factory(
   to = quants$biomass_rap[quants$PFT == 'pfgAGB'])
 
 
+predict_fire_with <- function(df) {
+  p <- with(df, predict_fire(mat = MAT, map = MAP, psp = psp, afg = Aherb,
+                             pfg = Pherb,
+                             # calculate the quantile mapped biomass,
+                              # so that predictions made with fire equation are appropriate
+                             qm_afg = qm_Aherb,
+                             qm_pfg = qm_Pherb,
+                             run_checks = TRUE))
+  p*100 # convert to %
+}
+
 # prepare dataframes  --------------------------------------------------------
 
 bio2 <- bio1 %>% 
@@ -62,11 +72,8 @@ bio3a <- bio2 %>%
   pivot_wider(values_from = biomass, names_from = PFT) %>% 
   df_factor()
 
-# calculate the quantile mapped biomass,
-# so that predictions made with fire equation are appropriate
-bio3 <- bio3a %>% 
-  mutate(Aherb = qm_Aherb(Aherb),
-         Pherb = qm_Pherb(Pherb))
+
+bio3 <- bio3a 
 
 bio_cur1 <- bio3 %>% 
   filter(years == 'Current')
@@ -174,11 +181,7 @@ one_change_gref <- bio_ref3 %>%
 
 # predict fire probability ------------------------------------------------
 
-predict_fire_with <- function(df) {
-  p <- with(df, predict_fire(mat = MAT, map = MAP, psp = psp, afg = Aherb,
-                        pfg = Pherb,run_checks = TRUE))
-  p*100 # convert to %
-}
+
 
 # predicted fire probability when 1 variable changed to the current value
 one_change$fire_prob_1var <- predict_fire_with(one_change)
@@ -350,7 +353,9 @@ out <- list(
   dominant_driver1 = dominant_driver1,
   dominant_driver_gref1 = dominant_driver_gref1,
   pred_vars = pred_vars,
-  pred_vars2 = levels(dominant_driver1$dominant_driver)
+  pred_vars2 = levels(dominant_driver1$dominant_driver),
+  predict_fire_with = predict_fire_with,
+  bio_wide = bio3
 )
 
 saveRDS(out, 'data_processed/site_means/fire_dominant_drivers.RDS')

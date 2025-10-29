@@ -20,7 +20,7 @@ source("src/general_functions.R")
 source("src/mapping_functions.R") # for calc_low/high functions
 
 # params ------------------------------------------------------------------
-
+source('src/params.R')
 n_years <- 50 # number of years of data from simulations we're using (i.e. 
 # years 101-150)
 
@@ -29,7 +29,7 @@ n_iter <- 200 # number of iterations run
 # runs with all grazing levels
 runs_graze <- c('NoC4Exp' = "fire1_eind1_c4grass0_co20_2503", 
                 'default' = "fire1_eind1_c4grass1_co20_2503")
-
+ref_graze = opt$ref_graze
 # read in files -----------------------------------------------------------
 
 # site level means of biomass across years, for each treatment and PFT
@@ -283,9 +283,9 @@ pft5_es_grefs <- map(levs_graze, function(x) {
 })
 
 
-# ** change relative to light grazing of same gcm -------------------------
+# ** change relative to reference grazing of same gcm -------------------------
 
-# e.g. this shows the effects size of going from light grazing, to heavy
+# e.g. this shows the effects size of going from moderate grazing, to heavy
 # grazing for RCP 8.5 end of century
 
 # naming" d = difference, wgcm = within gcm comparison
@@ -305,7 +305,7 @@ pft5_d_wgcm <- pft5_bio1 %>%
 pft5_es_wgcm <- pft5_bio1 %>% 
   scaled_change_2var(by = c("run", "PFT", "RCP", "GCM", "years"), 
                      vars = c("biomass", "indivs", "utilization"),
-                ref_graze = "Light", percent = FALSE, effect_size = TRUE,
+                ref_graze = ref_graze, percent = FALSE, effect_size = TRUE,
                 within_GCM = TRUE) %>% 
   # median across GCMs
   group_by(run, site, years, RCP, PFT, graze, id) %>% 
@@ -506,7 +506,7 @@ util_es_grefs <- map(levs_graze, function(x) {
 util_es_wgcm <- util1 %>% 
   scaled_change(by = c("run", "RCP", "GCM", "years"), 
                      var = "utilization",
-                     ref_graze = "Light", percent = FALSE, effect_size = TRUE,
+                     ref_graze = ref_graze, percent = FALSE, effect_size = TRUE,
                      within_GCM = TRUE) %>% 
   # median across GCMs
   group_by(run, site, years, RCP, graze, id) %>% 
