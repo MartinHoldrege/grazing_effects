@@ -295,7 +295,9 @@ box_abs_diff <- function(df_abs,
                          y_diff = 'bio_diff',
                          ylab_abs = y_abs,
                          ylab_diff_cref = y_diff,
-                         ylab_diff_gref = y_diff
+                         ylab_diff_gref = y_diff,
+                         scales_cref = 'free_y',
+                         scales_gref = 'fixed'
 ) {
   
   stopifnot(unique(sort(df_abs$PFT)) == unique(sort(df_diff_gref$PFT)))
@@ -333,13 +335,13 @@ box_abs_diff <- function(df_abs,
   
 
   g2  <- ggplot(df_diff_gref, aes(graze, .data[[y_diff]], fill = summary))+
-    base(add_hline = TRUE, scales = 'fixed') +
+    base(add_hline = TRUE, scales = scales_gref) +
     blank_strip() +
     labs(x = lab_graze,
          y = ylab_diff_gref) 
 
   g3  <- ggplot(df_diff_cref, aes(graze, .data[[y_diff]], fill = summary))+
-    base(add_hline = TRUE) +
+    base(add_hline = TRUE, scales = scales_cref) +
     labs(x = lab_graze,
          y = ylab_diff_cref) 
   

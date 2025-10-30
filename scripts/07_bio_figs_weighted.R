@@ -249,12 +249,14 @@ pmap(args, function(pfts, RCP) {
                y_diff = 'bio_diff',
                ylab_abs = lab_bio0,
                ylab_diff_gref = ylab_diff_gref,
-               ylab_diff_cref = ylab_diff_cref)
+               ylab_diff_cref = ylab_diff_cref,
+               scales_cref = 'free_y',
+               scales_gref = 'fixed')
   
   # Pub qual for the main manuscript
   n_pft <- length(pfts)
   filename <- paste0("bio-abs-diff_weighted_entire_",
-                     n_pft, "pft_boxplot_", RCP, yr_lab, "_", 
+                     n_pft, "pft_boxplot_", RCP, '_', years, "_", 
                      run, v, ".png")
   
   ggsave(file.path("figures/biomass", filename),plot = g1,
