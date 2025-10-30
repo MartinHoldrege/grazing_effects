@@ -1,4 +1,4 @@
-# Purpose: TBD
+# Purpose: Biomass etc figures, weighted by interpolation area
 
 # Author: Martin Holdrege
 
@@ -28,7 +28,7 @@ pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
 
 regions <- region_factor(v = vr, return_levels = TRUE)
 entire <- regions[1]
-
+ref_graze <- opt$ref_graze
 # read in data ------------------------------------------------------------
 
 path_rds <- 'data_processed/site_means/summarize_bio.RDS'
@@ -49,7 +49,7 @@ bio_gcm1 <- l$pft5_bio1 #
 bio2 <- l$pft5_bio2# summarized across GCMs
 fire_med1 <- l$fire_med1
 pft5_bio_d2 <- l$pft5_bio_d2
-
+pft5_d_wgcm <- l$pft5_d_wgcm
 # create in "scripts/06_summarize_sei_scd-adj.R"
 seifire1 <- read_csv(paste0('data_processed/raster_means/', 
                             runv, vr_name, yr_lab,  
@@ -90,21 +90,32 @@ bio_gcm2 <- bio_gcm1 %>%
   df_factor() %>% 
   filter(region != levels(region)[1])
 
-# % change
+# % change (climate effect)
+
+prepare_bio_diff <- function(df) {
+  df %>% 
+    filter_clim_extremes(years = years) %>% 
+    filter(run == !!run) %>% 
+    rename(bio_diff_median = bio_diff) %>% 
+    select(run, site, years, RCP, PFT, graze, matches('bio_diff')) %>% 
+    pivot_longer(cols = matches('bio_diff_'),
+                 values_to = 'bio_diff',
+                 names_to = 'summary',
+                 names_pattern = '([[:alpha:]]+$)') %>% 
+    left_join(w1[w1$region == entire, ], 
+              by = 'site') %>% 
+    df_factor(v = vr) %>% 
+    mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
+                                add_newline = TRUE))
+}
+
 pft5_bio_d3 <- pft5_bio_d2 %>% 
-  filter_clim_extremes(years = years) %>% 
-  filter(run == !!run) %>% 
-  rename(bio_diff_median = bio_diff) %>% 
-  select(run, site, years, RCP, PFT, graze, matches('bio_diff')) %>% 
-  pivot_longer(cols = matches('bio_diff_'),
-               values_to = 'bio_diff',
-               names_to = 'summary',
-               names_pattern = '([[:alpha:]]+$)') %>% 
-  left_join(w1[w1$region == entire, ], 
-            by = 'site') %>% 
-  df_factor(v = vr) %>% 
-  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
-                              add_newline = TRUE))
+  prepare_bio_diff()
+
+
+# % change (grazing effect)
+pft5_d_wgcm2 <- pft5_d_wgcm %>% 
+  prepare_bio_diff()
   
 # other summaries ---------------------------------------------------------
 
@@ -209,22 +220,36 @@ args <- list(
   RCP = c('RCP45', 'RCP45', 'RCP85', 'RCP85')
 )
 
+ylab_diff_gref = paste0('\u0394Biomass (%), relative to ', str_to_lower(ref_graze),
+                        ' grazing')
+
+ylab_diff_cref = '\u0394Biomass (%), relative to historical climate'
+
 # figure for entire region
 pmap(args, function(pfts, RCP) {
   df_abs <- bio4 %>% 
-    filter(RCP == 'Current', region == entire, PFT %in% pfts) %>% 
-    filter(summary == 'median')
+    filter(RCP %in% c('Current', !!RCP), 
+           region == entire, PFT %in% pfts)# %>% 
+    #filter(summary == 'median')
   
-  df_diff <- pft5_bio_d3 %>% 
+  # % change in biomass due to climate
+  df_diff_cref <- pft5_bio_d3 %>% 
     filter(region == entire) %>% 
     filter(RCP == !!RCP, PFT %in% pfts)
   
+  df_diff_gref <- pft5_d_wgcm2 %>% 
+    filter(region == entire) %>% 
+    filter(RCP %in% c('Current', !!RCP), 
+           PFT %in% pfts)
+  
   g1 <- box_abs_diff(df_abs = df_abs,
-               df_diff = df_diff,
+               df_diff_cref = df_diff_cref,
+               df_diff_gref = df_diff_gref,
                y_abs = 'biomass',
                y_diff = 'bio_diff',
                ylab_abs = lab_bio0,
-               ylab_diff = lab_bio2)
+               ylab_diff_gref = ylab_diff_gref,
+               ylab_diff_cref = ylab_diff_cref)
   
   # Pub qual for the main manuscript
   n_pft <- length(pfts)
@@ -233,7 +258,7 @@ pmap(args, function(pfts, RCP) {
                      run, v, ".png")
   
   ggsave(file.path("figures/biomass", filename),plot = g1,
-      width = 4.5, height = 5*n_pft/3, dpi = 600)
+      width = 7, height = 5*n_pft/3, dpi = 600)
 
 })
 

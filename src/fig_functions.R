@@ -281,11 +281,13 @@ weighted_violin1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
 #' side-by side boxplots of absolute and change values by PFT, by grazing intensity
 #'
 #' @param df_abs dataframe of historical conditions
-#' @param df_diff dataframe change relative to historical conditions
 #' @param y_abs name of y variable in df_abs
-#' @param y_diff y variable in df_diff
+#' @param y_diff y variable in df_diff dataframse
+#' @param df_diff_cref difference data frame (climate reference)
+#' @param df_diff_gref difference data frame (grazing reference)
+#' @param ylab_diff_cref 
+#' @param ylab_diff_gref 
 #' @param ylab_abs label for abs panels
-#' @param ylab_diff label for diff panels
 box_abs_diff <- function(df_abs, 
                          df_diff_cref,
                          df_diff_gref,
@@ -296,8 +298,8 @@ box_abs_diff <- function(df_abs,
                          ylab_diff_gref = y_diff
 ) {
   
-  stopifnot(unique(sort(df_abs$PFT)) == unique(sort(df_diff$PFT)))
-  # CONTINUE HERE  TO GET LETTERS IN CORNERS
+  stopifnot(unique(sort(df_abs$PFT)) == unique(sort(df_diff_gref$PFT)))
+
   base <- function(add_hline = FALSE, scales = 'free_y') {
     out <- list(
       geom_boxplot(aes(weight = weight), coef = 10,
@@ -329,9 +331,7 @@ box_abs_diff <- function(df_abs,
     guides(fill = 'none') +
     expand_limits(y = 0)
   
-  
-  df_diff_gref
-  
+
   g2  <- ggplot(df_diff_gref, aes(graze, .data[[y_diff]], fill = summary))+
     base(add_hline = TRUE, scales = 'fixed') +
     blank_strip() +
@@ -342,39 +342,26 @@ box_abs_diff <- function(df_abs,
     base(add_hline = TRUE) +
     labs(x = lab_graze,
          y = ylab_diff_cref) 
-  g3
   
-  
-  n_scen <- lu(df_diff_gref$rcp_year)
-  n_pft <- lu(df_abs$PFT)
-  
-  index_abs <- seq(from = 1, length.out = n_pft,
-                   by = n_scen + 1)
-  
-  n_panels = n_pft*n_scen*2 + n_pft
-  index_diff <- seq(from = 1, to = n_panels)
-  index_diff <- index_diff[!index_diff %in% index_abs]
-  
-  
+  # letters for each panel (running rowwise left to right)
+  ncol1 <- lu(df_abs$rcp_year)
+  ncol2 <- lu(df_diff_gref$rcp_year)
+  ncol3 <- lu(df_diff_cref$rcp_year)
+  nrow <- lu(df_abs$PFT)
+  ncol <- ncol1 + ncol2 + ncol3
+
+  m <- matrix(data = fig_letters[1:(ncol*nrow)], ncol = ncol, byrow = TRUE)
+  let1 <- sort(as.vector(m[, 1:ncol1]))
+  let2 <- sort(as.vector(m[, (ncol1 + 1):(ncol1 + ncol2)]))
+  let3 <- sort(as.vector(m[, (ncol1 + ncol2 + 1):ncol(m)]))
   
   # adding letters to panels
-  g1b <- egg::tag_facet(g1, tag_pool = fig_letters[index_abs],
-                        open = "",
-                        close = "",
-                        hjust = -0.1,
-                        size = 3) + 
-    theme(strip.text = element_text())
-  
-  g2b <- egg::tag_facet(g2, tag_pool = fig_letters[index_diff],
-                        open = "",
-                        close = "",
-                        hjust = -0.1,
-                        size = 3)+ 
-    theme(strip.text = element_text())
-  
-  g3b <- #blah
 
-  comb <- g1b + g2b + plot_layout(widths = c(0.33, n_scen),
+  g1b <- tag(g1, let1)
+  g2b <- tag(g2, let2)
+  g3b <- tag(g3, let3)
+
+  comb <- g1b + g2b + g3b + plot_layout(widths = c(ncol1, ncol2, ncol3),
                           guides = 'collect')
   comb&theme(legend.position = "bottom")
 }
@@ -813,6 +800,14 @@ ylab_plot <- function(ylab = '', secondary = FALSE, ...) {
 }
 
 
+tag <- function(g, tag_pool) {
+  egg::tag_facet(g, tag_pool = tag_pool,
+                 open = "",
+                 close = "",
+                 hjust = -0.1,
+                 size = 3) + 
+    theme(strip.text = element_text())
+}
 
 # funs for scatterplots ---------------------------------------------------
 
