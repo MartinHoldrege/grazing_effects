@@ -18,13 +18,14 @@ theme_set(theme_custom1())
 # params ------------------------------------------------------------------
 
 source('src/params.R')
-yr_lab <- opt$yr_lab
-years <- opt$years
+vr <- opt$vr
 run <- opt$run
-runv <- paste0(run, v_interp)
+yr_lab <- opt$yr_lab
+runv <- opt$runv
+ref_graze <- opt$ref_graze
 q_curve_fig <- FALSE # create figure showing the 'biomass' q curves
 v <- '_v2'
-suffix <- paste0(run, v, vr_name, yr_lab) # for figures
+#suffix <- paste0(run, v, vr_name, yr_lab) # for figures
 pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
 
 regions <- region_factor(v = vr, return_levels = TRUE)
@@ -63,9 +64,13 @@ w1 <- df_factor(w1)
 
 bio3 <- bio2 %>% 
   left_join(w1, by = 'site',relationship = "many-to-many") %>% 
-  filter_clim_extremes(years = years) %>% 
   df_factor() 
 
+y <- levels(bio2$years)
+r <- levels(bio2$RCP)
+# for looping over
+df_rcp_yr <- expand_grid(RCP = r[r != 'Current'],
+                         years = y[y != 'Current'])
 
 # longer format
 bio4 <- bio3 %>% 
@@ -81,7 +86,6 @@ bio4 <- bio3 %>%
 
 bio_gcm2 <- bio_gcm1 %>% 
   left_join(w1, by = 'site',relationship = "many-to-many") %>% 
-  filter_clim_extremes(years = years) %>% 
   df_factor() %>% 
   filter(region != levels(region)[1])
 
@@ -89,7 +93,6 @@ bio_gcm2 <- bio_gcm1 %>%
 
 prepare_bio_diff <- function(df) {
   df %>% 
-    filter_clim_extremes(years = years) %>% 
     filter(run == !!run) %>% 
     rename(bio_diff_median = bio_diff) %>% 
     select(run, site, years, RCP, PFT, graze, matches('bio_diff')) %>% 
@@ -174,8 +177,8 @@ sei2 <- sei1 %>%
   bind_rows(sei1) %>% 
   df_factor()
 
-# for use in the 08_fire_area_figs.R script
-saveRDS(sei2, paste0('data_processed/temp_rds/sei_df', vr_name, yr_lab, '.rds'))
+# for potential use in the 08_fire_area_figs.R script
+saveRDS(sei2, paste0('data_processed/temp_rds/sei_df', vr_name, '.rds'))
 
 q1 <- q_gcm1 %>% 
   group_by(run, years, RCP, rcp_year, graze, site, weight, region, PFT) %>% 
@@ -210,9 +213,10 @@ dev.off()
 
 # absolute biomass for current and %change for future
 pft5 <- c(pfts, 'C3Pgrass', 'C4Pgrass')
-args <- list(
-  pfts = list(pfts, pft5, pfts, pft5),
-  RCP = c('RCP45', 'RCP45', 'RCP85', 'RCP85')
+args <- expand_grid(
+  pfts = list(pfts, pft5),
+  RCP = c('RCP45', 'RCP85'),
+  years = years
 )
 
 ylab_diff_gref = paste0('\u0394Biomass (%), relative to ', str_to_lower(ref_graze),
@@ -415,9 +419,10 @@ if(q_curve_fig) {
 # (x axis)
 
 linewidth <- 0.3
-rcps <- unique(driver1$RCP)
 
-for (rcp in rcps) { 
+for (i in 1:nrow(df_rcp_yr)) { 
+  rcp <- df_rcp_yr$RCP[i]
+  years <- df_rcp_yr$years[i]
   for (reg in regions) {
 
     df <- driver2 %>% 
@@ -482,13 +487,15 @@ for (rcp in rcps) {
 
 vars <- tibble(var1 = c('MAT', 'MAT', 'MAP'),
                var2 = c('MAP', 'PSP', 'PSP'))
-for (rcp in rcps) { 
+for (i in 1:nrow(df_rcp_yr)) { 
+  rcp <- df_rcp_yr$RCP[i]
+  years <- df_rcp_yr$years[i]
   for (reg in regions) {
     
     df <- driver2 %>% 
       filter(years == !!years,
              RCP == rcp,
-             graze == 'Moderate',
+             graze == ref_graze,
              region == reg) %>% 
       mutate(GCM = factor(GCM, levels = names(cols_GCM1)))
     
