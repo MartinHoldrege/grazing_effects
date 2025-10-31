@@ -26,6 +26,7 @@ ref_graze <- opt$ref_graze
 q_curve_fig <- FALSE # create figure showing the 'biomass' q curves
 v <- '_v2'
 #suffix <- paste0(run, v, vr_name, yr_lab) # for figures
+suffix <- paste0(runv, '_', vr)
 pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
 
 regions <- region_factor(v = vr, return_levels = TRUE)
@@ -66,11 +67,13 @@ bio3 <- bio2 %>%
   left_join(w1, by = 'site',relationship = "many-to-many") %>% 
   df_factor() 
 
-y <- levels(bio2$years)
-r <- levels(bio2$RCP)
+yrs <- levels(bio2$years)
+rcps <- levels(bio2$RCP)
+yrs <- yrs[yrs != 'Current']
+rcps <- rcps[rcps != 'Current']
 # for looping over
-df_rcp_yr <- expand_grid(RCP = r[r != 'Current'],
-                         years = y[y != 'Current'])
+df_rcp_yr <- expand_grid(RCP = rcps,
+                         years = yrs)
 
 # longer format
 bio4 <- bio3 %>% 
@@ -142,60 +145,11 @@ driver2 <- driver1 %>%
   droplevels() %>% 
   arrange(region, RCP, years)
 
-# calculate Q's and SEI ---------------------------------------------------
-
-
-
-# need to calculate for GCM wise q values and SEI, and then summaryies
-# b/ SEI is multiplicative median sei need to be from median Q values
-
-
-q_gcm1 <- bio_gcm2 %>% 
-  filter(region != levels(region)[1],
-         PFT %in% pfts) %>%  # entire study area
-  group_by(PFT, region) %>% 
-  mutate(Q = bio2q(biomass, as.character(unique(PFT)), as.character(unique(region)),
-                   v = vr),
-         rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
-                              add_newline = TRUE))
-
-sei1 <- q_gcm1 %>% 
-  select(-matches('biomass'), - matches('indivs'), -matches('utilization')) %>% 
-  pivot_wider(values_from = 'Q',
-              names_from = 'PFT',
-              names_prefix = 'Q_') %>% 
-  mutate(SEI = Q_Aherb*Q_Sagebrush*Q_Pherb) %>% 
-  select(-matches('^Q_')) %>% 
-  group_by(run, years, RCP, graze, site, weight, region, rcp_year) %>% 
-  # summarize across GCMs
-  summarize_across_GCMs(var = 'SEI')
-
-sei2 <- sei1 %>% 
-  # 'total' region
-  mutate(region = levels(region)[1]) %>% 
-  # individual regions
-  bind_rows(sei1) %>% 
-  df_factor()
-
-# for potential use in the 08_fire_area_figs.R script
-saveRDS(sei2, paste0('data_processed/temp_rds/sei_df', vr_name, '.rds'))
-
-q1 <- q_gcm1 %>% 
-  group_by(run, years, RCP, rcp_year, graze, site, weight, region, PFT) %>% 
-  summarize_across_GCMs(var = 'Q')
-
-q2 <- q1 %>% 
-  # the entire study area is all other regions combined
-  # but note that q's are calculated seperately for each ecoregion
-  # so a given site may appear multiple times for the 'total'
-  mutate(region = levels(region)[1]) %>% 
-  bind_rows(q1) %>% 
-  df_factor()
-
 # boxplots ----------------------------------------------------------------
 
 # *biomass ----------------------------------------------------------------
 
+# biomass boxplots for all scenarios
 plots <- map(pfts, function(pft) {
   weighted_box1(df = filter(bio4, PFT == pft),
                 y_string = 'biomass',
@@ -206,17 +160,20 @@ plots <- map(pfts, function(pft) {
 
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
 
-png(paste0("figures/biomass/bio_weighted_by-region_3pft_boxplot_", suffix, ".png"),
-    width = 8, height = 11, units = 'in', res = 600)
+png(paste0("figures/biomass/bio_weighted_by-region_3pft_boxplot_", suffix, 
+           ".png"),
+    width = 12, height = 11, units = 'in', res = 600)
 g2
 dev.off()
 
-# absolute biomass for current and %change for future
+
+# absolute biomass for current and %change 
+# pub qual, first biomass figure
 pft5 <- c(pfts, 'C3Pgrass', 'C4Pgrass')
 args <- expand_grid(
   pfts = list(pfts, pft5),
   RCP = c('RCP45', 'RCP85'),
-  years = years
+  years = yrs
 )
 
 ylab_diff_gref = paste0('\u0394Biomass (%), relative to ', str_to_lower(ref_graze),
@@ -225,20 +182,23 @@ ylab_diff_gref = paste0('\u0394Biomass (%), relative to ', str_to_lower(ref_graz
 ylab_diff_cref = '\u0394Biomass (%), relative to historical climate'
 
 # figure for entire region
-pmap(args, function(pfts, RCP) {
+pmap(args, function(pfts, RCP, years) {
   df_abs <- bio4 %>% 
     filter(RCP %in% c('Current', !!RCP), 
+           years %in% c('Current', !!years),
            region == entire, PFT %in% pfts)# %>% 
     #filter(summary == 'median')
   
   # % change in biomass due to climate
   df_diff_cref <- pft5_bio_d3 %>% 
     filter(region == entire) %>% 
-    filter(RCP == !!RCP, PFT %in% pfts)
+    filter(RCP == !!RCP, PFT %in% pfts,
+           years == !!years)
   
   df_diff_gref <- pft5_d_wgcm2 %>% 
     filter(region == entire) %>% 
     filter(RCP %in% c('Current', !!RCP), 
+           years %in% c('Current', !!years),
            PFT %in% pfts)
   
   g1 <- box_abs_diff(df_abs = df_abs,
@@ -265,53 +225,6 @@ pmap(args, function(pfts, RCP) {
 
 
 
-
-# *testing -----------------------------------------------------------------
-
-# this code can be deleted (used to confirm that these
-# numbers correspond to the Core area figure)
-# df <- sei2 %>% 
-#   filter(region == 'Southern Great Basin',
-#          years == 'Current', summary == 'median')
-# 
-# ggplot(df, aes(x = graze, y = SEI, weight = weight, fill = graze)) +
-#   geom_violin() +
-#   scale_fill_manual(values = cols_graze) +
-#   geom_hline(yintercept = 0.431)
-# 
-# 
-# l <- split(df, df$graze)[c(1, 3)]
-# map(l, \(df) Hmisc::wtd.quantile(df$SEI, weights = df$weight,
-#                                  probs = seq(0.5, 0.75, by = 0.05)))
-
-
-# * Q and SEI -------------------------------------------------------------
-
-plots <- map(pfts, function(pft) {
-  weighted_box1(df = filter(q2, PFT == pft),
-                y_string = 'Q',
-                ylab = lab_q0,
-                subtitle = pft) +
-    expand_limits(y = c(0, 1))
-})
-n <- length(plots)
-plots[[n]] <- plots[[n]] + theme(strip.text.y = element_blank())
-
-g_sei <- weighted_box1(df = sei2,
-                     y_string = 'SEI',
-                     ylab = lab_sei0,
-                     subtitle = 'SEI',
-                     strip.text.y = element_text(size = rel(0.7)))
-
-
-g2 <- combine_grid_panels1(plots, remove_y_axis_labels = TRUE)
-g3 <- g2 + g_sei + plot_layout(guides = 'collect')
-
-png(paste0("figures/sei/q-sei_weighted_by-region_3pft_boxplot_", suffix, ".png"),
-    width = 11, height = 10, units = 'in', res = 600)
-g3&theme(legend.position = 'bottom')
-dev.off()
-
 # *utilization ----------------------------------------------------------------
 
 plots <- map(pfts, function(pft) {
@@ -325,7 +238,7 @@ plots <- map(pfts, function(pft) {
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
 
 png(paste0("figures/util/util_weighted_by-region_3pft_boxplot_", suffix, ".png"),
-    width = 8, height = 10, units = 'in', res = 600)
+    width = 12, height = 10, units = 'in', res = 600)
 g2
 dev.off()
 
@@ -343,7 +256,7 @@ plots <- map(pfts, function(pft) {
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
 
 png(paste0("figures/indivs/indivs_weighted_by-region_3pft_boxplot_", suffix, ".png"),
-    width = 8, height = 11, units = 'in', res = 600)
+    width = 12, height = 11, units = 'in', res = 600)
 g2
 dev.off()
 
@@ -366,7 +279,7 @@ g <- ggplot(bio_pcent1, aes(graze, util_pcent, fill = PFT)) +
 
 ggsave(
   paste0('figures/util/util-perc_bar_pft3_', suffix, '.png'),
-  g, width = 4, height = 9
+  g, width = 6, height = 9
 )
 
 
@@ -392,16 +305,17 @@ if(q_curve_fig) {
                by = 'row', 
                relationship = 'many-to-many') %>% 
     df_factor() %>% 
-    mutate(region = region2wafwa(region)) %>% 
+    mutate(region = region2wafwa(region, v = vr)) %>% 
     group_by(PFT, region) %>% 
     mutate(Q = bio2q(biomass, pft = unique(as.character(PFT)), 
-                     region = unique(as.character(region)))) %>% 
+                     region = unique(as.character(region)),
+                     v = vr)) %>% 
     select(-row)
   
   g <- ggplot(q_range, aes(biomass, Q, color = region, linetype = region)) +
     geom_line() + 
     facet_wrap(~PFT, scales = 'free_x') +
-    scale_color_manual(values = cols_ecoregion) +
+    scale_color_manual(values = cols_wafwa_region) +
     labs(y = lab_q0,
          x = 'Biomass (from stepwat, prior to quantile mapping)',
          caption = 'Q calculated by quantile mapping Pherb and Aherb to 

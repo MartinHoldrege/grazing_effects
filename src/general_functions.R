@@ -239,6 +239,10 @@ region2wafwa <- function(x, v = NULL) {
   x2 <- as.character(x)
   vr <- if(is.null(v)) which_vr(x2) else v
   
+  if(vr == 'wafwa') {
+    return(x)
+  }
+  
   eco <- load_wafwa_ecoregions(total_region = FALSE, v = vr)
   from <- eco$region
   to <- eco$wafwa_NAME
@@ -247,7 +251,7 @@ region2wafwa <- function(x, v = NULL) {
   if(is.factor(x)) {
     include_entire <- any(str_detect(x, 'Entire'))
     x2 <- region_factor(x2, wafwa_only = TRUE, include_entire = include_entire,
-                        vr)
+                        v = vr)
   } 
   x2
 }

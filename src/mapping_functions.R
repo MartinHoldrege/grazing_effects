@@ -1163,6 +1163,7 @@ load_wafwa_ecoregions <- function(total_region = FALSE,
   
   stopifnot(str_detect(v, '^r\\d+\\.\\d+$'),
             is.logical(wafwa_only))
+  
 
   # file created by the 01_ecoregions.R script
   if(v == 'r1.0') {

@@ -81,9 +81,6 @@ drivers1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
 # and dominant drivers of change
 driver_l <- readRDS('data_processed/site_means/fire_dominant_drivers.RDS')
 
-# created in 07_bio_figs_weighted.R
-sei2 <- readRDS(paste0('data_processed/temp_rds/sei_df', vr_name, yr_lab, '.rds'))
-
 # created in "scripts/06_summarize_sei_scd-adj.R"
 sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', 
                               runv, vr_name, yr_lab, 
