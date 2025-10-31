@@ -15,6 +15,7 @@ scripts_vr <- c(
   # 'scripts/04_summarize_fire_drivers.R'
   #'scripts/06_fire_area.R',
   # 'scripts/07_fire_area_summaries.R'
+  # 'scripts/07_bio_figs_weighted.R',
 )
 
 # scripts that need to be run seperately for each set of years
@@ -29,7 +30,6 @@ scripts_vr_yr <- c(
   #'scripts/05_interpolated_summarize_sei_scd-adj.R'
   # 'scripts/06_summarize_sei_scd-adj.R',
   # 'scripts/06_summarize_fire_drivers.R',
-  # 'scripts/07_bio_figs_weighted.R',
   #'scripts/07_figs_sei_scd-adj.R'
   # 'scripts/08_fire_area_figs.R',
   'scripts/09_tradeoff_slope_figs.R'

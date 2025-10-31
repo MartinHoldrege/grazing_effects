@@ -945,6 +945,30 @@ calc_aherb <- function(df, col_names = c('biomass', "indivs", "utilization"),
   out
 }
 
+#' calculated weighted percentiles
+#'
+#' @param df grouped dataframe
+#' @param varname character vector of variable names
+#' @param .names how to glue names together
+summarize_weighted <- function(df, varname, .names = "{.fn}") {
+  stopifnot(c(varname, 'weight') %in% names(df))
+  df %>% 
+    summarise(
+      across(.cols = all_of(varname),
+             .fns = 
+               list(mean = \(x) weighted.mean(x, w = weight),
+                    p25 = \(x) as.numeric(Hmisc::wtd.quantile(
+                      x,  weights = weight, probs = 0.25)),
+                    median =  \(x) as.numeric(Hmisc::wtd.quantile(
+                      x,  weights = weight, probs = 0.5)),
+                    p75 = \(x) as.numeric(Hmisc::wtd.quantile(
+                      x,  weights = weight, probs = 0.75))
+               ),
+             .names = .names),
+      weight = sum(weight)
+    )
+}
+
 # classification ----------------------------------------------------------
 
 #' percent correctly classified

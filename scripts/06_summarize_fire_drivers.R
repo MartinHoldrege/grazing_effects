@@ -53,18 +53,6 @@ comb1 <- bind_rows(bio_long, clim_long)
 # weighted means ----------------------------------------------------------
 # weighted by area
 
-summarize_weighted <- function(df, varname) {
-  df %>% 
-    summarize(mean = weighted.mean(.data[[varname]], w = weight),
-              p25 = as.numeric(Hmisc::wtd.quantile(.data[[varname]], weights = weight, 
-                                                   probs = 0.25)),
-              median = as.numeric(Hmisc::wtd.quantile(.data[[varname]], weights = weight, 
-                                                      probs = 0.50)),
-              p75 = as.numeric(Hmisc::wtd.quantile(.data[[varname]], weights = weight, 
-                                                   probs = 0.75)),
-              weight = sum(weight),
-              .groups = 'drop')
-}
 # mean across SEI class and ecoregions
 comb2 <- comb1 %>%
   select(-run) %>% 
@@ -82,6 +70,7 @@ comb2_eco <- comb2 %>%
     .groups = 'drop') 
 means_c3eco1 <- comb2 %>% 
   group_by(years, RCP, graze, GCM, region, variable, c3) %>% 
+  # calculated weighted percentiles
   summarize_weighted(varname = 'value')
 
 # mean across regions

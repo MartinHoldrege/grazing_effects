@@ -16,16 +16,16 @@ source('src/mapping_functions.R')
 theme_set(theme_custom1())
 
 # params ------------------------------------------------------------------
-
+# this script runs for all RCP/years
 source('src/params.R')
 vr <- opt$vr
 run <- opt$run
-yr_lab <- opt$yr_lab
+
 runv <- opt$runv
 ref_graze <- opt$ref_graze
 q_curve_fig <- FALSE # create figure showing the 'biomass' q curves
 v <- '_v2'
-#suffix <- paste0(run, v, vr_name, yr_lab) # for figures
+
 suffix <- paste0(runv, '_', vr)
 pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
 
@@ -33,7 +33,7 @@ regions <- region_factor(v = vr, return_levels = TRUE)
 entire <- regions[1]
 ref_graze <- opt$ref_graze
 # read in data ------------------------------------------------------------
-
+# created in "scripts/02_summarize_bio.R"
 path_rds <- 'data_processed/site_means/summarize_bio.RDS'
 
 if(!file.exists(path_rds)) {
@@ -53,7 +53,9 @@ bio_gcm1 <- l$pft5_bio1 #
 bio2 <- l$pft5_bio2# summarized across GCMs
 fire_med1 <- l$fire_med1
 pft5_bio_d2 <- l$pft5_bio_d2
-pft5_d_wgcm <- l$pft5_d_wgcm
+pft5_d_wgcm <- l$pft5_d_wgcm # summarized across gcms
+pft5_d_wgcm_gcm <- l$pft5_d_wgcm_gcm # values by GCM
+fire_d_wgcm_gcm <- l$fire_d_wgcm_gcm
 
 # weighted means and percentiles of change biomass and climate variables
 # created in "scripts/06_summarize_fire_drivers.R"
@@ -117,6 +119,27 @@ pft5_bio_d3 <- pft5_bio_d2 %>%
 # % change (grazing effect)
 pft5_d_wgcm2 <- pft5_d_wgcm %>% 
   prepare_bio_diff()
+
+
+join_vars <- c('run', 'years', 'RCP', 'graze',
+               'site', 'GCM')
+
+# GCM level delta biomass and delta fire responses to grazing
+gref_diff_gcm1 <- pft5_d_wgcm_gcm %>% 
+  filter(PFT %in% pfts) %>% 
+  select(all_of(join_vars), PFT, bio_diff) %>% 
+  left_join(
+    select(fire_d_wgcm_gcm, all_of(join_vars), fire_prob_diff),
+    by = join_vars
+  ) %>% 
+  rename(fire = fire_prob_diff,
+         bio = bio_diff) %>% 
+  left_join(w1, by = 'site',relationship = "many-to-many") %>% 
+  group_by(run, years, RCP, graze, GCM, region, PFT) %>% 
+  # weighted percentiles
+  summarize_weighted(varname = c('bio', 'fire'),
+                     .names = '{.col}_{.fn}') %>% 
+  df_factor()
   
 # other summaries ---------------------------------------------------------
 
@@ -179,7 +202,7 @@ args <- expand_grid(
 ylab_diff_gref = paste0('\u0394Biomass (%), relative to ', str_to_lower(ref_graze),
                         ' grazing')
 
-ylab_diff_cref = '\u0394Biomass (%), relative to historical climate'
+
 
 # figure for entire region
 pmap(args, function(pfts, RCP, years) {
@@ -207,8 +230,8 @@ pmap(args, function(pfts, RCP, years) {
                y_abs = 'biomass',
                y_diff = 'bio_diff',
                ylab_abs = lab_bio0,
-               ylab_diff_gref = ylab_diff_gref,
-               ylab_diff_cref = ylab_diff_cref,
+               ylab_diff_gref = lab_bio2_gref,
+               ylab_diff_cref = lab_bio2_cref,
                scales_cref = 'free_y',
                scales_gref = 'fixed')
   
@@ -332,7 +355,7 @@ if(q_curve_fig) {
 # show the 25th to 75 percentiles of biomass (y axis) and climate variables 
 # (x axis)
 
-linewidth <- 0.3
+
 
 for (i in 1:nrow(df_rcp_yr)) { 
   rcp <- df_rcp_yr$RCP[i]
@@ -448,3 +471,38 @@ for (i in 1:nrow(df_rcp_yr)) {
   }
 }
 
+# gref bio vs fire by GCM ------------------------------------------------------
+# crossplots showing delta fire against delta biomass, within a GCM
+# comparing to moderate grazing
+
+# i <- 1
+# yr <- df_rcp_yr$years[i]
+# rcp <- df_rcp_yr$RCP[i]
+# pft <- pfts[1]
+for(pft in pfts) {
+  pmap(df_rcp_yr, function(RCP, years) {
+    rcp <- RCP
+    yr <- years
+    df <- gref_diff_gcm1 %>% 
+      filter(years == yr,
+             RCP == rcp,
+             PFT == pft) %>% 
+      mutate(GCM = factor(GCM, levels = names(cols_GCM1)))
+    
+    subtitle <- paste0(pft, ', ', rcp_label(rcp, yr, include_parenth = FALSE))
+    
+    g <- crossplot_1panel(df, var1 = 'fire', var2 = 'bio') +
+      geom_smooth(aes(x = fire_median, y = bio_median), method = 'lm',
+                  se = FALSE, formula = ' y ~ x') +
+      facet_grid(graze ~ region , scales = 'free') +
+      labs(y = lab_bio2_gref,
+           x = lab_firep1_gref,
+           subtitle = subtitle)
+    g <- tag(g, fig_letters)
+    filename <- paste0('figures/biomass/by_gcm/bio_vs_fire_gref_crossplot_',
+                       pft, "_", vr, '_by-region_', rcp, '_', 
+                       yr, '_', runv, '.png')
+    ggsave(filename, plot = g,
+           width = 10, height = 6, dpi = 600)
+  })
+}

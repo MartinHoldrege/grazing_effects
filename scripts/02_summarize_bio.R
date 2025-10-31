@@ -290,11 +290,13 @@ pft5_es_grefs <- map(levs_graze, function(x) {
 
 # naming" d = difference, wgcm = within gcm comparison
 # throws warnings b/ 0 utilization in some sites (ok)
-pft5_d_wgcm <- pft5_bio1 %>% 
+pft5_d_wgcm_gcm <- pft5_bio1 %>% 
   scaled_change_2var(by = c("run", "PFT", "RCP", "GCM", "years"), 
                      vars = c("biomass", "indivs", "utilization"),
                 ref_graze = ref_graze, percent = TRUE, effect_size = FALSE,
-                within_GCM = TRUE) %>% 
+                within_GCM = TRUE) 
+
+pft5_d_wgcm <- pft5_d_wgcm_gcm %>% 
   # median across GCMs
   group_by(run, site, years, RCP, PFT, graze, id) %>% 
   # importantly differences are calculated then high/low (i.e.
@@ -610,13 +612,14 @@ out <- list(
   pft5_bio_d2 = pft5_bio_d2,
   pft5_bio_es1 = pft5_bio_es1,
   pft5_d_wgcm = pft5_d_wgcm,
+  pft5_d_wgcm_gcm = pft5_d_wgcm_gcm, # gcm level results
   pft5_d_grefs = pft5_d_grefs,
   pft5_es_wgcm = pft5_es_wgcm,
   fire0 = fire0,
   fire_med1 = fire_med1,
   fire_d_wgraze = fire_d_wgraze,
   fire_d_wgcm = fire_d_wgcm,
-  fire_d_wgcm_gcm = fire_d_wgcm,
+  fire_d_wgcm_gcm = fire_d_wgcm_gcm,
   clim_all2 = clim_all2,
   clim1 = clim1,
   runs_graze = runs_graze,
