@@ -1035,6 +1035,18 @@ filter_scenarios <- function(df, PFT = NULL,
   as_tibble(out)
 }
 
+# function for filtering dataframes in a list 
+# (e.g. a list outputted by an upstream script)
+filter_list_run <- function(l, run) {
+  map(l, function(x) {
+    if(is.data.frame(x) & 'run' %in% names(x)) {
+      if(!run %in% x$run) stop('run not present in dataframe')
+      x <- filter(x, .data$run == !!run)
+    } 
+    x
+  })
+}
+
 # misc functions ---------------------------------------------------------------
 
 filter_clim_extremes <- function(df, years = '2070-2100') {

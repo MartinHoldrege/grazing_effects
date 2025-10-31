@@ -588,11 +588,13 @@ fire_d_wgraze <- fire_med1 %>%
 
 # naming" d = difference, wgcm = within gcm comparison
 
-fire_d_wgcm <- fire0 %>% 
+fire_d_wgcm_gcm <- fire0 %>% 
   scaled_change(by = c("run", "RCP", "GCM", "years"), 
                      var = "fire_prob",
-                     ref_graze = "Light", percent = FALSE, effect_size = FALSE,
-                     within_GCM = TRUE) %>% 
+                     ref_graze = ref_graze, percent = FALSE, effect_size = FALSE,
+                     within_GCM = TRUE)
+
+fire_d_wgcm <- fire_d_wgcm_gcm %>% 
   # median across GCMs
   group_by(run, site, years, RCP, graze, id) %>% 
   summarise(fire_prob_diff = median(fire_prob_diff)) %>% 
@@ -614,6 +616,7 @@ out <- list(
   fire_med1 = fire_med1,
   fire_d_wgraze = fire_d_wgraze,
   fire_d_wgcm = fire_d_wgcm,
+  fire_d_wgcm_gcm = fire_d_wgcm,
   clim_all2 = clim_all2,
   clim1 = clim1,
   runs_graze = runs_graze,

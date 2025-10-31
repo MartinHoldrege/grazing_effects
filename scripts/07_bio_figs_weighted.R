@@ -20,6 +20,7 @@ theme_set(theme_custom1())
 source('src/params.R')
 yr_lab <- opt$yr_lab
 years <- opt$years
+run <- opt$run
 runv <- paste0(run, v_interp)
 q_curve_fig <- FALSE # create figure showing the 'biomass' q curves
 v <- '_v2'
@@ -37,6 +38,7 @@ if(!file.exists(path_rds)) {
   source("scripts/02_summarize_bio.R") # where needed dataframes are created
 }
 l <- readRDS(path_rds) # created in 02_sommarize_bio.R
+l <- filter_list_run(l, run)
 
 # weight (based on area of interpolation) corresponding to each site
 # in each ecoregion
@@ -50,11 +52,6 @@ bio2 <- l$pft5_bio2# summarized across GCMs
 fire_med1 <- l$fire_med1
 pft5_bio_d2 <- l$pft5_bio_d2
 pft5_d_wgcm <- l$pft5_d_wgcm
-# create in "scripts/06_summarize_sei_scd-adj.R"
-seifire1 <- read_csv(paste0('data_processed/raster_means/', 
-                            runv, vr_name, yr_lab,  
-                           '_sei-by-fire-bin_scd-adj_summaries_by-ecoregion.csv'),
-                    show_col_types = FALSE)
 
 # weighted means and percentiles of change biomass and climate variables
 # created in "scripts/06_summarize_fire_drivers.R"
@@ -67,7 +64,6 @@ w1 <- df_factor(w1)
 bio3 <- bio2 %>% 
   left_join(w1, by = 'site',relationship = "many-to-many") %>% 
   filter_clim_extremes(years = years) %>% 
-  filter(run == !!run) %>% 
   df_factor() 
 
 
@@ -86,7 +82,6 @@ bio4 <- bio3 %>%
 bio_gcm2 <- bio_gcm1 %>% 
   left_join(w1, by = 'site',relationship = "many-to-many") %>% 
   filter_clim_extremes(years = years) %>% 
-  filter(run == !!run) %>% 
   df_factor() %>% 
   filter(region != levels(region)[1])
 
@@ -532,51 +527,3 @@ for (rcp in rcps) {
   }
 }
 
-# comparing to fire -------------------------------------------------------
-
-# 'heat map' type figure showing binned fire on the y axis, grazing
-# on the x and SEI (or area) as the color
-
-# * prepare dataframes ----------------------------------------------------
-
-seifire2 <- seifire1 %>% 
-  df_factor() %>% 
-  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE, 
-                              add_newline = TRUE)) %>% 
-  group_by(RCP, years, graze, summary, region) %>% 
-  mutate(percent_area = n_pixels/sum(n_pixels))
-
-
-# * create figures ----------------------------------------------------------
-
-base_fire_bins <- function() {
-  list(geom_tile(),
-       labs(x = lab_graze,
-            y =  lab_firep0),
-    theme(axis.text.y = element_text(size = rel(0.7)),
-          axis.text.x = element_text(angle = 45, hjust = 1)),
-    facet_grid(region~rcp_year))
-}
-
-
-g <- ggplot(seifire2, aes(x = graze, y = fire_bin, fill = SEI)) +
-  base_fire_bins() +
-  scale_fill_gradientn(
-    colors = cols_seicont,
-    values = vals_seicont,
-    guide = "colorbar",
-    name = "SEI"
-  ) 
-
-ggsave(paste0("figures/sei/sei_by-fire-graze_scd-adj_", suffix, ".png"), 
-       plot = g, dpi = 600,
-       width = 8, height = 10)
-
-g <- ggplot(seifire2, aes(x = graze, y = fire_bin, fill = percent_area)) +
-  base_fire_bins() +
-  scale_fill_viridis_c(option = "C", name = "% of area", trans = 'sqrt')
-  
-
-ggsave(paste0("figures/sei/area-perc_by-fire-graze_scd-adj_", suffix, ".png"), 
-       plot = g, dpi = 600,
-       width = 8, height = 10)
