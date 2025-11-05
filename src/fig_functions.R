@@ -872,7 +872,9 @@ scatter_light <- function(pft, # for subtitle
 
 # make a single panel, plantting IQR of two variables
 # (for plotting climate variables agains each other)
-crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3) {
+crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3,
+                             colors = cols_GCM1,
+                             shapes = shapes_GCM1) {
     g <- ggplot(data = df_wide) 
   # adding vertical and horizontal lines, as long as it doesn't
   # extend the axes
@@ -902,8 +904,8 @@ crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3) {
     geom_point(aes(x = .data[[paste0(var1, '_median')]], 
                    y = .data[[paste0(var2, '_median')]], 
                    color = GCM, shape = GCM)) +
-    scale_color_manual(values = cols_GCM1) +
-    scale_shape_manual(values = shapes_GCM1) +
+    scale_color_manual(values = colors) +
+    scale_shape_manual(values = shapes) +
     labs(x = labeller(var1),
          y = labeller(var2))
   g

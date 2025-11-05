@@ -484,17 +484,21 @@ for(pft in pfts) {
     rcp <- RCP
     yr <- years
     df <- gref_diff_gcm1 %>% 
-      filter(years == yr,
-             RCP == rcp,
+      filter(years %in% c('Current', yr),
+             RCP %in% c('Current', rcp),
              PFT == pft) %>% 
-      mutate(GCM = factor(GCM, levels = names(cols_GCM1)))
+      mutate(GCM = factor(GCM, 
+                          levels = c('Current', names(cols_GCM1)),
+                          labels = names(cols_GCM2)))
     
     subtitle <- paste0(pft, ', ', rcp_label(rcp, yr, include_parenth = FALSE))
     
-    g <- crossplot_1panel(df, var1 = 'fire', var2 = 'bio') +
-      geom_smooth(aes(x = fire_median, y = bio_median), method = 'lm',
-                  se = FALSE, formula = ' y ~ x') +
-      facet_grid(graze ~ region , scales = 'free') +
+    g <- crossplot_1panel(df, var1 = 'fire', var2 = 'bio',
+                          colors = cols_GCM2,
+                          shapes = shapes_GCM2) +
+      # geom_smooth(aes(x = fire_median, y = bio_median), method = 'lm',
+      #             se = FALSE, formula = ' y ~ x') +
+      facet_grid(graze ~ region , scales = 'free_y') +
       labs(y = lab_bio2_gref,
            x = lab_firep1_gref,
            subtitle = subtitle)

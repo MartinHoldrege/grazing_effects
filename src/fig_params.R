@@ -184,7 +184,8 @@ shapes_scen <- c("Historical" = 21,
                  "RCP4.5\n2071-2100" = 17, "RCP4.5 2071-2100" = 17,
                  "RCP8.5\n2071-2100" = 15, "RCP8.5 2071-2100" = 15)
 
-shapes_GCM1 <- rep(c(15, 16, 17), length.out = 13)
+shapes_GCM1 <- rep(c(15, 16, 17), length.out = length(cols_GCM1))
+shapes_GCM2 <- c(shapes_GCM1[3], shapes_GCM1)
 # linetypes ---------------------------------------------------------------
 
 linetypes_scen <- c(
@@ -258,7 +259,8 @@ lab_fire1 <- "Change in fire return interval (years)"
 # fire probability
 lab_firep0 <- "# fires/century"
 lab_firep1 <- expression(Delta~"# fires/century")
-
+lab_firep1_gref <- paste0('\u0394 # fires/century, relative to ', 
+                          str_to_lower(ref_graze), ' grazing')
 # fire area
 lab_ba0 <- "Expected burned area (ha/yr)"
 lab_ba1 <- "Expected burned area (%/yr)"
