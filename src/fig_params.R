@@ -214,7 +214,7 @@ lab_change0 <- "% Change relative to light grazing"
 # biomass
 lab_bio0 <- expression("Biomass ("*gm^-2*")")
 lab_bio1 <- expression(~Delta*" Biomass ("*gm^-2*")")
-lab_bio1b <- "\u0394 Biomass" # delta biomass
+lab_bio1b <- "\u0394Biomass" # delta biomass
 lab_bio2 <- expression(~Delta*" Biomass (%)")
 lab_bio2_cref = '\u0394Biomass (%), relative to historical climate'
 lab_bio2_gref = paste0('\u0394Biomass (%), relative to ', str_to_lower(ref_graze),

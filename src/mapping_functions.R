@@ -11,6 +11,124 @@
 source("src/fig_params.R") # for cols_map_bio() color ramp function
 source("src/fig_functions.R")
 source("src/general_functions.R")
+
+# crs -----------------------------------------------------------------------
+
+# the crs to be used for the sagebrush conservation design (this is the same
+# one as used by NLCD)
+crs_scd <- terra::crs("PROJCRS[\"Albers_Conical_Equal_Area\",\n    BASEGEOGCRS[\"WGS 84\",\n        DATUM[\"World Geodetic System 1984\",\n            ELLIPSOID[\"WGS 84\",6378137,298.257223563,\n                LENGTHUNIT[\"metre\",1]]],\n        PRIMEM[\"Greenwich\",0,\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n        ID[\"EPSG\",4326]],\n    CONVERSION[\"Albers Equal Area\",\n        METHOD[\"Albers Equal Area\",\n            ID[\"EPSG\",9822]],\n        PARAMETER[\"Latitude of false origin\",23,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8821]],\n        PARAMETER[\"Longitude of false origin\",-96,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8822]],\n        PARAMETER[\"Latitude of 1st standard parallel\",29.5,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8823]],\n        PARAMETER[\"Latitude of 2nd standard parallel\",45.5,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8824]],\n        PARAMETER[\"Easting at false origin\",0,\n            LENGTHUNIT[\"metre\",1],\n            ID[\"EPSG\",8826]],\n        PARAMETER[\"Northing at false origin\",0,\n            LENGTHUNIT[\"metre\",1],\n            ID[\"EPSG\",8827]]],\n    CS[Cartesian,2],\n        AXIS[\"easting\",east,\n            ORDER[1],\n            LENGTHUNIT[\"metre\",1,\n                ID[\"EPSG\",9001]]],\n        AXIS[\"northing\",north,\n            ORDER[2],\n            LENGTHUNIT[\"metre\",1,\n                ID[\"EPSG\",9001]]]]")
+
+
+
+# polygons for basemaps etc---------------------------------------------------
+
+states <- sf::st_transform(sf::st_as_sf(spData::us_states), crs = crs_scd)
+
+load_template <- function(template_path = file.path(
+  "data_processed",  "interpolated_rasters","biomass", "v4",
+  "fire1_eind1_c4grass1_co20_2503v4_Sagebrush_biomass_Current_Current_Light_Current.tif")) {
+  # any of the correct version of biomass interpolated layers works
+  # as a template
+  r <- terra::rast(template_path)[[1]]
+  r[!is.na(r)] <- 1
+  r
+}
+
+load_wafwa_ecoregions <- function(total_region = FALSE,
+                                  wafwa_only = FALSE,
+                                  v = 'r1.0') {
+  
+  stopifnot(str_detect(v, '^r\\d+\\.\\d+$'),
+            is.logical(wafwa_only))
+  
+  
+  # file created by the 01_ecoregions.R script
+  if(v == 'r1.0') {
+    shp1 <- sf::st_read('data_processed/ecoregions/four_regions_v1.gpkg')
+  } else {
+    path <- paste0('data_processed/ecoregions/regions_', v, '.gpkg')
+    stopifnot(file.exists(path),
+              # wafwa_only doesn't work with newer 
+              !wafwa_only)
+    shp1 <- sf::st_read(path)
+  }
+  
+  shp2 <- shp1|> 
+    dplyr::rename(geometry = geom)
+  
+  if(wafwa_only) {
+    shp2$ecoregion <- shp2$wafwa_NAME
+    shp2 <- shp2 |> 
+      dplyr::group_by(ecoregion) |> 
+      dplyr::summarize(geometry = sf::st_union(.data$geometry),
+                       .groups = 'drop')
+  } else {
+    shp2$ecoregion <- shp2$region
+  }
+  
+  # also have a seperate row for the entire region
+  if(total_region) {
+    shp2 <- shp2 |> 
+      dplyr::summarize(geometry = sf::st_union(.data$geometry)) |> 
+      dplyr::mutate(ecoregion = "Entire study area") |> 
+      dplyr::bind_rows(shp2) |> 
+      dplyr::mutate(ecoregion = region_factor(as.character(.data$ecoregion)))
+  } else {
+    # these factor levels not being alphabetical could cause problems
+    # in some code
+    shp2$ecoregion <- region_factor(shp2$ecoregion, include_entire = FALSE,
+                                    wafwa_only = wafwa_only) 
+  }
+  shp2
+}
+
+st_geom_eco <- load_wafwa_ecoregions()
+
+load_wafwa_ecoregions_raster <- function(
+    wafwa_only = FALSE,
+    v = 'r1.0') {
+  
+  r_template <- load_template()
+  eco1 <- load_wafwa_ecoregions(wafwa_only = wafwa_only,
+                                v = v)
+  r_eco <- terra::rasterize(
+    terra::vect(eco1),
+    r_template,
+    field = 'ecoregion',
+    touches = FALSE
+  )
+  
+  r_eco[is.na(r_template)] <- NA
+  
+  # reordering so that levels
+  # in the raster are the same order as the factor
+  # from region_factor
+  lvls_old <- as.data.frame(levels(r_eco)[[1]])
+  desired_levs <- levels(eco1$ecoregion)
+  order <- 0:(length(desired_levs) -1)
+  names(order) <- desired_levs
+  
+  lvls_old$ID_to <- order[lvls_old$ecoregion]
+  lvls_old$ecoregion_to <- desired_levs[lvls_old$ID_to + 1]
+  
+  r_eco2 <- terra::classify(r_eco,
+                            as.matrix(lvls_old[c('ID', 'ID_to')]))
+  
+  lvls <- lvls_old[c('ID_to', 'ecoregion_to')]
+  names(lvls) <- stringr::str_replace(names(lvls), "_to", "")
+  lvls <- dplyr::arrange(lvls, .data$ID)
+  
+  levels(r_eco2) <- lvls
+  r_eco2
+}
+load_cell_size <- function() {
+  r <- load_wafwa_ecoregions_raster()
+  s <- terra::cellSize(r, mask = TRUE,
+                       unit = 'ha',
+                       transform = FALSE)
+  s
+}
+
 # misc --------------------------------------------------------------------
 
 # the crs to be used for the sagebrush conservation design (this is the same
@@ -405,6 +523,7 @@ plot_map2 <- function(r, add_coords = TRUE,...)  {
   
   map <- newRR3::plot_map(s, 
                   st_geom_state = states,
+                  st_geom_eco = st_geom_eco,
                   add_coords = add_coords,
                   ...) +
     newRR3::ggplot2_map_theme() +
@@ -453,6 +572,7 @@ plot_map_inset <- function(r,
   
   map <- newRR3::plot_map(s, 
                   st_geom_state = states,
+                  st_geom_eco = st_geom_eco,
                   add_coords = TRUE) +
     newRR3::ggplot2_map_theme() +
     scale_fill_gradientn(na.value = 'transparent',
@@ -1135,117 +1255,3 @@ plot_dsei_drvr_cref <- function(info, r) {
 }
 
 
-# crs -----------------------------------------------------------------------
-
-# the crs to be used for the sagebrush conservation design (this is the same
-# one as used by NLCD)
-crs_scd <- terra::crs("PROJCRS[\"Albers_Conical_Equal_Area\",\n    BASEGEOGCRS[\"WGS 84\",\n        DATUM[\"World Geodetic System 1984\",\n            ELLIPSOID[\"WGS 84\",6378137,298.257223563,\n                LENGTHUNIT[\"metre\",1]]],\n        PRIMEM[\"Greenwich\",0,\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n        ID[\"EPSG\",4326]],\n    CONVERSION[\"Albers Equal Area\",\n        METHOD[\"Albers Equal Area\",\n            ID[\"EPSG\",9822]],\n        PARAMETER[\"Latitude of false origin\",23,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8821]],\n        PARAMETER[\"Longitude of false origin\",-96,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8822]],\n        PARAMETER[\"Latitude of 1st standard parallel\",29.5,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8823]],\n        PARAMETER[\"Latitude of 2nd standard parallel\",45.5,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8824]],\n        PARAMETER[\"Easting at false origin\",0,\n            LENGTHUNIT[\"metre\",1],\n            ID[\"EPSG\",8826]],\n        PARAMETER[\"Northing at false origin\",0,\n            LENGTHUNIT[\"metre\",1],\n            ID[\"EPSG\",8827]]],\n    CS[Cartesian,2],\n        AXIS[\"easting\",east,\n            ORDER[1],\n            LENGTHUNIT[\"metre\",1,\n                ID[\"EPSG\",9001]]],\n        AXIS[\"northing\",north,\n            ORDER[2],\n            LENGTHUNIT[\"metre\",1,\n                ID[\"EPSG\",9001]]]]")
-
-
-
-# polygons for basemaps etc---------------------------------------------------
-
-states <- sf::st_transform(sf::st_as_sf(spData::us_states), crs = crs_scd)
-
-load_template <- function(template_path = file.path(
-  "data_processed",  "interpolated_rasters","biomass", "v4",
-  "fire1_eind1_c4grass1_co20_2503v4_Sagebrush_biomass_Current_Current_Light_Current.tif")) {
-  # any of the correct version of biomass interpolated layers works
-  # as a template
-  r <- terra::rast(template_path)[[1]]
-  r[!is.na(r)] <- 1
-  r
-}
-
-load_wafwa_ecoregions <- function(total_region = FALSE,
-                                  wafwa_only = FALSE,
-                                  v = 'r1.0') {
-  
-  stopifnot(str_detect(v, '^r\\d+\\.\\d+$'),
-            is.logical(wafwa_only))
-  
-
-  # file created by the 01_ecoregions.R script
-  if(v == 'r1.0') {
-    shp1 <- sf::st_read('data_processed/ecoregions/four_regions_v1.gpkg')
-  } else {
-    path <- paste0('data_processed/ecoregions/regions_', v, '.gpkg')
-    stopifnot(file.exists(path),
-              # wafwa_only doesn't work with newer 
-              !wafwa_only)
-    shp1 <- sf::st_read(path)
-  }
-  
-  shp2 <- shp1|> 
-    dplyr::rename(geometry = geom)
-  
-  if(wafwa_only) {
-    shp2$ecoregion <- shp2$wafwa_NAME
-    shp2 <- shp2 |> 
-      dplyr::group_by(ecoregion) |> 
-      dplyr::summarize(geometry = sf::st_union(.data$geometry),
-                       .groups = 'drop')
-  } else {
-    shp2$ecoregion <- shp2$region
-  }
-
-    # also have a seperate row for the entire region
-  if(total_region) {
-    shp2 <- shp2 |> 
-      dplyr::summarize(geometry = sf::st_union(.data$geometry)) |> 
-      dplyr::mutate(ecoregion = "Entire study area") |> 
-      dplyr::bind_rows(shp2) |> 
-      dplyr::mutate(ecoregion = region_factor(as.character(.data$ecoregion)))
-  } else {
-    # these factor levels not being alphabetical could cause problems
-    # in some code
-    shp2$ecoregion <- region_factor(shp2$ecoregion, include_entire = FALSE,
-                                    wafwa_only = wafwa_only) 
-  }
-  shp2
-}
-
-load_wafwa_ecoregions_raster <- function(
-    wafwa_only = FALSE,
-    v = 'r1.0') {
-  
-  r_template <- load_template()
-  eco1 <- load_wafwa_ecoregions(wafwa_only = wafwa_only,
-                                v = v)
-  r_eco <- terra::rasterize(
-    terra::vect(eco1),
-    r_template,
-    field = 'ecoregion',
-    touches = FALSE
-  )
-  
-  r_eco[is.na(r_template)] <- NA
-  
-  # reordering so that levels
-  # in the raster are the same order as the factor
-  # from region_factor
-  lvls_old <- as.data.frame(levels(r_eco)[[1]])
-  desired_levs <- levels(eco1$ecoregion)
-  order <- 0:(length(desired_levs) -1)
-  names(order) <- desired_levs
- 
-  lvls_old$ID_to <- order[lvls_old$ecoregion]
-  lvls_old$ecoregion_to <- desired_levs[lvls_old$ID_to + 1]
-
-  r_eco2 <- terra::classify(r_eco,
-                            as.matrix(lvls_old[c('ID', 'ID_to')]))
-  
-  lvls <- lvls_old[c('ID_to', 'ecoregion_to')]
-  names(lvls) <- stringr::str_replace(names(lvls), "_to", "")
-  lvls <- dplyr::arrange(lvls, .data$ID)
-
-  levels(r_eco2) <- lvls
-  r_eco2
-}
-load_cell_size <- function() {
-  r <- load_wafwa_ecoregions_raster()
-  s <- terra::cellSize(r, mask = TRUE,
-                       unit = 'ha',
-                       transform = FALSE)
-  s
-}

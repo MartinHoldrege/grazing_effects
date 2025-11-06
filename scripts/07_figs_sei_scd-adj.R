@@ -365,13 +365,17 @@ heightr <- if (nr <= 6) 6 else 7
 # build & save for each target RCP --------------------------------------
 purrr::walk(rcps, function(rcp) {
   suffix2 <- paste0(vr, "_", rcp, '_', years,   "_", runv)
-  g_stack <- make_stacked_c3_panels(sei_pcent1, rcp = rcp, vr = vr)
-  
+  g_stack <- make_stacked_c3_panels(df = sei_pcent1, rcp = rcp, vr = vr)
+
   ggsave(
-    filename = paste0("figures/sei/c3_area/c3-bar-stack_abs-area_by-region_", suffix2, ".png"),
+    filename = paste0("figures/sei/c3_area/c3-bar-stack_abs-area_by-region_",
+                      suffix2, ".pdf"),
     plot = g_stack,
-    dpi = 600, height = heightr, width = widthr
+    height = heightr, width = widthr,
+    device = cairo_pdf, # so text can be edited
+    family = "sans"  # or a specific font like "Arial"
   )
+
 })
 
 
