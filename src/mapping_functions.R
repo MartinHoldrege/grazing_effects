@@ -985,6 +985,111 @@ plot_c3c9_gref <- function(r_c3, r_c9, info_c3, info_c9) {
   
 }
 
+#' Graze and climate effects on SEI (maps).
+#' 
+#' @description
+#' 3 panel maps showing sei class (historical climate, reference grazing; to left)
+#' as well as one map of change due to grazing (right) and one map of change
+#' due to climate (bottom)
+#' 
+#'
+#' @param r_sei raster with sei (continuous)
+#' @param info info dataframe
+#' @param ref_graze reference grazing level
+#' @param target_graze target grazing level
+#' @param target_rcp future rcp
+#' @param target_yr future time period
+plot_c3c9_3panel <- function(r_sei, 
+                             info, 
+                             ref_graze = 'Moderate',
+                             target_graze = 'Very Heavy',
+                             target_rcp = 'RCP45', 
+                             target_yr = '2070-2100') {
+  info <- info %>% 
+    filter(type == 'SEI',
+           (graze == ref_graze & RCP %in% c('Current', target_rcp) 
+            & years %in% c('Current', target_yr)) |
+             (graze == target_graze & RCP == 'Current')) %>% 
+    select(-run2, -group, -type) %>% 
+    mutate(type = case_when(
+      RCP == 'Current' & graze == ref_graze ~ 'c3', # should plot C3
+      RCP == 'Current' & graze == target_graze ~ 'gref', # should plto grazing c9
+      RCP == target_rcp ~ 'cref', # should plot climate effect
+    ),
+    type= factor(type, levels = c('c3', 'gref', 'cref'))) %>% 
+    arrange(type) %>% 
+    mutate(tag = fig_letters[1:n()])
+  stopifnot(nrow(info) == 3)
+  
+  info$title <- NA
+  info$title[info$type == 'c3'] <- paste0('SEI class\n(historical climate, ',
+                                          str_to_lower(ref_graze), ' grazing)')
+  info$title[info$type == 'gref'] <- paste0('\u0394SEI class: grazing effect\n(response to ',
+                                            str_to_lower(target_graze), ' grazing)')
+  info$title[info$type == 'cref'] <- paste0(
+    '\u0394SEI class: climate effect\n(response to ',
+    rcp_label(target_rcp, target_yr, include_parenth = FALSE), ')')
+  
+  r_c3 <- sei2c3(r_sei[[info$id]])
+  r_c9 <- c3toc9(current = r_c3[[info$id[info$type == 'c3']]],
+                 future = r_c3[[info$id[info$type != 'c3']]])
+  
+  
+  levs_l <- list(c3 = data.frame(ID = 1:3, 
+                                 class = c3Names),
+                 gref = data.frame(ID = 1:9, 
+                                   class = c9Names))
+  levs_l$cref <- levs_l$gref
+  
+  r_c3c9 <- c(r_c3[info$id[info$type == 'c3']], r_c9)
+  fill <- list(
+    'c3' = scale_fill_c3,
+    'gref' = scale_fill_c9,
+    'cref' = scale_fill_c9
+  )
+  
+  
+  guide_l <- list('c3' = 'right', 'gref' = 'none', 'cref' = 'none')
+  
+  plots1 <- pmap(info[c('id', 'type', 'tag', 'title')], 
+                 function(id, type, tag, title) {
+                   fl <- fill[[type]]
+                   r <- r_c3c9[[id]]
+                   levels(r) <- levs_l[[type]]
+                   plot_map2(r = r,
+                             panel_tag = tag) + 
+                     fl() + 
+                     theme(legend.position = 'none',
+                           plot.tag.position =  'topleft',
+                           plot.tag.location = 'panel',
+                           plot.margin = unit(c(0, 0, 0, 0), units = 'in')) +
+                     labs(subtitle = title)
+                 })
+  
+  # to serve as a legend
+  color_matrix1 <- color_matrix(ylab = 'Reference scenario',
+                                xlab = 'Comparison scenario') +
+    labs(subtitle = '\u0394SEI class')
+  
+  
+  # wrapping color matrix so that 
+  plots2 <- c(plots1, list(wrap_elements(color_matrix1)))
+  design <- '
+    ABD
+    c##
+  '
+  patchwork::wrap_plots(plots2, 
+                        widths = c(1, 1, 0.6), 
+                        heights = c(1, 1),
+                        design = design) + 
+    plot_layout(guides = 'collect')
+  
+}
+
+
+
+
+
 # map of (continuous) change in SEI
 plot_delta_sei <- function(r, panel_tag = NULL,
                            legend_title = '\u0394SEI') {

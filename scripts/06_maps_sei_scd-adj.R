@@ -13,6 +13,7 @@ runv <- paste0(run, v)
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
 test_run <- FALSE
 c3_rcps <- c('RCP45', 'RCP85') # future scenario shown on map
+ref_graze <-  opt$ref_graze
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -195,7 +196,7 @@ dev.off()
 # * grazing c9 --------------------------------------------------------------
 # change sei class relative to moderate grazing (within a climate scenario)
 
-ref_graze <- 'Moderate'
+
 target_grazeL <- list(
   c('Light', 'Heavy', 'Very Heavy'),
   'Very Heavy')
@@ -247,3 +248,32 @@ for(rcp in c3_rcps) {
     dev.off()
   }
 }
+
+
+# * climate & grazing -----------------------------------------------------
+# 3 panel maps showing sei class (historical climate, reference grazing)
+# as well as one map of change due to grazing and one map of change
+# due to climate
+
+
+target_graze <- 'Very Heavy'
+target_rcp <- 'RCP45'
+target_yr <- '2070-2100'
+
+g <- plot_c3c9_3panel(r_sei = r_comb1,
+                      info = info1,
+                      ref_graze = ref_graze,
+                      target_rcp = target_rcp,
+                      target_yr = target_yr)
+
+filename <- paste0('figures/sei/maps/c3c9cgref_3panel_',
+                   target_rcp, '_',target_yr, '_', words2abbrev(target_graze), 
+                   '_', runv, ".pdf")
+ggsave(
+  filename = filename,
+  plot = g,
+  height = 6.8, width = 7.4,
+  device = cairo_pdf, # so text can be edited
+  family = "sans"  
+)
+
