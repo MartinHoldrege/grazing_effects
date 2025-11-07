@@ -309,7 +309,8 @@ box_abs_diff <- function(df_abs,
       scale_fill_smry(),
       facet_grid(PFT~rcp_year, scales = scales),
       theme(axis.text.x = element_text(angle = 45, hjust = 1),
-            panel.spacing.x = unit(0, "lines"))
+            panel.spacing.x = unit(0, "lines"),
+            plot.subtitle = element_text(hjust = 0.5))
 
     )
     if(add_hline) {
@@ -338,12 +339,14 @@ box_abs_diff <- function(df_abs,
     base(add_hline = TRUE, scales = scales_gref) +
     blank_strip() +
     labs(x = lab_graze,
-         y = ylab_diff_gref) 
+         y = ylab_diff_gref,
+         subtitle = 'Grazing effect') 
 
   g3  <- ggplot(df_diff_cref, aes(graze, .data[[y_diff]], fill = summary))+
     base(add_hline = TRUE, scales = scales_cref) +
     labs(x = lab_graze,
-         y = ylab_diff_cref) 
+         y = ylab_diff_cref,
+         subtitle = 'Climate effect')  
   
   # letters for each panel (running rowwise left to right)
   ncol1 <- lu(df_abs$rcp_year)
@@ -510,6 +513,90 @@ make_stacked_c3_panels <- function(df, rcp, vr, include_sec_y = FALSE) {
 # dot plots ---------------------------------------------------------------
 
 
+#' @title Build dotplot of burned area
+#' @description Creates dotplot  region × climate facet (e.g. Current or RCP scenario),
+#'
+#' @param df_panel Data frame filtered to one region and one climate facet. 
+#' @param ylim y limits
+fire_dot_panel <- function(df_panel, ylim) {
+  
+  
+  x_text <- (lu(df_panel$graze) + 1)/2 
+  y_text <- 0.95*max(ylim)
+  df_text <- df_panel %>% 
+    group_by(rcp_year) %>% 
+    summarize(y_max = max(c(area_high_perc, area_median_perc),
+                          na.rm = TRUE)) %>% 
+    mutate(y_text = ifelse(y_max > !!y_text, 0.1*max(ylim), y_text),
+           x_text = x_text)
+  
+  ggplot(df_panel, aes(x = graze)) +
+    geom_errorbar(aes(ymin = area_low_perc, ymax = area_high_perc),
+                  width = 0) +
+    geom_point(aes(y = area_median_perc), 
+               position = position_dodge(width = 0.5)) +
+    adjust_graze_x_axis() +
+    geom_text(# to avoid overplotting the word many times
+      data = df_text, 
+      mapping = aes(x = x_text, y = y_text, label = rcp_year),
+      family = "sans",
+      size = 8, size.unit = 'pt', fontface = 1) +
+    theme(
+      # shrink subtitle
+      plot.subtitle = element_text(size = 10, margin = margin(b = 1)),
+      strip.text = element_blank(),
+      # reduce panel spacing between facets
+      panel.spacing.x = unit(0, "lines"),
+      panel.spacing.y = unit(0, "lines"),
+      # shrink plot margins
+      plot.margin = margin(2, 3, 2, 2)
+    )+
+    facet_wrap(~rcp_year) +
+    labs(y = lab_ba1) +
+    coord_cartesian(ylim = ylim)
+}
+
+#' @title Build  fire dotplots, 1 panel per region
+#'
+#' @param df dataframe
+#' @param vr region verion
+#' @param rcp Character, the future RCP scenario to plot .
+make_firedot_panels <- function(df, vr, rcp) {
+  
+  # filter to median summary and to Current vs selected rcp
+  df0 <- df %>%
+    filter(RCP %in% c("Current", rcp)) %>%
+    arrange(ecoregion, graze, RCP, years)
+  
+  max <- max(with(df0, c(area_high_perc, area_median_perc)),
+             na.rm = TRUE)
+  ylim <- c(0, max)
+  
+  # collect region order & labels
+  regions <- levels(df0$ecoregion)
+  region_label <- region_label_factory(v = vr)
+  # build per-region patchwork rows
+  plots <- purrr::map(regions, function(rr) {
+    
+    # split to current and selected future for this region
+    d_reg <- filter(df0, ecoregion == rr)
+    
+    # two panels for this region
+    g1 <- fire_dot_panel(df_panel = d_reg,ylim = ylim) 
+    
+    title <- region_label(rr)
+    g1 + 
+      labs(subtitle = title)
+  })
+  
+  
+  comb <- combine_panels_labs(plots, xlab = NULL, ylab = NULL, 
+                              ylab_sec = NULL,
+                              axes = 'collect') 
+  
+  comb
+  
+}
 
 # bar charts --------------------------------------------------------------
 

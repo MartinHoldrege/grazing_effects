@@ -262,8 +262,8 @@ lab_firep1 <- expression(Delta~"# fires/century")
 lab_firep1_gref <- paste0('\u0394 # fires/century, relative to ', 
                           str_to_lower(ref_graze), ' grazing')
 # fire area
-lab_ba0 <- "Expected burned area (ha/yr)"
-lab_ba1 <- "Expected burned area (%/yr)"
+lab_ba0 <- "Burned area (ha/yr)"
+lab_ba1 <- "Burned area (%/yr)"
 lab_agegroup <- "Years since fire"
 
 

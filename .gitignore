@@ -14,6 +14,7 @@ tmp/*
 *.tif
 *.ppt
 *.pptx
+*.svg
 
 # raster files
 *.tiff

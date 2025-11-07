@@ -202,8 +202,6 @@ args <- expand_grid(
 ylab_diff_gref = paste0('\u0394Biomass (%), relative to ', str_to_lower(ref_graze),
                         ' grazing')
 
-
-
 # figure for entire region
 pmap(args, function(pfts, RCP, years) {
   df_abs <- bio4 %>% 
@@ -245,7 +243,6 @@ pmap(args, function(pfts, RCP, years) {
       width = 7, height = 5*n_pft/3, dpi = 600)
 
 })
-
 
 
 # *utilization ----------------------------------------------------------------

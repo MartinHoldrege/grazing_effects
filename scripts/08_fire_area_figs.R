@@ -1,5 +1,5 @@
 # Purpose: Create figures of expected burned area and area in different
-# fire return inverval categories
+# fire return interval categories
 
 # Author: Martin Holdrege
 
@@ -356,41 +356,25 @@ write_csv(c3eco_gcm3, paste0('data_processed/raster_means/',
 
 if(create_figs){
 # expected burned area figs --------------------------------------------------
-
-plots <- map(ecoregions, function(region) {
-  total_area <- area_eco$area[area_eco$ecoregion == region]
-  ba3 %>% 
-    filter(ecoregion == region) %>% 
-    ggplot(aes(x = rcp_year, y = area_median)) +
-    geom_errorbar(aes(ymin = area_low, ymax = area_high, group = graze), 
-                  position = position_dodge(width = 0.5), width = 0) +
-    geom_point(aes(y = area_median, color = graze), 
-               position = position_dodge(width = 0.5)) +
-    scale_y_continuous(sec.axis = sec_axis(transform = \(x) x/total_area*100,
-                                           name = '% of region')) +
-    scale_color_manual(values = cols_graze, name = 'Grazing') +
-    geom_vline(xintercept = line_loc2, linetype = 2) +
-    theme(legend.position = 'bottom',
-          axis.text = element_text(size = 7),
-          axis.text.x = element_text(angle = 25, hjust = 1, size = rel(0.8))) +
-    labs(x = NULL,
-         y = lab_ba0,
-         subtitle = region)
-})
-
-plots <- remove_y_titles(plots, index_keep_y = 3, 
-                         index_keep_y_sec = 4)
-
-g <- patchwork::wrap_plots(plots) +
-  plot_layout(guides = 'collect', axes = 'collect', ncol = 2)
-
-g2 <- g&theme(legend.position = 'bottom')
-
-jpeg(paste0("figures/fire/area/expected_ba_dotplot_", 
-            v, vr_name, yr_lab, '_', run, '.jpg'),
-     units = 'in', width = width_3p, height = height_3p, res = 600)
-g2
-dev.off()
+# see pre-nov 2025 commits for version making old version of this
+# figure with total area and colored grazing
+widthr  <- 6.3 
+heightr <- 6 
+ba3_tmp <- ba3 %>% 
+  mutate(rcp_year = rcp_label(RCP, years = years, include_parenth = FALSE,
+                              add_newline = TRUE))
+for (rcp in rcps) {
+  g <- make_firedot_panels(df = ba3_tmp, vr = vr, rcp = rcp)
+  # saving as pdf so can better be combined with fire change maps
+  ggsave(
+    paste0("figures/fire/area/expected_ba_dotplot_", 
+           vr, '_', rcp, '_', years, '_', runv, '.pdf'),
+    plot = g,
+    height = heightr, width = widthr,
+    device = cairo_pdf, # so text can be edited
+    family = "sans"  # or a specific font like "Arial"
+  )
+}
 
 
 # age_group figs -----------------------------------------------------
