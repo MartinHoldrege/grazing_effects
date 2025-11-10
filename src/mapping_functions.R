@@ -650,8 +650,7 @@ plot_map_20panel <- function(
   midpoints <- list(NULL, midpoint_diff)
   names(midpoints) <- types
   values <- list(values_absolute, NULL)
-  names(values)
-  
+
   stopifnot(
     c(types) %in% info$type)
   
@@ -706,6 +705,7 @@ plot_map_20panel <- function(
       theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
   })
   
+
   # labels for the left margin
   plots_left <- map(label_left, function(x) {
     ggplot() +

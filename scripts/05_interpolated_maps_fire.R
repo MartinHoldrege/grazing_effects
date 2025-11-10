@@ -5,7 +5,6 @@
 # Purpose: Map and examine interpolated fire probability
 # code adapted from SEI/scripts/sw_results/01_examine_sw_results_fire.R
 
-# NOTE--this script is currently failing
 # dependencies ------------------------------------------------------------
 
 library(terra)
@@ -19,14 +18,13 @@ source('src/fig_functions.R')
 source('src/params.R')
 # params ------------------------------------------------------------------
 
-runs <- opt$run
-names(runs) <- runs
+run <- opt$run
 v_out <- "v1" # version appended to output
 years <- opt$years
 yr_lab <- opt$years
-graze_levels <- c("grazL" = "Light")
-ref_graze <- 'Light' # opt$ref_graze
-
+graze_levels <- c("grazM" = "Moderate")
+ref_graze <- opt$ref_graze
+test_run <- opt$test_run # TRUE
 # Read in data ------------------------------------------------------------
 
 # selecting which rasters to load
@@ -38,7 +36,7 @@ path_r <- "data_processed/interpolated_rasters"
 
 paths <- list.files(path_r, full.names = TRUE,
                     pattern = 'fire-prob_future_summary_across_GCMs.tif') %>% 
-  str_subset(pattern = paste("(", runs, ")", collapse = "|", sep = "")) 
+  str_subset(pattern = run) 
 
 r1 <- rast(paths)
 
@@ -63,7 +61,7 @@ info1 <- info1a %>%
 # raw difference relative to historical climate conditions
 paths_rdiff <- list.files(path_r, full.names = TRUE,
                           pattern = 'fire-prob-rdiff-cref_median') %>% 
-  str_subset(pattern = paste("(", runs, ")", collapse = "|", sep = "")) 
+  str_subset(pattern = run) 
 
 rdiff1 <- rast(paths_rdiff)
 
@@ -75,23 +73,26 @@ info_rdiff1 <- info_rdiff0 %>%
   
 # * median delta fire prob wgcm ------------------------------------------
 
-paths_wgcm <- map(runs, function(run) {
-  p <- list.files(path_r, full.names = TRUE,
-             pattern = paste0(run, "_fire-prob-wgcmDiff-", ref_graze, "_median"))
-  stopifnot(length(p) == 1)
-  p
-})
-
-wgcm_l1 <- map(paths_wgcm, rast)
+path_wgcm  <- list.files(path_r, full.names = TRUE,
+                         pattern = paste0(run, "_fire-prob-wgcmDiff-", 
+                                          ref_graze, "_median"))
 
 
+wgcm1 <- rast(path_wgcm)
+
+
+if(test_run) {
+  wgcm1 <- downsample(wgcm1)
+  rdiff1 <- downsample(rdiff1)
+  r2 <- downsample(r2)
+  r1 <- downsample(r1)
+}
 # figures--20 panel -------------------------------------------------------
 
 # 20 panel figures ---------------------------------------------------------
 
 # preparing args
 r <- c(r1, rdiff1)
-# r <- spatSample(r, 100, method = 'regular', as.raster = TRUE) # for testing
 
 info_20panel <- info1a %>% 
   bind_rows(info_rdiff0) %>% 
@@ -162,13 +163,10 @@ info_c1 <- bind_rows(info1, info_rdiff1) %>%
 r_c1 <- c(r2, rdiff1) # combined raster
 
 
-# maps of biomass and raw difference --------------------------------------
-# One big map on the left of historical biomass, and 4 panels on the left
+# maps of fir and raw difference --------------------------------------
+# One big map on the left of historical fir, and 4 panels on the left
 # showing 2 future time periods and for each time period 1 map shows
-# biomass the other shows delta biomass
-info_c_l <- info_c1 %>% 
-  group_by(run2) %>% 
-  group_split() # split into list
+# fire the other shows delta fire
 
 # ranges for axes
 # ids for all runs for this PFT
@@ -195,7 +193,7 @@ title_diff <- "\u0394 # fires/century" # delta
 cairo_pdf(paste0("figures/fire/maps/fire-prob-rdiff-cref_", v_out, yr_lab,
                  ".pdf"),
           width = 12, height = 7, onefile = TRUE)
-for(df in info_c_l){
+  df <- info_c1
   print(df$id[1])
   fire_id <- df$id[df$type == 'fire-prob']
   diff_id <- df$id[df$type != 'fire-prob']
@@ -272,7 +270,7 @@ for(df in info_c_l){
   p3 <- p2+
     patchwork::plot_annotation(caption = paste(df$run2[1], cap_perc))
   print(p3)
-}
+
 
 
 dev.off()
@@ -280,56 +278,56 @@ dev.off()
 
 
 # comparing grazing levels ------------------------------------------------
+# this figure not used in manuscript (could be deleted)
+r <- wgcm1
+m <- max(abs(unlist(minmax(r))))
+range_wgcm <- c(-m, m)
+info_wgcm1 <- create_rast_info(r,
+                               into = c("type", 'RCP', 'years', 'graze')) %>% 
+  mutate(id_noGraze = str_replace(id, '_[[:alpha:]]+$', '')) %>% 
+  arrange(RCP, years, graze)
 
-for (run in runs) {
-  r <- wgcm_l1[[run]]
-  m <- max(abs(unlist(minmax(r))))
-  range_wgcm <- c(-m, m)
-  info_wgcm1 <- create_rast_info(r,
-                                 into = c("type", 'RCP', 'years', 'graze')) %>% 
-    mutate(id_noGraze = str_replace(id, '_[[:alpha:]]+$', '')) %>% 
-    arrange(RCP, years, graze)
-  
-  info_wgcm_l <- split(info_wgcm1, info_wgcm1$id_noGraze)
-  # iterating across scenarios (1 page per scenario)
-  pages <- map(info_wgcm_l, function(info) {
+info_wgcm_l <- split(info_wgcm1, info_wgcm1$id_noGraze)
+# iterating across scenarios (1 page per scenario)
+pages <- map(info_wgcm_l, function(info) {
 
-    # iterating across grazin levels
-    maps_delta <- map(info$id, function(id) {
-      tag_label <- paste0("Delta fire probability (", 
-                          info$graze[info$id == id], "\n relative to ", 
-                          ref_graze, " grazing)")
-      plot_map_inset(r = r[[id]],
-                     colors = rev(cols_map_bio_d),
-                     tag_label = tag_label,
-                     limits = range_wgcm,
-                     scale_name = lab_firep1)
-    })
-    
-    id <- paste0(unique(info$id_noGraze), '_', ref_graze)
-    map_ref <-plot_map_inset(r = r2[[id]],
-                             colors = cols_firep,
-                             tag_label = paste0("Fire probability (", ref_graze, 
-                                                " grazing)"),
-                             limits = range_f,
-                             scale_name = lab_firep0)
-    
-    
-    comb1 <- patchwork::wrap_plots(c(list(map_ref), maps_delta),
-                                   ncol = 2, guides = 'collect')
-    
-    comb2 <- comb1 +
-      patchwork::plot_annotation(
-        subtitle = paste0('Change in fire probability due to grazing', 
-                          ' (comparisons within climate scenario)\n',
-                          rcp_label(unique(info$RCP), unique(info$years))))
-    comb2
+  # iterating across grazin levels
+  maps_delta <- map(info$id, function(id) {
+    tag_label <- paste0("Delta fire probability (", 
+                        info$graze[info$id == id], "\n relative to ", 
+                        ref_graze, " grazing)")
+    plot_map_inset(r = r[[id]],
+                   colors = rev(cols_map_bio_d),
+                   tag_label = tag_label,
+                   limits = range_wgcm,
+                   scale_name = lab_firep1)
   })
   
-  pdf(paste0("figures/fire/maps/", run, yr_lab, "_delta-prob_wgcm-", ref_graze, '_', 
-             v_out, '.pdf'),
-      width = 10, height = 10)
-    map(pages, print)
-  dev.off()
+  id <- paste0(unique(info$id_noGraze), '_', ref_graze) %>% 
+    str_replace('-rdiff-gref', '')
+  map_ref <-plot_map_inset(r = r2[[id]],
+                           colors = cols_firep,
+                           tag_label = paste0("Fire probability (", ref_graze, 
+                                              " grazing)"),
+                           limits = range_f,
+                           scale_name = lab_firep0)
   
-}
+  
+  comb1 <- patchwork::wrap_plots(c(list(map_ref), maps_delta),
+                                 ncol = 2, guides = 'collect')
+  
+  comb2 <- comb1 +
+    patchwork::plot_annotation(
+      subtitle = paste0('Change in fire probability due to grazing', 
+                        ' (comparisons within climate scenario)\n',
+                        rcp_label(unique(info$RCP), unique(info$years))))
+  comb2
+})
+
+pdf(paste0("figures/fire/maps/", run, yr_lab, "_delta-prob_wgcm-", ref_graze, '_', 
+           v_out, '.pdf'),
+    width = 10, height = 10)
+  map(pages, print)
+dev.off()
+  
+
