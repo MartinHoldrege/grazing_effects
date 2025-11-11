@@ -531,7 +531,7 @@ plot_map2 <- function(r, add_coords = TRUE,...)  {
     theme(axis.text = element_blank(),
           axis.ticks = element_blank(),
           axis.text.y = element_blank(),
-          plot.margin = unit(c(0, 0, 0, 0), units = 'in'),
+          plot.margin = unit(rep(0.05, 4), units = 'in'),
           plot.tag.position = 'topleft',
           plot.tag.location = 'panel')
   
@@ -1114,7 +1114,25 @@ plot_delta_sei <- function(r, panel_tag = NULL,
     theme(legend.position = 'right')
 }
 
-# map of (continuous) change in SEI
+plot_fire <- function(r, panel_tag = NULL, 
+                      limits = NULL,
+                      legend_title = '#fires/century') {
+  
+  if(is.null(limits)) {
+    limits <- range_raster(r)
+  }
+  colors <- cols_firep
+  
+  plot_map2(r, panel_tag = panel_tag) +
+    scale_fill_gradientn(na.value = 'transparent',
+                         limits = limits,
+                         name = legend_title,
+                         colors = colors) +
+    theme(legend.position = 'right')
+  
+}
+
+# map of (continuous) change in fire
 plot_delta_fire <- function(r, panel_tag = NULL, 
                             limits = NULL,
                             legend_title = '\u0394 #fires/century') {
@@ -1132,6 +1150,75 @@ plot_delta_fire <- function(r, panel_tag = NULL,
     theme(legend.position = 'right')
  
 }
+
+# absolute fire probability (historical, reference), and one map, each,
+# of change due to grazing and change due to climate
+plot_fire_3panel <- function(r, 
+                             info, 
+                             ref_graze = 'Moderate',
+                             target_graze = 'Very Heavy',
+                             target_rcp = 'RCP45', 
+                             target_yr = '2070-2100') {
+  info <- info %>% 
+    filter(  (graze == ref_graze & RCP == 'Current' & type == 'fire-prob') |
+               (graze == target_graze & RCP == 'Current' 
+                & type == 'fire-prob-rdiff-gref') |
+               (graze == ref_graze & RCP == target_rcp & years == target_yr 
+                & type == 'fire-prob-rdiff-cref')) %>% 
+    mutate(type = str_extract(type, 'cref|gref'),
+           type = ifelse(is.na(type), 'abs', type),
+           type= factor(type, levels = c('abs', 'gref', 'cref'))) %>% 
+    arrange(type) %>% 
+    mutate(tag = fig_letters[1:n()])
+  stopifnot(nrow(info) == 3)
+  
+  info$title <- NA
+  info$title[info$type == 'abs'] <- paste0('Wildfire\n(historical climate, ',
+                                           str_to_lower(ref_graze), ' grazing)')
+  info$title[info$type == 'gref'] <- paste0('\u0394Wildfire: grazing effect\n(response to ',
+                                            str_to_lower(target_graze), ' grazing)')
+  info$title[info$type == 'cref'] <- paste0(
+    '\u0394Wildfire: climate effect\n(response to ',
+    rcp_label(target_rcp, target_yr, include_parenth = FALSE), ')')
+  
+  f_l <- list(
+    'abs' = plot_fire,
+    'gref' = plot_delta_fire,
+    'cref' = plot_delta_fire
+  )
+  
+  limits <- list(
+    'abs' = c(0, max(range_raster(r[[info$id[info$type == 'abs']]]))),
+    'gref' = range_raster(r[[info$id[info$type != 'abs']]], 
+                          absolute = TRUE)
+  )
+  limits$cref <- limits$gref
+  
+  plots1 <- pmap(info[c('id', 'type', 'tag', 'title')], 
+                 function(id, type, tag, title) {
+                   f <- f_l[[type]]
+                   r <- r[[id]]
+                   f(r = r,panel_tag = tag,
+                     limits = limits[[type]]) + 
+                     labs(subtitle = title)
+                 })
+  
+  
+  
+  # wrapping color matrix so that 
+  plots2 <- c(plots1, list(guide_area()))
+  design <- '
+    ABD
+    c##
+  '
+  patchwork::wrap_plots(plots2, 
+                        widths = c(1, 1, 0.6), 
+                        heights = c(1, 1),
+                        design = design) + 
+    plot_layout(guides = 'collect')
+  
+}
+
 
 plot_fire_gref_18panel <- function(info, r, legend_title) {
   stopifnot(nrow(info) == 18)

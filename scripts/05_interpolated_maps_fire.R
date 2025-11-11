@@ -19,6 +19,7 @@ source('src/params.R')
 # params ------------------------------------------------------------------
 
 run <- opt$run
+runv <- opt$runv
 v_out <- "v1" # version appended to output
 years <- opt$years
 yr_lab <- opt$years
@@ -52,9 +53,7 @@ info1a <- info0 %>%
 r2 <- r1[[info1a$id]]
 names(r2) <- str_replace(names(r2), "_median$", "")
 
-info1 <- info1a %>% 
-  mutate(id = str_replace(id, "_median$", "")) %>% 
-  filter(graze %in% graze_levels,)
+
 
 # *median delta fire-prob ---------------------------------------------------
 
@@ -65,21 +64,12 @@ paths_rdiff <- list.files(path_r, full.names = TRUE,
 
 rdiff1 <- rast(paths_rdiff)
 
-info_rdiff0 <- create_rast_info(rdiff1, into = into)%>% 
-  filter_clim_extremes(years = years)
-
-info_rdiff1 <- info_rdiff0 %>% 
-  filter(graze %in% graze_levels) 
-  
 # * median delta fire prob wgcm ------------------------------------------
 
 path_wgcm  <- list.files(path_r, full.names = TRUE,
                          pattern = paste0(run, "_fire-prob-wgcmDiff-", 
                                           ref_graze, "_median"))
-
-
 wgcm1 <- rast(path_wgcm)
-
 
 if(test_run) {
   wgcm1 <- downsample(wgcm1)
@@ -87,6 +77,27 @@ if(test_run) {
   r2 <- downsample(r2)
   r1 <- downsample(r1)
 }
+
+
+# info ------------------------------------------------------------------
+
+info1 <- info1a %>% 
+  mutate(id = str_replace(id, "_median$", "")) %>% 
+  filter(graze %in% graze_levels)
+
+info_wgcm1 <- create_rast_info(wgcm1,
+                               into = c("type", 'RCP', 'years', 'graze')) %>% 
+  mutate(id_noGraze = str_replace(id, '_[[:alpha:]]+$', '')) %>% 
+  arrange(RCP, years, graze)
+
+info_rdiff0 <- create_rast_info(rdiff1, into = into)%>% 
+  filter_clim_extremes(years = years)
+
+info_rdiff1 <- info_rdiff0 %>% 
+  filter(graze %in% graze_levels) 
+
+info_comb1 <- bind_rows(info1, info_rdiff0, info_wgcm1)
+
 # figures--20 panel -------------------------------------------------------
 
 # 20 panel figures ---------------------------------------------------------
@@ -282,10 +293,7 @@ dev.off()
 r <- wgcm1
 m <- max(abs(unlist(minmax(r))))
 range_wgcm <- c(-m, m)
-info_wgcm1 <- create_rast_info(r,
-                               into = c("type", 'RCP', 'years', 'graze')) %>% 
-  mutate(id_noGraze = str_replace(id, '_[[:alpha:]]+$', '')) %>% 
-  arrange(RCP, years, graze)
+
 
 info_wgcm_l <- split(info_wgcm1, info_wgcm1$id_noGraze)
 # iterating across scenarios (1 page per scenario)
@@ -329,5 +337,30 @@ pdf(paste0("figures/fire/maps/", run, yr_lab, "_delta-prob_wgcm-", ref_graze, '_
     width = 10, height = 10)
   map(pages, print)
 dev.off()
-  
 
+# 3 panel climate and grazing reference -----------------------------------
+# absolute fire probability (historical, reference), and one map, each,
+# of change due to grazing and change due to climate
+
+
+target_graze <- 'Very Heavy'
+target_rcp <- 'RCP45'
+target_yr <- years
+
+
+g <- plot_fire_3panel(r = c(r2, rdiff1, wgcm1), 
+                 info = info_comb1,
+                 target_graze = target_graze,
+                 target_rcp = target_rcp,
+                 target_yr = target_yr)  
+
+filename <- paste0('figures/fire/maps/3panel_cgref_',
+                   target_rcp, '_',target_yr, '_', words2abbrev(target_graze), 
+                   '_', runv, ".pdf")
+ggsave(
+  filename = filename,
+  plot = g,
+  height = 6.8, width = 7.4,
+  device = cairo_pdf, # so text can be edited
+  family = "sans"  
+)

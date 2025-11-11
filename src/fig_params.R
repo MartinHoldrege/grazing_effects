@@ -42,7 +42,8 @@ cols_pft3 <- c("Aherb" = "#f6e8c3",
 
 
 # fire probability
-cols_firep <- RColorBrewer::brewer.pal(11, "RdYlBu")[9:2]
+# cols_firep <- RColorBrewer::brewer.pal(11, "RdYlBu")[9:2]
+cols_firep <- viridisLite::inferno(100)[-(1:9)]
 
 
 # colors are based on ordering by median MAT based on MAT at the 200 sites
