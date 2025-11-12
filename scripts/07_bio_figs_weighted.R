@@ -125,7 +125,7 @@ join_vars <- c('run', 'years', 'RCP', 'graze',
                'site', 'GCM')
 
 # GCM level delta biomass and delta fire responses to grazing
-gref_diff_gcm1 <- pft5_d_wgcm_gcm %>% 
+gref_diff_gcm0 <- pft5_d_wgcm_gcm %>% 
   filter(PFT %in% pfts) %>% 
   select(all_of(join_vars), PFT, bio_diff) %>% 
   left_join(
@@ -134,7 +134,10 @@ gref_diff_gcm1 <- pft5_d_wgcm_gcm %>%
   ) %>% 
   rename(fire = fire_prob_diff,
          bio = bio_diff) %>% 
-  left_join(w1, by = 'site',relationship = "many-to-many") %>% 
+  left_join(w1, by = 'site',relationship = "many-to-many")
+
+#summarize across sites
+gref_diff_gcm1 <-   gref_diff_gcm0 %>% 
   group_by(run, years, RCP, graze, GCM, region, PFT) %>% 
   # weighted percentiles
   summarize_weighted(varname = c('bio', 'fire'),
@@ -507,3 +510,45 @@ for(pft in pfts) {
            width = 10, height = 6, dpi = 600)
   })
 }
+
+
+# gref bio vs fire by site ------------------------------------------------
+# plot change in biomass vs change in fire, to help explain
+# why sagebrush sometimes goes down with light grazing
+
+
+
+
+ylab <- "\u0394Sagebrush biomass (%)"
+label <- function(x) {
+  paste0(as.character(x), '\nrelative to ', str_to_lower(ref_graze), ' grazing')
+}
+g <- gref_diff_gcm0 %>% 
+  filter(PFT == 'Sagebrush', 
+         #region == levels(region)[[1]],
+         RCP %in% c('Current', 'RCP45'),
+         years %in% c('Current', '2070-2100')) %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
+  ggplot(aes(fire, bio)) +
+  geom_point(aes(color = rcp_year), alpha = 0.2, size = 1) +
+  geom_vline(xintercept = 0, linetype = 2, alpha = 0.4) +
+  geom_hline(yintercept = 0, linetype = 2, alpha = 0.4) +
+  geom_smooth(method = 'lm', color = 'black') +
+  labs(x = lab_firep1, y = ylab) +
+  scale_color_manual(values = cols_scen, name = 'Scenario') +
+  facet_grid(region~graze, labeller = ggplot2::labeller(graze =as_labeller(label)))
+
+g
+filename <- paste0('figures/biomass/delta-bio_vs_delta-fire_sagebrush_graz',
+                   paste0(words2abbrev(c(ref_graze)), collapse = ''), 
+                   "_", vr, '_', run, '.png')
+                   
+ggsave(
+  filename = filename,
+  plot = g,
+  width = 10,
+  height =10,
+  dpi = 600
+)
+
+

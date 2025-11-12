@@ -17,6 +17,10 @@ cols_rcp <- c("Current" = "cornflower blue",
               "RCP45" = "darkgreen",
               "RCP85" = "green3")
 
+cols_scen <- c("Historical" = "cornflower blue", 
+                 "RCP4.5\n2071-2100" =  "darkgreen", "RCP4.5 2071-2100" =  "darkgreen",
+                 "RCP8.5\n2071-2100" = "green3", "RCP8.5 2071-2100" = "green3")
+
 # colors for grazing levels (from 5-class OrRd on colorbrewer2)
 cols_graze <- c("Light" = "#fdd49e", 
                 "Moderate" = "#fc8d59",
@@ -259,12 +263,12 @@ lab_fire1 <- "Change in fire return interval (years)"
 
 # fire probability
 lab_firep0 <- "# fires/century"
-lab_firep1 <- expression(Delta~"# fires/century")
+lab_firep1 <- '\u0394 # fires/century'
 lab_firep1_gref <- paste0('\u0394 # fires/century, relative to ', 
                           str_to_lower(ref_graze), ' grazing')
 # fire area
-lab_ba0 <- "Burned area (ha/yr)"
-lab_ba1 <- "Burned area (%/yr)"
+lab_ba0 <- "Burned area (ha/year)"
+lab_ba1 <- "Burned area (%/year)"
 lab_agegroup <- "Years since fire"
 
 
