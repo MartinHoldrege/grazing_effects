@@ -231,7 +231,7 @@ g3 <- g2 + g_sei + plot_layout(guides = 'collect')
 png(paste0("figures/sei/q-sei_scd-adj_weighted_by-region_3pft_boxplot", 
            vr_name, yr_lab, "_", suffix, ".png"),
     width = 11, height = 2.3 + 7.7*mr, units = 'in', res = 600)
-g3&theme(legend.position = 'bottom')
+print(g3&theme(legend.position = 'bottom'))
 dev.off()
 
 
@@ -439,23 +439,21 @@ purrr::walk(rcps, function(rcp) {
 
 # burned area--attribution ------------------------------------------------
 
-drivers2 <- drivers1 %>% 
-  select(-id) %>% 
-  rename(region = ecoregion)
+drivers2 <- drivers1 
 
 sei_byGCM2 <- sei_byGCM1 %>% 
   select(-type, -group)
 
 sei_byGCM3 <- drivers2 %>% 
-  filter(type == "climate") %>% 
-  select(-graze, -type) %>%  # grazing doesn't apply to climate variables
+  filter(variable %in% c('MAP', 'MAT', 'psp', 'PSP')) %>% 
+  select(-graze, -matches('p\\d+'), -matches('median')) %>%  # grazing doesn't apply to climate variables
   pivot_wider(values_from = 'mean',
               names_from = variable) %>% 
   right_join(sei_byGCM2, by = join_by(region, RCP, years, GCM))
 
 sei_byGCM4 <- drivers2 %>% 
-  filter(type == "biomass") %>% 
-  select(-type) %>% 
+  filter(variable %in% c('Aherb', 'Pherb', 'Sagebrush')) %>% # biomass variables 
+  select(-matches('p\\d+'), -matches('median')) %>%  # grazing doesn't apply to climate variables
   pivot_wider(values_from = 'mean',
               names_from = variable) %>% 
   right_join(sei_byGCM3, by = join_by(region, RCP, years, GCM, graze)) %>% 
@@ -533,11 +531,13 @@ plots2 <- map(rcp_year, function(x) {
   
 })
 
-pdf(paste0("figures/sei/sei_scd-adj_vs_driver_by-GCM",vr_name, yr_lab, "_", 
+pdf(paste0("figures/sei/sei_scd-adj_vs_driver_by-GCM_",vr, "_", years, "_", 
            suffix, '.pdf'),
     width = 14, height = 10*mr)
-plots1
-plots2
+print(plots1)
+print(plots2)
 dev.off()
 
 } # end create figs
+
+
