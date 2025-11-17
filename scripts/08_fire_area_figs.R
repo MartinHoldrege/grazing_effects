@@ -633,7 +633,8 @@ ggsave("figures/sei/tradeoff/conceptual_fig_v1.png",
 
 # * burned area--attribution ------------------------------------------------
 
-drivers2 <- drivers1 
+drivers2 <- drivers1 %>% 
+  select(-p25, -median, -p75)
 ba_gcm2 <- ba_gcm1 %>% 
   left_join(rename(area_eco, total_area = area), by = 'ecoregion') %>% 
   mutate(ba_perc = area/total_area*100) %>% 
@@ -672,31 +673,37 @@ rcp_year <- unique(ba_gcm4$rcp_year) %>%
 
 
 plots <- map(rcp_year, function(x) {
-  ba_gcm5 %>% 
+  g <- ba_gcm5 %>% 
     filter(rcp_year == x) %>% 
     ggplot(aes(mean_driver, ba_perc)) +
     geom_smooth(aes(linetype = graze), se = FALSE, color = 'gray') +
     geom_point(aes(shape = graze, color = GCM)) +
     geom_point(data = ba_current,
                aes(shape = graze, color = 'Historical')) +
-    facet_grid(region~driver, scales = 'free', switch = 'x') +
+    facet_grid(region~driver, scales = 'free', switch = 'x',
+               labeller = ggplot2::labeller(driver = driver_labeller())) +
     scale_color_manual(values = cols_GCM2,
                        name = 'GCM (or historical)') +
     scale_linetype(name = 'Grazing') +
     scale_shape(name = 'Grazing')+
     labs(x = " ",
-         y = lab_ba0,
-         subtitle = x,
-         caption = 'Mean of fire probability predictor variable was calculated across
-         pixels in ecoregion, for a given GCM') +
-    theme(strip.placement.x = 'outside')
+         y = lab_ba1,
+         subtitle = x) +
+    theme(strip.placement.x = 'outside',
+          strip.text = ggtext::element_markdown())
+  
+  filename <- paste0("figures/fire/area/ba-perc_vs_driver_by-GCM_", 
+                     vr, '_',  
+                     str_replace(str_replace(x, '\\.', ''), ' ', '_'), 
+                     '_', runv, '.png')
+  
+  ggsave(filename = filename,
+         plot = g,
+         width = 13, height = 10*mr,
+         dpi = 600)
   
 })
 
-pdf(paste0("figures/fire/area/ba-perc_vs_driver_by-GCM_", suffix, '.pdf'),
-    width = 13, height = 10*mr)
-print(plots)
-dev.off()
 
 
 # * delta fire prob attribution -------------------------------------------
