@@ -11,7 +11,7 @@
 
 source("src/params.R") # some params used in this script
 yr_lab <- opt$yr_lab
-test_run <- opt$test_run
+test_run <- opt$test_run # TRUE # 
 run <- opt$run
 vr <- opt$vr
 vr_name <- opt$vr_name
@@ -227,22 +227,53 @@ stopifnot(length(id_ref) == 1)
 c3_ref <- sei2c3(sei_scd_adj1[[id_ref]])
 c3eco <- c3_ref*10 + as.numeric(r_eco4)
 names(c3eco) <- 'c3eco'
-c3eco_sei1 <- zonal(sei_scd_adj1, c3eco, fun = 'mean')
-c3eco_area1 <- zonal(size, c3eco, fun = 'sum')
 
-c3eco_sei2_gcm <- c3eco_sei1 %>% 
-  pivot_longer(-c3eco,
-               values_to = 'SEI_mean',
-               names_to = 'id') %>% 
-  mutate(c3 = c3eco_to_c3(c3eco),
-         # warning here is ok on test runs (sampling can miss regions), but not ok
-         # for real run
-         region = c3eco_to_eco(c3eco, levels(r_eco4)[[1]]$ecoregion)) %>% 
-  left_join(c3eco_area1, by = "c3eco") %>% 
-  left_join(info_sei, by = 'id') %>% 
-  select(-c3eco)
+p2 <- paste0('data_processed/raster_means/', runv, vr_name,
+            '_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv')
 
+if(!file.exists(p2) | rerun) {
+  c3eco_sei1 <- zonal(sei_scd_adj1, c3eco, fun = 'mean')
+  c3eco_area1 <- zonal(size, c3eco, fun = 'sum')
+  tmp <- zonal(sei_scd_adj1, c3eco, fun = quantile, 
+                        probs = c(0.25, 0.5, 0.75)) 
+  tmp2 <- tmp
+  tmp3 <- map2(tmp2[-1], names(tmp2[-1]), function(x, id) {
+    df <- as_tibble(x)
+    nms <- names(df)
+    p <- str_replace(nms, '%', '')
+    names(df) <- paste0(id, '__', 'p', p)
+    df
+  }) %>% 
+    bind_cols() %>% 
+    mutate(c3eco = tmp$c3eco)
+  
+  c3eco_quants1 <- tmp3 %>%
+    pivot_longer(
+      cols = -c3eco,
+      names_to = c("id", ".value"),
+      names_sep = "__"
+    ) %>% 
+    rename_with(
+      .fn = \(x) paste0('SEI_', x),
+      .cols = matches('p\\d+')
+    )
+    
+  
+  c3eco_sei2_gcm <- c3eco_sei1 %>% 
+    pivot_longer(-c3eco,
+                 values_to = 'SEI_mean',
+                 names_to = 'id') %>% 
+    left_join(c3eco_quants1, by = c('c3eco', 'id')) %>% 
+    mutate(c3 = c3eco_to_c3(c3eco),
+           # warning here is ok on test runs (sampling can miss regions), but not ok
+           # for real run
+           region = c3eco_to_eco(c3eco, levels(r_eco4)[[1]]$ecoregion)) %>% 
+    left_join(c3eco_area1, by = "c3eco") %>% 
+    left_join(info_sei, by = 'id') %>% 
+    select(-c3eco)
+  write_csv(c3eco_sei2_gcm, p2)
 
+}
 # Calculate summaries and differences -------------------------------------
 
 
@@ -279,20 +310,31 @@ if(!file.exists(p) | rerun) {
   sei_goa1 <- terra::extract(sei_scd_adj1, eco1, percent_goa,  na.rm = TRUE)
   region_area <- terra::extract(size, eco1, sum, na.rm = TRUE)
   regions <- as.character(eco1$ecoregion)
-  
   region_area$region <- regions
   region_area$ID <- NULL
+
+
+  probs <- c(0.25, 0.5, 0.75)
+  sei_quant_l <- map(probs, function(prob) {
+    tmp <- terra::extract(sei_scd_adj1, eco1, fun = quantile, 
+                          probs = prob, na.rm = TRUE)
+    pivot_longer_extracted(tmp, regions, 
+                           values_to = paste0('SEI_p', prob*100))
+    
+  })
+
   sei_mean2 <- pivot_longer_extracted(sei_mean1, regions, 
                                       values_to = 'SEI_mean')
-  
   sei_core2 <- pivot_longer_extracted(sei_core1, regions, 
                                       values_to = 'percent_csa')
   sei_goa2 <- pivot_longer_extracted(sei_goa1, regions, 
                                      values_to = 'percent_goa')
+ 
+   # df's that all have region and id cols
+  df_l <- c(list(sei_mean2, sei_core2, sei_goa2), sei_quant_l)
   
-  sei_mean_core1 <- left_join(sei_mean2, sei_core2, by = c("id", "region")) %>% 
+  sei_mean_core1 <-  reduce(df_l, .f = left_join, by = c('region', 'id')) %>% 
     left_join(info_sei, by = 'id') %>% 
-    left_join(sei_goa2, by = c("id", "region")) %>% 
     left_join(region_area, by = 'region') %>% 
     select(-run2, -id_noGCM)
   
@@ -383,9 +425,7 @@ writeRaster(q_sei_diff,
                                    runv, vr_name,
                                    '_sei-mean_scd-adj_smry-by-region-c3.csv'))
  
- write_csv(c3eco_sei2_gcm, paste0('data_processed/raster_means/', 
-                                  runv, vr_name,
-                                   '_sei-mean_scd-adj_by-GCM-region-c3.csv'))
+
 
 }
 
