@@ -110,6 +110,18 @@ rcp2factor <- function(x) {
   out
 }
 
+gcm2factor <- function(x, include_current = TRUE) {
+  # this function requires the fig_params.R script
+  # to have been run
+  levels <- names(cols_GCM1)
+  labels <- levels
+  if(include_current) {
+    levels <- c('Current', levels)
+    labels <- c('Historical', labels)
+  }
+  factor(x, levels = levels, labels = labels)
+}
+
 epoch2factor <- function(x) {
   x2 <- update_yr(x) 
   factor(x2, levels = c('2031-2060', '2071-2100'))

@@ -1005,7 +1005,8 @@ scatter_light <- function(pft, # for subtitle
 # (for plotting climate variables agains each other)
 crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3,
                              colors = cols_GCM1,
-                             shapes = shapes_GCM1) {
+                             shapes = shapes_GCM1,
+                             labeller = driver_labeller(delta = TRUE)) {
     g <- ggplot(data = df_wide) 
   # adding vertical and horizontal lines, as long as it doesn't
   # extend the axes
@@ -1015,13 +1016,18 @@ crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3,
       alpha = 0.3, linetype = 2, linewidth = linewidth
     ) 
   }
-  if(min(df_wide[[paste0(var2, '_p25')]]) < 0) {
+  # e.g. burned area doesn't have a spatial range 
+  y_min <- min(c(df_wide[[paste0(var2, '_p25')]],
+                 df_wide[[paste0(var2, '_median')]]),
+               na.rm = TRUE)
+  if(y_min < 0) {
     g <- g + geom_hline(
       mapping = aes(yintercept = 0),
       alpha = 0.3, linetype = 2, linewidth = linewidth
     ) 
   }
-  labeller <- driver_labeller(delta = TRUE)
+  
+
   g <- g + 
     geom_segment(aes(x = .data[[paste0(var1, '_median')]], 
                      y = .data[[paste0(var2, '_p25')]], 
@@ -1038,10 +1044,14 @@ crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3,
     scale_color_manual(values = colors) +
     scale_shape_manual(values = shapes) +
     labs(x = labeller(var1),
-         y = labeller(var2))
+         y = labeller(var2)) +
+    theme(axis.title.y = ggtext::element_markdown(),
+          axis.title.x = ggtext::element_markdown())
   g
 
 }
+
+
 
 # facet functions ---------------------------------------------------------
 
@@ -1243,7 +1253,9 @@ driver_labeller <- function(delta = FALSE) {
     "psp" = "PSP",
     "Aherb" = "Aherb (g/m<sup>2</sup>)",
     "Pherb" = "Pherb (g/m<sup>2</sup>)",
-    "Sagebrush" = "Sagebrush (g/m<sup>2</sup>)"
+    "Sagebrush" = "Sagebrush (g/m<sup>2</sup>)",
+    "SEI" = "SEI",
+    'ba' = lab_ba1
   )
   if(delta) {
     nms <- names(lookup_md)
