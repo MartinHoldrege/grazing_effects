@@ -28,14 +28,16 @@ graze2factor <- function(x) {
   x2 <- as.character(x) 
   
   # add space back in (useful when splitting apart id variable)
-  if (any(x2 == "VeryHeavy")) {
-    x2 <- ifelse(x2 == "VeryHeavy", "Very Heavy", x2)
+  if (any(x2[!is.na(x2)] == "VeryHeavy")) {
+    x2 <- ifelse(!is.na(x2) & x2 == "VeryHeavy", "Very Heavy", x2)
   }
   
-  if(all(x2 %in% levels)) {
+  xnona <- x2[!is.na(x2)]
+  if(all(is.na(x2))) stop('all NAs')
+  if(all(xnona %in% levels)) {
     out <- factor(x2, levels = levels,
                   labels = labels)
-  } else if (all(x2 %in% labels)) {
+  } else if (all(xnona %in% labels)) {
     out <- factor(x2, levels = labels)
   } else {
     stop("x doesn't have the right levels")
