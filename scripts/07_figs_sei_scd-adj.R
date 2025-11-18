@@ -71,11 +71,6 @@ ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_",
 sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name, yr_lab,
                              '_sei-class-pcent-long_scd-adj_summaries_by-ecoregion.csv'))
 
-# % core and grow by GCM
-c3_gcm1 <- read_csv(paste0("data_processed/raster_means/", 
-                            runv, yr_lab, vr_name, 
-                            "_sei-mean_pcent-csa_scd-adj_by-GCM-region.csv"))
-
 # create in "scripts/06_summarize_sei_scd-adj.R"
 # area in each of 9 climate caused SEI class change categories
 c9_area2 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name, yr_lab, 
@@ -118,14 +113,14 @@ c3_clim_delta <- sei_pcent1 %>%
          delta_area_perc = delta_area/c3_area_cur*100)
 
 # * change in area of each sei class relative to reference grazing level
-c3_gcm2 <- c3_gcm1 %>% 
+c3_gcm2 <- sei_byGCM1 %>% 
   mutate(percent_ora = 100 - percent_csa - percent_goa) %>% 
   pivot_longer(cols = matches('percent_'),
                names_to = 'c3',
                values_to = 'c3_percent') %>% 
   mutate(c3 = str_to_upper(str_extract(c3, '[a-z]{3}$')),
          c3_area = c3_percent * area) %>% 
-  select(-SEI_mean, -area, -group, -type, -id, -c3_percent)
+  select(-matches('SEI_'), -area, -group, -type, -id, -c3_percent)
 
 c3_gcm3 <- c3_gcm2 %>% 
   filter(graze == ref_graze) %>% 
