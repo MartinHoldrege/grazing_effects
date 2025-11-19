@@ -1001,6 +1001,16 @@ scatter_light <- function(pft, # for subtitle
 
 # crossplots --------------------------------------------------------------
 
+# make wide format dataframe
+make_wide_4crossplot <- function(df, var1, var2) {
+  df_wide <- df %>% 
+    filter(.data$variable %in% c(var1, var2)) %>% 
+    pivot_wider(values_from = c('p25', 'median', 'p75'), 
+                names_from = "variable",
+                names_glue = "{variable}_{.value}")
+  df_wide
+}
+
 # make a single panel, plantting IQR of two variables
 # (for plotting climate variables agains each other)
 crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3,
@@ -1255,6 +1265,8 @@ driver_labeller <- function(delta = FALSE) {
     "Pherb" = "Pherb (g/m<sup>2</sup>)",
     "Sagebrush" = "Sagebrush (g/m<sup>2</sup>)",
     "SEI" = "SEI",
+    'csa_goa' = 'CSA + GOA (%)',
+    'ba_delta_perc' = 'Annual\nburned area (%)',
     'ba' = lab_ba1
   )
   if(delta) {

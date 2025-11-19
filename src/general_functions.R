@@ -1140,6 +1140,23 @@ join_subsetcells <- function(step_dat, sc_dat,
   out
 }
 
+# split and re-join a datframe so it has columns 
+# for the future values of a variable and the current/historical values
+# (for evaluating climate effects, calculating differences etc. )
+join4cref <- function(df, by) {
+  stopifnot(c('years', 'RCP', 'GCM') %in% names(df))
+  df_cur <- df %>% 
+    filter(years == 'Current') %>% 
+    select(-years, -GCM, -RCP)
+  
+  df_fut <- df %>% 
+    filter(years != 'Current')
+  
+  out <- left_join(df_fut, df_cur, by = by,
+                   suffix = c('_fut', '_cur'))
+  out
+}
+
 # temporary files ---------------------------------------------------------
 
 tmp_exists <- function(object_name, rerun, suffix = '.tif') {
