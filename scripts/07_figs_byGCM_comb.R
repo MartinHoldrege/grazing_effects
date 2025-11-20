@@ -12,6 +12,7 @@ source('src/general_functions.R')
 source('src/params.R')
 runv <- opt$runv
 yr_lab <- opt$yr_lab
+years <- opt$years
 vr_name <- opt$vr_name
 ref_graze <- opt$ref_graze
 vr <- opt$vr
@@ -47,14 +48,16 @@ ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_v2",
 
 sei_byGCM2 <- sei_byGCM1 %>% 
   # combined goa & CSA area
-  mutate(class_area = percent_goa/100*area + percent_csa/100*area) %>% 
+  #mutate(class_area = percent_goa/100*area + percent_csa/100*area) %>% 
+  # just CSA
+  mutate(class_area = percent_csa/100*area) %>% 
   select(-id, -matches('SEI'), -area, -group, -type, -matches('percent_'),
          -run)
 
 sei_cref_gcm <- join4cref(sei_byGCM2, by = c('region', 'graze')) %>% 
   # % change in area
   mutate(median = (class_area_fut - class_area_cur)/class_area_cur *100,
-         variable = 'csa_goa') %>% 
+         variable = 'csa') %>% 
   select(-matches('class_area'))
 
 # * burned area -----------------------------------------------------------
@@ -94,58 +97,53 @@ vars_pred <- c(vars_clim, rev(vars_veg))
 # which x and y variables are plotted against each other
 vars_l <- list(
   veg = expand_grid(y = vars_veg, x = vars_clim),
-  SEI = expand_grid(y = "csa_goa", x = vars_pred),
+  SEI = expand_grid(y = "csa", x = vars_pred),
   ba = expand_grid(y = 'ba_delta_perc', x = vars_pred)
 )
   
 vars_df <- bind_rows(vars_l)
-
+vars_df$tag <- fig_letters[1:nrow(vars_df)]
 # * df prep ---------------------------------------------------------------
 
-yr <- '2070-2100'
-rcp <- 'RCP45'
-region <- levels(comb1$region)[1]
-df <- comb1 %>% 
+comb2 <- comb1 %>% 
   # treating grazing of climate variables as moderate 
   # (climate doesn't differ with grazing )
   mutate(graze = ifelse(is.na(graze), ref_graze, as.character(graze)),
          graze = graze2factor(graze),
-         GCM = gcm2factor(GCM, include_current = TRUE)) %>% 
-  filter(region == !!region,
-         graze == ref_graze,
-         years %in% c('Current', yr),
-         RCP %in% c('Current', rcp))
-
-plots <- pmap(vars_df, function(x, y) {
-  df_wide <- make_wide_4crossplot(df, var1 = x, var2 = y)
-  crossplot_1panel(df_wide, x, y, colors = cols_GCM2,
-                   shapes = shapes_GCM2,
-                   labeller = driver_labeller(delta = TRUE))
-})
+         GCM = gcm2factor(GCM, include_current = TRUE))
 
 
-design <- '
-abcvvv
-defvvv
-ghivvv
-jklmno
-pqrstu
-'
-plots2 <- c(plots, list(guide_area()))
+# * create fig ------------------------------------------------------------
 
-g <- patchwork::wrap_plots(plots2,
-                      design = design) + 
-  plot_layout(guides = 'collect', axis_titles = 'collect',
-              axes = 'collect')
 
-filename <- paste0('figures/by_gcm_comb/response_v_driver_', length(plots), 
-                   'panel_cref_',
+yr <- years
+
+region <- levels(comb1$region)[1]
+
+rcps <- unique(comb1$RCP)
+for(rcp in rcps) {
+  df <-  comb2%>% 
+    filter(region == !!region,
+           graze == ref_graze,
+           years == yr,
+           RCP == rcp)
+  
+  legend_title <- paste0('GCM\n', rcp_label(rcp, yr, include_parenth = TRUE))
+  
+  g <- crossplot_multipanel(df = df,
+                            vars_df = vars_df,
+                            legend_title = legend_title)
+
+  filename <- paste0('figures/by_gcm_comb/response_v_driver_', nrow(vars_df), 
+                   'panel_cref_csa_',
                    vr, "_", words2abbrev(region), '_', rcp, '_', yr, '_',
                    runv, '.png')
-ggsave(
-  filename = filename,
-  plot = g,
-  width = 11,
-  height = 10,
-  dpi = 600
-)
+  ggsave(
+    filename = filename,
+    plot = g,
+    width = 11,
+    height = 10,
+    dpi = 600
+  )
+}
+

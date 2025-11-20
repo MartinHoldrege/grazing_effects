@@ -30,7 +30,12 @@ theme_custom1 <- function() {
     theme(panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), 
           axis.line = element_line(colour = "black"),
-          strip.background = element_blank())
+          strip.background = element_blank(),
+          plot.tag.position = 'topleft',
+          plot.tag = element_text(
+            margin = margin(l = 1)   # nudge right (points)
+          ),
+          plot.tag.location = 'panel')
 }
 
 # funs that misc create dfs ------------------------------------------------------
@@ -1016,7 +1021,8 @@ make_wide_4crossplot <- function(df, var1, var2) {
 crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3,
                              colors = cols_GCM1,
                              shapes = shapes_GCM1,
-                             labeller = driver_labeller(delta = TRUE)) {
+                             labeller = driver_labeller(delta = TRUE),
+                             legend_title = ggplot2::waiver()) {
     g <- ggplot(data = df_wide) 
   # adding vertical and horizontal lines, as long as it doesn't
   # extend the axes
@@ -1051,16 +1057,44 @@ crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3,
     geom_point(aes(x = .data[[paste0(var1, '_median')]], 
                    y = .data[[paste0(var2, '_median')]], 
                    color = GCM, shape = GCM)) +
-    scale_color_manual(values = colors) +
-    scale_shape_manual(values = shapes) +
+    scale_color_manual(values = colors, name = legend_title) +
+    scale_shape_manual(values = shapes, name = legend_title) +
     labs(x = labeller(var1),
          y = labeller(var2)) +
     theme(axis.title.y = ggtext::element_markdown(),
-          axis.title.x = ggtext::element_markdown())
+          axis.title.x = ggtext::element_markdown(),
+          plot.margin = unit(rep(1, 4), units = 'mm'),)
   g
 
 }
 
+crossplot_multipanel <- function(df, vars_df, 
+                                 design = '
+                                  abcvvv
+                                  defvvv
+                                  ghivvv
+                                  jklmno
+                                  pqrstu
+                                  ',
+                                 legend_title = ggplot2::waiver()) {
+  plots <- pmap(vars_df, function(x, y, tag) {
+    df_wide <- make_wide_4crossplot(df, var1 = x, var2 = y)
+    g <- crossplot_1panel(df_wide, x, y, colors = cols_GCM2,
+                     shapes = shapes_GCM2,
+                     labeller = driver_labeller(delta = TRUE),
+                     legend_title = legend_title)
+    g + labs(tag = tag) 
+      
+  })
+  
+  plots2 <- c(plots, list(guide_area()))
+  
+  g <- patchwork::wrap_plots(plots2,
+                             design = design) + 
+    plot_layout(guides = 'collect', axis_titles = 'collect',
+                axes = 'collect')
+  g
+}
 
 
 # facet functions ---------------------------------------------------------
@@ -1265,8 +1299,9 @@ driver_labeller <- function(delta = FALSE) {
     "Pherb" = "Pherb (g/m<sup>2</sup>)",
     "Sagebrush" = "Sagebrush (g/m<sup>2</sup>)",
     "SEI" = "SEI",
+    'csa' = 'Core sagebrush area (%)',
     'csa_goa' = 'CSA + GOA (%)',
-    'ba_delta_perc' = 'Annual\nburned area (%)',
+    'ba_delta_perc' = 'Annual burned area (%)',
     'ba' = lab_ba1
   )
   if(delta) {
