@@ -12,11 +12,11 @@
 
 
 # params ------------------------------------------------------------------
-
+source('src/params.R')
 rerun <- FALSE # re-create rasters that have already been interpolated?
 test_run <- FALSE
 date <- "20250228" # for appending to select file names
-version <- 'v4'
+version <- opt$v_interp
 # v1--1st version of criteria (i.e. based on calculating mathcing criteria across the region)
 # v2--second version of criteria (i.e. basing matching criteria just on 200 sites)
 # v3--criteria used in palmquist et al 2021 and renne et al 2024
@@ -25,16 +25,24 @@ run_climate <- FALSE # whether to upscale the climate data (doesn't need to be
 run_climate_daymet <- FALSE # create a climate interpolation, not interpolating
 run_fire <- FALSE
 # interpolate data showing which vars caused changes in fire?
-run_fire_attribution <- TRUE 
+run_fire_attribution <- FALSE
 run_util <- FALSE # utilization
 
+#unlike all other parts of this script, 
+# interpolation of the spatial reference (sref) 
+# fire attribution cannot run (i.e. needs to be set to false)
+# until after this script and downstream scripts have already 
+# been run (it relies on 06_attribution_sref.R output, which
+# needs weights, based on the interpolations done by other parts
+# of this script)
+run_fire_attrib_sref <- TRUE
 # for filtering output, put NULL if don't want to filter that variable
 PFT2run =c('Sagebrush', 'C3Pgrass', 'C4Pgrass', 'Cheatgrass', 'Pforb', 'Shrub', 
            'Pherb', 'Aherb', 'Aforb','Pgrass')
 
 PFT2run_util <- c('Sagebrush', 'Pherb', 'Aherb') # for utilization
 
-run2run = 'fire1_eind1_c4grass1_co20_2503' # NULL # 
+run2run = opt$run 
 years2run =  NULL #'Current'
 
 v2paste <- if(version == 'v1') "" else version # for pasting to interpolated tiffs
@@ -52,7 +60,7 @@ library(dtplyr)
 source("src/general_functions.R")
 source("src/mapping_functions.R")
 source("src/interpolation_functions.R")
-
+options(readr.show_col_types = FALSE)
 # read in data ------------------------------------------------------------
 # list dataframes of stepwat2 output created in "scripts/02_summarize_bio.R" 
 bio <- readRDS('data_processed/site_means/summarize_bio.RDS') 
@@ -81,6 +89,13 @@ tc0 <- read_csv("data_processed/interpolation_data/clim_for_interp_daymet-v4_199
 if(run_fire_attribution) {
   # created in 02b_fire_attribution.R
   attrib <- readRDS("data_processed/site_means/fire_dominant_drivers.RDS")
+}
+
+if(run_fire_attrib_sref) {
+  # created in 06_fire_attribution_sref.R
+  filename <- paste0('data_processed/site_means/fire_attribution_spatial-reference_',
+                     run2run, version, '.csv')
+  attrib_sref <- read_csv(filename)
 }
 
 # Prep data -------------------------------------------------------------
@@ -241,7 +256,7 @@ if (run_fire_attribution) {
     dplyr::select(site, id, delta_1var) %>% 
     pivot_wider(id_cols = "site",
                 names_from = "id",
-                values_from = "delta_1var")%>% 
+                values_from = "delta_1var") %>% 
     join_subsetcells(sc_dat = sc1, subset_in_target = subset_in_target)
   
   dominant_driver_w1 <- attrib$dominant_driver1 %>% 
@@ -283,6 +298,18 @@ if (run_fire_attribution) {
   fire_attrib_gref_w <- dominant_driver_gref_w1 %>% 
     left_join(one_change_gref_w1, by = 'cellnumber')
   
+}
+
+if (run_fire_attrib_sref) {
+  # spatial effect
+  fire_attrib_sref_w <- attrib_sref %>% 
+    mutate(id = paste0(run, v2paste, "_","fire-delta-sref_", 
+                       pred_var, "_", id, "_median")) %>% 
+    dplyr::select(site, id, delta_1var) %>% 
+    pivot_wider(id_cols = "site",
+                names_from = "id",
+                values_from = "delta_1var") %>% 
+    join_subsetcells(sc_dat = sc1, subset_in_target = subset_in_target)
 }
 
 # * climate ---------------------------------------------------------------
@@ -506,6 +533,20 @@ if(run_fire_attribution) {
                         rerun = rerun,
                         exclude_poor_matches = exclude_poor_matches)
 
+}
+
+if(run_fire_attrib_sref) {
+  
+  path_attrib <- file.path("data_processed/interpolated_rasters/fire_attrib_sref", version)
+  
+  run_interpolatePoints(df = fire_attrib_sref_w,
+                        match = match1,
+                        template = template,
+                        path = path_attrib,
+                        min_size = min_size,
+                        rerun = rerun,
+                        exclude_poor_matches = exclude_poor_matches)
+  
 }
 
 

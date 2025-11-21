@@ -27,7 +27,7 @@ source("src/fig_functions.R")
 
 # list of dataframes created in "scripts/02_summarize_bio.R" 
 l <- readRDS('data_processed/site_means/summarize_bio.RDS') 
-
+bio1 <- l$pft5_bio1
 clim_all2 <- l$clim_all2
 
 # quantiles used in STEPWAT2 for quantile mapping in fire equation
@@ -47,17 +47,22 @@ qm_Pherb <- qm_quant_factory(
   from = quants$biomass_stepwat[quants$PFT == 'pfgAGB'], 
   to = quants$biomass_rap[quants$PFT == 'pfgAGB'])
 
-
-predict_fire_with <- function(df) {
-  p <- with(df, predict_fire(mat = MAT, map = MAP, psp = psp, afg = Aherb,
-                             pfg = Pherb,
-                             # calculate the quantile mapped biomass,
-                              # so that predictions made with fire equation are appropriate
-                             qm_afg = qm_Aherb,
-                             qm_pfg = qm_Pherb,
-                             run_checks = TRUE))
-  p*100 # convert to %
+# using a function factory: binds qm_Aherb/qm_Pherb *into* the function's environment
+# so rds can be loaded and the 'qm_' objects are with it
+tmp_factory <- function(qm_Aherb, qm_Pherb) {
+  function(df) {
+    p <- with(df, predict_fire(mat = MAT, map = MAP, psp = psp, afg = Aherb,
+                               pfg = Pherb,
+                               # calculate the quantile mapped biomass,
+                                # so that predictions made with fire equation are appropriate
+                               qm_afg = qm_Aherb,
+                               qm_pfg = qm_Pherb,
+                               run_checks = TRUE))
+    p*100 # convert to %
+  }
 }
+
+predict_fire_with <- tmp_factory(qm_Aherb, qm_Pherb)
 
 # prepare dataframes  --------------------------------------------------------
 

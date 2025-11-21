@@ -86,7 +86,7 @@ run_interpolatePoints <- function(df,
                                   rerun,
                                   exclude_poor_matches = TRUE) {
   if(!dir.exists(path)) {
-    dir.create(path)
+    dir.create(path, recursive = TRUE)
   }
   
   todo2 <- which_todo(df = df,

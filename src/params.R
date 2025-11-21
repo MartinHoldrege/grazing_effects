@@ -20,7 +20,9 @@ option_list <- list(
   # otherwise leave it out
   optparse::make_option("--test_run", action = "store_true", default = FALSE),
   # reference grazing level
-  optparse::make_option("--ref_graze", type = "character", default = "Moderate")
+  optparse::make_option("--ref_graze", type = "character", default = "Moderate"),
+  # string for entire study area
+  optparse::make_option("--entire", type = "character", default = "Entire study area")
 )
 
 opt_parser <-optparse::OptionParser(option_list = option_list)

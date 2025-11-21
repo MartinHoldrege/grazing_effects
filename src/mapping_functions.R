@@ -1146,7 +1146,8 @@ plot_delta_fire <- function(r, panel_tag = NULL,
     scale_fill_gradientn(na.value = 'transparent',
                          limits = limits,
                          name = legend_title,
-                         colors = colors) +
+                         colors = colors,
+                         oob = scales::squish()) +
     theme(legend.position = 'right')
  
 }
