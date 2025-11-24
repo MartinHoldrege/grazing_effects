@@ -532,8 +532,13 @@ plot_map2 <- function(r, add_coords = TRUE,...)  {
           axis.ticks = element_blank(),
           axis.text.y = element_blank(),
           plot.margin = unit(rep(0.05, 4), units = 'in'),
-          plot.tag.position = 'topleft',
-          plot.tag.location = 'panel')
+          plot.tag.location = "panel",
+          plot.tag.position = c(0.01, 0.99),  # near top-left inside panel
+          
+          plot.tag = element_text(
+            hjust = 0,  # left-justify
+            vjust = 1   # top-justify
+          ))
   
   map
   
@@ -1147,7 +1152,7 @@ plot_delta_fire <- function(r, panel_tag = NULL,
                          limits = limits,
                          name = legend_title,
                          colors = colors,
-                         oob = scales::squish()) +
+                         oob = scales::squish) +
     theme(legend.position = 'right')
  
 }
