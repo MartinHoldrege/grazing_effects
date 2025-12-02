@@ -589,7 +589,7 @@ plot_map_inset <- function(r,
     theme(axis.text = element_blank(),
           axis.ticks = element_blank(),
           axis.text.y = element_blank(),
-          plot.margin = unit(c(0, 0, 0, 0), units = 'in')) +
+          plot.margin = unit(rep(0.02, 4), units = 'in')) +
     newRR3::add_tag_as_label(tag_label) 
   
   map + inset_element2(inset)
@@ -1140,20 +1140,36 @@ plot_fire <- function(r, panel_tag = NULL,
 # map of (continuous) change in fire
 plot_delta_fire <- function(r, panel_tag = NULL, 
                             limits = NULL,
-                            legend_title = '\u0394 #fires/century') {
+                            legend_title = '\u0394 #fires/century',
+                            add_inset = FALSE) {
   
   if(is.null(limits)) {
     limits <- range_raster(r, absolute = TRUE)
   }
   colors <- rev(cols_map_bio_d2)
   
-  plot_map2(r, panel_tag = panel_tag) +
-    scale_fill_gradientn(na.value = 'transparent',
-                         limits = limits,
-                         name = legend_title,
-                         colors = colors,
-                         oob = scales::squish) +
-    theme(legend.position = 'right')
+  if(add_inset) {
+    
+    g <- plot_map_inset(r,
+                   colors = colors,
+                   tag_label= panel_tag,
+                   limits = limits,
+                   scale_name = legend_title
+    ) +
+      theme(legend.position = 'right')
+    
+  } else {
+    g <- plot_map2(r, panel_tag = panel_tag) +
+      scale_fill_gradientn(na.value = 'transparent',
+                           limits = limits,
+                           name = legend_title,
+                           colors = colors,
+                           oob = scales::squish) +
+      theme(legend.position = 'right')
+  }
+  
+  g
+
  
 }
 
