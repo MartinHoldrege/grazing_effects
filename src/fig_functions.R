@@ -234,7 +234,7 @@ geom_boxplot_identity <- function(...) {
 
 weighted_box1 <- function(df, y_string, ylab = NULL, subtitle = NULL,
                           strip.text.y = element_text(size = rel(0.7))) {
-  ggplot(df, aes(graze, .data[[y_string]], fill = summary)) +
+  g <- ggplot(df, aes(graze, .data[[y_string]], fill = summary)) +
     geom_boxplot(aes(weight = weight), position = position_dodge2(preserve = 'single'),
                  outlier.size = 0.25, outlier.alpha = 0.5) + 
     facet_grid(region~rcp_year) +
@@ -246,6 +246,8 @@ weighted_box1 <- function(df, y_string, ylab = NULL, subtitle = NULL,
     labs(x = lab_graze,
          y = ylab,
          subtitle = subtitle)
+  
+  g
 }
 
 # boxplot (same as weighted box, but w/ fivenumber summary)
@@ -302,15 +304,18 @@ box_abs_diff <- function(df_abs,
                          ylab_diff_cref = y_diff,
                          ylab_diff_gref = y_diff,
                          scales_cref = 'free_y',
-                         scales_gref = 'fixed'
+                         scales_gref = 'fixed',
+                         col_ratio = 1 # fraction that first col is of other cols (1 means no change)
 ) {
   
   stopifnot(unique(sort(df_abs$PFT)) == unique(sort(df_diff_gref$PFT)))
 
+  preserve <- if(col_ratio != 1) 'total' else 'single'   
+  
   base <- function(add_hline = FALSE, scales = 'free_y') {
     out <- list(
       geom_boxplot(aes(weight = weight), coef = 10,
-                   position = position_dodge2(preserve = 'single')),
+                   position = position_dodge2(preserve = preserve)),
       scale_fill_smry(),
       facet_grid(PFT~rcp_year, scales = scales),
       theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -332,7 +337,8 @@ box_abs_diff <- function(df_abs,
     base() +
     blank_strip() +
     labs(x = lab_graze,
-         y = ylab_abs) +
+         y = ylab_abs,
+         subtitle = ' ') +
     # add space on the left (for tags)
     # (and adding space to the right, to be symetric)) 
     #scale_x_discrete(expand = expansion(add = c(1, 1))) +
@@ -345,13 +351,19 @@ box_abs_diff <- function(df_abs,
     blank_strip() +
     labs(x = lab_graze,
          y = ylab_diff_gref,
-         subtitle = 'Grazing effect') 
+         subtitle = 'Grazing effect') +
+    theme(legend.position = 'none')
 
   g3  <- ggplot(df_diff_cref, aes(graze, .data[[y_diff]], fill = summary))+
     base(add_hline = TRUE, scales = scales_cref) +
     labs(x = lab_graze,
          y = ylab_diff_cref,
-         subtitle = 'Climate effect')  
+         subtitle = 'Climate effect')  +
+    theme(legend.position = 'bottom')
+  
+  
+
+
   
   # letters for each panel (running rowwise left to right)
   ncol1 <- lu(df_abs$rcp_year)
@@ -370,10 +382,45 @@ box_abs_diff <- function(df_abs,
   g1b <- tag(g1, let1)
   g2b <- tag(g2, let2)
   g3b <- tag(g3, let3)
+  
+  widths <- c(ncol1 - 1 + col_ratio, 
+              ncol2 - 1 + col_ratio, 
+              ncol3)
+  if(col_ratio != 1) {
+    g1b <- shrink_first_facet_col(g1b, ratio = col_ratio)
+    g2b <- shrink_first_facet_col(g2b, ratio = col_ratio)
+    
+    as_ggplot <- function(g) {
+      #wrap_elements(g)
+      ggplotify::as.ggplot(g)
+      #patchwork::wrap_ggplot_grob(g)
+    }
+    # Wrap each grob so patchwork can handle them
+    g1b <- as_ggplot(g1b)
+    g2b<- as_ggplot(g2b)
+   
+    
+    legend <- cowplot::get_legend(g3)
+    g3b <- g3b + theme(legend.position = 'none')
+    g3b <- as_ggplot(g3b)
+    
+    design <- 
+    'ABC
+    DDD'
+    
+    widths <- widths*c(0.8, 0.7, 1)
+    comb <- wrap_plots(g1b, g2b, g3b, legend) +
+      plot_layout(widths = widths, heights = c(1, 0.1),
+                  design = design)
+  } else {
+    comb <- g1b + g2b + g3b + plot_layout(widths = widths,
+                                          guides = 'collect')
+    comb&theme(legend.position = "bottom")
+  }
+  
+  comb
 
-  comb <- g1b + g2b + g3b + plot_layout(widths = c(ncol1, ncol2, ncol3),
-                          guides = 'collect')
-  comb&theme(legend.position = "bottom")
+
 }
 
 # *stacked bar ------------------------------------------------------------
@@ -1098,6 +1145,69 @@ crossplot_multipanel <- function(df, vars_df,
 
 
 # facet functions ---------------------------------------------------------
+
+
+#' makes first column of facet_grid plot narrower
+#'
+#' @param p ggplot object
+#' @param ratio what fraction of other columns should it be?
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+#' library(ggplot2)
+#' library(grid)
+#' 
+#' set.seed(1)
+#' 
+#' dat <- expand.grid(
+#'   facet = factor(c("Historical", "RCP4.5")),
+#'   graze = factor(c("Light", "Moderate", "Heavy")),
+#'   summary = factor(c("low", "median", "high"))
+#' )
+#' dat$y <- rnorm(nrow(dat))
+#' dat <- subset(dat, !(facet == "Historical" & summary != "median"))
+#' 
+#' p <- ggplot(dat, aes(graze, y, fill = summary)) +
+#'   geom_boxplot(position = position_dodge2(preserve = "total"),
+#'                width = 0.6) +
+#'   facet_grid(~ facet) +
+#'   theme_bw()
+#' 
+#' g <- shrink_first_facet_col(p, ratio = 1/3)
+#' 
+#' grid.newpage()
+#' grid.draw(g)
+shrink_first_facet_col <- function(p, ratio = 1/3) {
+  if (!inherits(p, "ggplot"))
+    stop("Input must be a ggplot object.")
+  
+  g <- ggplotGrob(p)
+  
+  # All panel grobs (panel-1-1, panel-1-2, ...)
+  panel_layout <- subset(g$layout, grepl("^panel", name))
+  
+  # Unique panel *column* indices, left to right
+  panel_cols <- sort(unique(panel_layout$l))
+  
+  if (length(panel_cols) < 2) {
+    warning("Only one facet column detected — nothing to shrink.")
+    return(g)
+  }
+  
+  n_cols <- length(panel_cols)
+  
+  # ratio = relative weight of first column vs the others (which are 1)
+  # ratio = 1  -> all equal
+  # ratio < 1  -> first column narrower
+  # ratio > 1  -> first column wider
+  weights <- c(ratio, rep(1, n_cols - 1))
+  
+  g$widths[panel_cols] <- grid::unit(weights, "null")
+  
+  g
+}
 
 facet_manual_region <- function(v = 'r1.0', 
                                 legend.position = NULL,

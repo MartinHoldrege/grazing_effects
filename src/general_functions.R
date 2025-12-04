@@ -1180,7 +1180,9 @@ writeReadRast <- function(object, objectName, dir = 'tmp') {
 # number of unique elements in a vector
 lu <- function(x) length(unique(x))
 
-
+weighted_median <- function(x, weight) {
+  as.numeric(Hmisc::wtd.quantile(x,  weights = weight, probs = 0.5))
+}
 
 #' Grazing level that causes a site's biomass to drop below threshold
 #' 

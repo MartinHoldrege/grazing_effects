@@ -118,32 +118,41 @@ comb2 <- comb1 %>%
 
 yr <- years
 
-region <- levels(comb1$region)[1]
+regions <- levels(comb1$region)
 
 rcps <- unique(comb1$RCP)
 for(rcp in rcps) {
-  df <-  comb2%>% 
-    filter(region == !!region,
-           graze == ref_graze,
-           years == yr,
-           RCP == rcp)
+  for(region in regions) {
+    df <-  comb2%>% 
+      filter(region == !!region,
+             graze == ref_graze,
+             years == yr,
+             RCP == rcp)
+    
+    
+    
+    legend_title <- paste0('GCM\n', rcp_label(rcp, yr, include_parenth = TRUE))
+    
+    g <- crossplot_multipanel(df = df,
+                              vars_df = vars_df,
+                              legend_title = legend_title)
+    
+    if(region != regions[1]) {
+      g <- g +
+        plot_annotation(subtitle = region)
+    }
   
-  legend_title <- paste0('GCM\n', rcp_label(rcp, yr, include_parenth = TRUE))
-  
-  g <- crossplot_multipanel(df = df,
-                            vars_df = vars_df,
-                            legend_title = legend_title)
-
-  filename <- paste0('figures/by_gcm_comb/response_v_driver_', nrow(vars_df), 
-                   'panel_cref_csa_',
-                   vr, "_", words2abbrev(region), '_', rcp, '_', yr, '_',
-                   runv, '.png')
-  ggsave(
-    filename = filename,
-    plot = g,
-    width = 11,
-    height = 10,
-    dpi = 600
-  )
+    filename <- paste0('figures/by_gcm_comb/response_v_driver_', nrow(vars_df), 
+                     'panel_cref_csa_',
+                     vr, "_", words2abbrev(region), '_', rcp, '_', yr, '_',
+                     runv, '.png')
+    ggsave(
+      filename = filename,
+      plot = g,
+      width = 11,
+      height = 10,
+      dpi = 600
+    )
+  }
 }
 

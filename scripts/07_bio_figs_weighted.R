@@ -13,6 +13,7 @@ source("src/fig_functions.R")
 source('src/general_functions.R')
 source('src/SEI_functions.R')
 source('src/mapping_functions.R')
+source('src/gw_functions.R')
 theme_set(theme_custom1())
 
 # params ------------------------------------------------------------------
@@ -32,6 +33,7 @@ pfts <- c("Sagebrush", 'Pherb', 'Aherb') # code won't work with any other pfts
 regions <- region_factor(v = vr, return_levels = TRUE)
 entire <- regions[1]
 ref_graze <- opt$ref_graze
+
 # read in data ------------------------------------------------------------
 # created in "scripts/02_summarize_bio.R"
 path_rds <- 'data_processed/site_means/summarize_bio.RDS'
@@ -50,9 +52,9 @@ w1 <- read_csv(paste0('data_processed/interpolation_data/interpolation_weights_'
                show_col_types = FALSE)
 
 bio_gcm1 <- l$pft5_bio1 # 
-bio2 <- l$pft5_bio2# summarized across GCMs
-fire_med1 <- l$fire_med1
-pft5_bio_d2 <- l$pft5_bio_d2
+
+pft5_bio_d2 <- l$pft5_bio_d2 # delete
+pft5_bio_d2_gcm <- l$pft5_bio_d2_gcm
 pft5_d_wgcm <- l$pft5_d_wgcm # summarized across gcms
 pft5_d_wgcm_gcm <- l$pft5_d_wgcm_gcm # values by GCM
 fire_d_wgcm_gcm <- l$fire_d_wgcm_gcm
@@ -65,46 +67,43 @@ driver1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
 # combine site level and weights ------------------------------------------
 w1 <- df_factor(w1)
 
-bio3 <- bio2 %>% 
-  left_join(w1, by = 'site',relationship = "many-to-many") %>% 
-  df_factor() 
 
-yrs <- levels(bio2$years)
-rcps <- levels(bio2$RCP)
+yrs <- levels(bio_gcm1$years)
+rcps <- levels(bio_gcm1$RCP)
 yrs <- yrs[yrs != 'Current']
 rcps <- rcps[rcps != 'Current']
 # for looping over
 df_rcp_yr <- expand_grid(RCP = rcps,
                          years = yrs)
 
-# longer format
-bio4 <- bio3 %>% 
-  pivot_longer(
-    cols = matches("^(utilization|biomass|indivs)"),
-    names_to = c(".value", "summary"),
-    names_pattern = "^(utilization|biomass|indivs)_?(.*)$"
-  ) %>% 
-  mutate(summary = ifelse(summary == "", "median", summary),
-         summary = summary2factor(summary),
+
+bio_gcm2a <- bio_gcm1 %>% 
+  left_join(w1, by = 'site',relationship = "many-to-many") %>% 
+  df_factor()
+
+bio_gcm2 <- bio_gcm2a %>% 
+  filter(region != levels(region)[1])
+
+# gcm-wise summaries ------------------------------------------------------
+
+vars <- c('biomass') 
+
+group_vars <- c('years', 'RCP', 'graze', 'PFT', 'region')
+group_vars2 <- c(group_vars, 'rcp_year')
+
+bio4 <- gw_select_smry_site(df = bio_gcm2a,
+                            summarize_vars = vars,
+                            group_vars = group_vars) %>% 
+  mutate(summary = summary2factor(summary),
          rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
                               add_newline = TRUE))
 
-bio_gcm2 <- bio_gcm1 %>% 
-  left_join(w1, by = 'site',relationship = "many-to-many") %>% 
-  df_factor() %>% 
-  filter(region != levels(region)[1])
 
-# % change (climate effect)
+
+# * change ----------------------------------------------------------------
 
 prepare_bio_diff <- function(df) {
   df %>% 
-    filter(run == !!run) %>% 
-    rename(bio_diff_median = bio_diff) %>% 
-    select(run, site, years, RCP, PFT, graze, matches('bio_diff')) %>% 
-    pivot_longer(cols = matches('bio_diff_'),
-                 values_to = 'bio_diff',
-                 names_to = 'summary',
-                 names_pattern = '([[:alpha:]]+$)') %>% 
     left_join(w1[w1$region == entire, ], 
               by = 'site') %>% 
     df_factor(v = vr) %>% 
@@ -112,13 +111,20 @@ prepare_bio_diff <- function(df) {
                                 add_newline = TRUE))
 }
 
-pft5_bio_d3 <- pft5_bio_d2 %>% 
-  prepare_bio_diff()
-
+# % change (climate effect)
+pft5_bio_d2_gcm2 <- prepare_bio_diff(df = pft5_bio_d2_gcm)
+pft5_bio_d2_gcm2$bio_diff[is.infinite(pft5_bio_d2_gcm2$bio_diff)] <- NA
+pft5_bio_d3 <- gw_select_smry_site(df = pft5_bio_d2_gcm2,
+                                   summarize_vars = 'bio_diff',
+                                   group_vars = group_vars2)
 
 # % change (grazing effect)
-pft5_d_wgcm2 <- pft5_d_wgcm %>% 
-  prepare_bio_diff()
+pft5_d_wgcm_gcm
+
+pft5_d_wgcm_gcm2 <- prepare_bio_diff(df = pft5_d_wgcm_gcm)
+pft5_d_wgcm2 <- gw_select_smry_site(df = pft5_d_wgcm_gcm2 ,
+                                   summarize_vars = 'bio_diff',
+                                   group_vars = group_vars2)
 
 
 join_vars <- c('run', 'years', 'RCP', 'graze',
@@ -146,14 +152,6 @@ gref_diff_gcm1 <-   gref_diff_gcm0 %>%
   
 # other summaries ---------------------------------------------------------
 
-# % of total utilization
-bio_pcent1 <- bio4 %>% 
-  filter(summary == 'median',
-         PFT %in% pfts) %>% 
-  group_by(region, run, years, RCP, rcp_year, graze, PFT) %>% 
-  summarize(util_median = spatstat.univar::weighted.median(utilization, w = weight),
-            .groups = 'drop_last') %>% 
-  mutate(util_pcent = util_median/sum(util_median)*100)
 
 # setup so can plot climate variables against biomass variables
 driver_bio1 <- driver1 %>% 
@@ -186,7 +184,7 @@ plots <- map(pfts, function(pft) {
 
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
 
-png(paste0("figures/biomass/bio_weighted_by-region_3pft_boxplot_", suffix, 
+png(paste0("figures/biomass/bio_weighted_by-region_3pft_boxplot_gw_", suffix, 
            ".png"),
     width = 12, height = 11, units = 'in', res = 600)
 g2
@@ -234,77 +232,35 @@ pmap(args, function(pfts, RCP, years) {
                ylab_diff_gref = lab_bio2_gref,
                ylab_diff_cref = lab_bio2_cref,
                scales_cref = 'free_y',
-               scales_gref = 'fixed')
+               scales_gref = 'fixed',
+               col_ratio = 1/3)
   
   # Pub qual for the main manuscript
   n_pft <- length(pfts)
-  filename <- paste0("bio-abs-diff_weighted_entire_",
+  filename <- paste0("bio-abs-diff_weighted_entire_gw_",
                      n_pft, "pft_boxplot_", RCP, '_', years, "_", 
                      run, v, ".png")
   
   ggsave(file.path("figures/biomass", filename),plot = g1,
-      width = 7, height = 5*n_pft/3, dpi = 600)
+      width = 9, height = 6*n_pft/3, dpi = 600)
 
 })
 
+# STOP: continue updating below
 
 # *utilization ----------------------------------------------------------------
 
-plots <- map(pfts, function(pft) {
-  weighted_box1(df = filter(bio4, PFT == pft),
-                y_string = 'utilization',
-                ylab = lab_util0,
-                subtitle = pft) +
-    expand_limits(y = 0)
-})
-
-g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
-
-png(paste0("figures/util/util_weighted_by-region_3pft_boxplot_", suffix, ".png"),
-    width = 12, height = 10, units = 'in', res = 600)
-g2
-dev.off()
-
+# see pre Dec 2025 commits
 
 # *individuals ----------------------------------------------------------------
 
-plots <- map(pfts, function(pft) {
-  weighted_box1(df = filter(bio4, PFT == pft),
-                y_string = 'indivs',
-                ylab = lab_indivs0,
-                subtitle = pft) +
-    expand_limits(y = 0)
-})
-
-g2 <- combine_grid_panels1(plots, remove_y_axis_labels = FALSE)
-
-png(paste0("figures/indivs/indivs_weighted_by-region_3pft_boxplot_", suffix, ".png"),
-    width = 12, height = 11, units = 'in', res = 600)
-g2
-dev.off()
-
+# see pre Dec 2025 commits for figures of individuals
 
 # stacked bar charts ------------------------------------------------------
 
 # * utilization -----------------------------------------------------------
 
-g <- ggplot(bio_pcent1, aes(graze, util_pcent, fill = PFT)) +
-  geom_col(position = 'stack') +
-  facet_grid(region~rcp_year) +
-  theme(panel.spacing.x = unit(0, "lines"),
-        axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.title = element_blank(),
-        legend.position = 'bottom') +
-  scale_fill_manual(values = cols_pft3) +
-  labs(x = lab_graze,
-       y = lab_util0b)
-
-
-ggsave(
-  paste0('figures/util/util-perc_bar_pft3_', suffix, '.png'),
-  g, width = 6, height = 9
-)
-
+# see pre Dec 2025 commits for figures of utilization
 
 # q-curve -----------------------------------------------------------------
 

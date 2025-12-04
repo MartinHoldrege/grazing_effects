@@ -212,14 +212,16 @@ C3_Pgrass_ratio <- pft5_bio1 %>%
 # % change in biomass and num individuals from current conditions ,
 
 # this throws a warning (which is ok) because utilization is 0 for some groups
-pft5_bio_d2 <-  pft5_bio1 %>% 
+pft5_bio_d2_gcm <-  pft5_bio1 %>% 
   filter(run %in% runs_graze) %>% 
   # calculating % scaled change for biomass and individuals
   scaled_change_2var(by = c("run", "PFT", "graze"),
                      vars = c("biomass", "indivs", "utilization"),
                      # regular % change
                      percent = TRUE,
-                     divide_by_max = FALSE) %>% 
+                     divide_by_max = FALSE) 
+
+pft5_bio_d2 <- pft5_bio_d2_gcm %>% 
   # median across GCMs
   group_by(run, site, years, RCP, PFT, graze, id) %>% 
   summarise_bio_indivs(suffix = "_diff", include_low_high = TRUE) %>% 
@@ -610,6 +612,7 @@ out <- list(
   pft5_bio1 = pft5_bio1,
   pft5_bio2 = pft5_bio2,
   pft5_bio_d2 = pft5_bio_d2,
+  pft5_bio_d2_gcm = pft5_bio_d2_gcm, # gcm level climate effect
   pft5_bio_es1 = pft5_bio_es1,
   pft5_d_wgcm = pft5_d_wgcm,
   pft5_d_wgcm_gcm = pft5_d_wgcm_gcm, # gcm level results
