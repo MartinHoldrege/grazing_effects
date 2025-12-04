@@ -461,9 +461,38 @@ stacked_panel <- function(df_panel,  area_total = NULL,
     }
   x_text <- (lu(df_panel$graze) + 1)/2 
 
+  wide <- 0.5
+  narrow <- 0.15
+  dodge_width = wide + narrow*2
+  
+  # making sideby side bars
+  # showing gcm uncertainty
+  df_dodge <- df_panel %>%
+    mutate(
+      graze_id    = as.numeric(graze),
+      summary_id  = as.numeric(summary),
+      n_summary   = n_distinct(summary),
+      dodge_width = dodge_width,                        # total cluster width around each graze
+      bar_width   = ifelse(summary == 'median', wide, narrow),
+    ) %>% 
+    group_by(rcp_year, graze) %>% 
+    mutate(x_pos = graze_id + case_when(
+      summary_id == 2 ~ 0,
+      summary_id == 1 ~ -(wide + narrow)/2,
+      summary_id == 3 ~ (wide + narrow)/2
+    ))
 
-  ggplot(df_panel, aes(x = graze, y = c3_percent)) +
-    geom_col(aes(fill = c3), position = 'stack') +
+  ggplot(df_dodge) +
+    # one stacked bar per (graze, summary), stacked by c3
+    geom_col(aes(x = x_pos,
+                 y = c3_percent,
+                 fill = c3,
+                 width = bar_width), color = 'grey') +
+    scale_x_continuous(
+      breaks = sort(unique(df_dodge$graze_id)),
+      labels = levels(df_panel$graze),
+      expand = expansion(mult = c(0.05, 0.05))
+    ) +
     adjust_graze_x_axis() +
     scale_fill_manual(values = cols_c3, name = lab_c3) +
     scale_y() +
@@ -502,12 +531,14 @@ make_stacked_c3_panels <- function(df, rcp, vr, include_sec_y = FALSE) {
   
   # filter to median summary and to Current vs selected rcp
   df0 <- df %>%
-    filter(summary == "median",
-           RCP %in% c("Current", rcp)) %>%
+    filter(RCP %in% c("Current", rcp)) %>%
     arrange(region, graze, RCP, years)
   
   # collect region order & labels
-  regions <- levels(df0$region)
+  stopifnot(
+    is.factor(df0$region)
+  )
+  regions <- unique(sort(df0$region))
   region_label <- region_label_factory(v = vr)
   # build per-region patchwork rows
   plots <- purrr::map(regions, function(rr) {
@@ -855,6 +886,16 @@ combine_5_panels <- function(plots, axes = 'collect') {
                 axis_titles = 'collect')
 }
 
+combine_4_panels <- function(plots, axes = 'collect') {
+  stopifnot(length(plots) == 4)
+  g <- wrap_plots(plots, nrow = 2, guides = 'collect') +
+    # thise axis collect only works if plots are not
+    # already patchwork combinations (e.g. plot with inset)
+    plot_layout(axes = axes,
+                axis_titles = 'collect')
+  g&theme(legend.position = 'right')
+}
+
 combine_more_panels <- function(plots, axes = 'collect',
                                 guides = 'collect') {
   stopifnot(length(plots) > 5)
@@ -875,7 +916,13 @@ combine_more_panels <- function(plots, axes = 'collect',
 combine_panels_labs <- function(plots, xlab = NULL, ylab = NULL, ylab_sec = NULL, ...) {
 
   
-  f <- if(length(plots) == 5) combine_5_panels else combine_more_panels
+  f <- if(length(plots) == 4) {
+    combine_4_panels 
+  } else if(length(plots ==5)) {
+    combine_5_panels
+  }else {
+    combine_more_panels
+  }
   panels <- f(plots, ...)
   
   if(is.null(xlab) & is.null(ylab) & is.null(ylab_sec)) {

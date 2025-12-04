@@ -15,7 +15,7 @@ vr_name <- opt$vr_name
 runv <- paste0(run, v_interp)
 yr_lab <- opt$yr_lab
 suffix <- paste0(runv, '_v1') # for figures
-
+entire <- opt$entire
 v_input <- paste0('v2', vr_name) # version for some input files
 scen_l <- list(RCP = c('RCP45', 'RCP85'),
                years = rep(opt$years, 2))
@@ -67,11 +67,6 @@ ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_",
                            v_input, "_", run, ".csv"))
 
 # create in "scripts/06_summarize_sei_scd-adj.R"
-# percent core and grow areas by region for low, median, and high SEI (across GCMs)
-sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name, yr_lab,
-                             '_sei-class-pcent-long_scd-adj_summaries_by-ecoregion.csv'))
-
-# create in "scripts/06_summarize_sei_scd-adj.R"
 # area in each of 9 climate caused SEI class change categories
 c9_area2 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name, yr_lab, 
                             '_c9-area_scd-adj_summaries_by-ecoregion.csv'))
@@ -91,18 +86,63 @@ qsei2 <- qsei1 %>%
   filter_clim_extremes(years = years)
 
 
-# * SEI class area --------------------------------------------------------
+# * gcm-wise calculations -------------------------------------------------
 
-sei_pcent1 <- df_factor(sei_pcent1) %>% 
+
+c3_gcm2 <- sei_byGCM1 %>% 
+  mutate(percent_ora = 100 - percent_csa - percent_goa) %>% 
+  select(-matches('SEI_'), -group, -type, -id) %>% 
+  pivot_longer(matches('percent_'), 
+               values_to = 'c3_percent',
+               names_to = 'c3') %>% 
+  mutate(c3 = str_replace(c3, 'percent_', ''),
+         c3 = str_to_upper(c3),
+         c3_area = area*c3_percent/100) %>% 
+  select(-area) %>% 
+  df_factor()
+
+join_vars <- c('region', 'RCP', 'years', 'graze')
+
+# which GCM has low, median or high values of 'mean' SEI
+# using mean SEI to sort gcms instead of median, because
+# because in some regions and scenarios median SEI is at or near
+# 0 so doesn't give seperation between GCMs
+sei_med_smry <- sei_byGCM1 %>% 
+  group_by(across(all_of(join_vars))) %>% 
+  summarize_across_GCMs(var = 'SEI_mean') %>% 
+  left_join(sei_byGCM1[c(join_vars, 'GCM', 'SEI_mean')],
+            by = c(join_vars, 'SEI_mean')) %>% 
+  filter(!is.na(GCM))
+
+test <- sei_med_smry %>% 
+  group_by(across(all_of(join_vars)), summary) %>% 
+  summarise(n = n(), .groups = 'drop')
+
+stopifnot(all(test$n == 1))
+
+# gcm-wise c3 class area
+sei_pcent1 <- c3_gcm2 %>% 
+  right_join(sei_med_smry, by = c(join_vars, 'GCM')) %>% 
   filter_clim_extremes(years = years) %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
-                              add_newline = TRUE))
+                              add_newline = TRUE)) %>% 
+  df_factor()
+
+# check if that got a 'unique' gcm for low, median and high
+test <- sei_pcent1 %>% 
+  group_by(across(all_of(join_vars)), summary, c3) %>% 
+  mutate(n = n(), .groups = 'drop') %>% 
+  pull(n)
+
+stopifnot(all(test == 1))
+
+# * SEI class area --------------------------------------------------------
 
 # change in area and % asei_pcent# change in area and % area in each sei class,
 # relative to historical climate (within grazing level comparisons)
 c3_clim_delta <- sei_pcent1 %>% 
   filter(RCP == 'Current') %>% 
-  select(-RCP, -years, -summary, -area_region, -c3_percent, -rcp_year) %>% 
+  select(-RCP, -years, -summary,-c3_percent, -rcp_year) %>% 
   right_join(
     filter(sei_pcent1, RCP != 'Current'),
     by = c('region', 'graze', 'c3', 'run'),
@@ -158,13 +198,11 @@ c3_graze_delta <- c3_graze_delta0 %>%
             by = join_by(region, run, RCP, years, c3, graze, delta_area_perc)) %>% 
   df_factor()
 
-
 stopifnot(
   # check for for any multiple to one matches
   nrow(c3_graze_delta) == nrow(c3_graze_delta0),
   # check that all % change values are their 
           all(!is.na(filter(c3_graze_delta, RCP != 'Current'))))
-
 
 # *format for output ------------------------------------------------------
 # versions for saving to output as summary stats
@@ -190,7 +228,7 @@ c3_graze_delta_wide <- c3_graze_delta %>%
 # *save tables ------------------------------------------------------------
 
 # pixelwise summaries across GCMs
-p1 <- paste0('data_processed/area/c3/c3_clim_delta-area_pw_', vr, '_', years, '_',
+p1 <- paste0('data_processed/area/c3/c3_clim_delta-area_gw_', vr, '_', years, '_',
             runv, '.csv')
 write_csv(c3_clim_delta_wide, p1)
 
@@ -269,7 +307,7 @@ map(rcps, function(rcp) {
     facet_grid(region ~rcp_year, scales = 'free_y') +
     labs(y = lab_area0)
   
-  ggsave(paste0('figures/sei/c3_area/c3-bar_abs-area_by-region',suffix, '.png'),
+  ggsave(paste0('figures/sei/c3_area/c3-bar_abs-area_by-region_gw_',suffix, '.png'),
          plot = g,
          dpi = 600, height = height10, width = width10)
   
@@ -288,7 +326,7 @@ map(rcps, function(rcp) {
     labs(y = 'Change in area relative to historical climate (ha)',
          subtitle = str_replace(rcp_year, '\n', ' '))
   
-  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area_by-region', 
+  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area_by-region_gw_', 
                 suffix, '.png'),
          plot = g,
          dpi = 600, height = heightr, width = widthr)
@@ -301,7 +339,7 @@ map(rcps, function(rcp) {
     labs(y = 'Change in SEI class area relative to historical climate (%)',
          subtitle = str_replace(rcp_year, '\n', ' '))
   
-  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area-perc_by-region', 
+  ggsave(paste0('figures/sei/c3_area/c3-bar_clim-delta-area-perc_by-region_gw_', 
                 suffix, '.png'),
          plot = g,
          dpi = 600, height = heightr, width = widthr)
@@ -358,12 +396,14 @@ widthr  <- if (nr <= 6) 6.3 else 7
 heightr <- if (nr <= 6) 6 else 7
 
 # build & save for each target RCP --------------------------------------
+df <- sei_pcent1 %>% 
+  filter(region != entire)
 purrr::walk(rcps, function(rcp) {
   suffix2 <- paste0(vr, "_", rcp, '_', years,   "_", runv)
-  g_stack <- make_stacked_c3_panels(df = sei_pcent1, rcp = rcp, vr = vr)
+  g_stack <- make_stacked_c3_panels(df = df, rcp = rcp, vr = vr)
 
   ggsave(
-    filename = paste0("figures/sei/c3_area/c3-bar-stack_abs-area_by-region_",
+    filename = paste0("figures/sei/c3_area/c3-bar-stack_abs-area_by-region_gw_",
                       suffix2, ".pdf"),
     plot = g_stack,
     height = heightr, width = widthr,
