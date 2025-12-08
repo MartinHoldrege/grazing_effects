@@ -142,7 +142,7 @@ sei_pcent_long <- sei_pcent %>%
 
 # gcm wise summaries 
 
-group_vars <- c('id', 'region', 'group', 'type', 'RCP', 'years', 'graze')
+group_vars <- c('region', 'group', 'type', 'RCP', 'years', 'graze')
 gcm_mean <- eco_gcm2 %>% 
   group_by(across(all_of(group_vars))) %>% 
   summarize_across_GCMs(var = 'mean') 
@@ -151,7 +151,7 @@ eco_smry_gw0 <- eco_gcm2 %>%
   right_join(gcm_mean, 
              by = c(group_vars, 'mean')) 
 
-check <- eco_smry_gw %>% 
+check <- eco_smry_gw0 %>% 
   group_by(across(all_of(group_vars))) %>% 
   summarize(n = n(), .groups = 'drop') %>% 
   pull(n)
