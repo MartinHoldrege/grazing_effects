@@ -36,6 +36,7 @@ source("src/fig_functions.R")
 source("src/general_functions.R")
 source("src/SEI_functions.R")
 source('src/mapping_functions.R')
+source('src/gw_functions.R')
 theme_set(theme_custom1())
 
 # Read in data ------------------------------------------------------------
@@ -45,9 +46,11 @@ options(readr.show_col_types = FALSE)
 # fivenumber summaries (for boxplots) across regions of Q and SEI
 # (SCD adjusted) rasters (i.e. these are area weighted summaries)
 # created in 06_summarize_sei_scd-adj
+# Note: in names 'summaries' was replaced w/ 'smry-gw'
+# when switched to gw summaries
 qsei1 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name,
                          yr_lab,
-                         '_q-sei_scd-adj_summaries_by-ecoregion.csv'))
+                         '_q-sei_scd-adj_smry-gw_by-ecoregion.csv'))
 
 
 # file created in 05_interpolated_summarize_sei_scd-adj.R
@@ -65,11 +68,6 @@ drivers1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
 # created in 06_fire_area.R
 ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
                            v_input, "_", run, ".csv"))
-
-# create in "scripts/06_summarize_sei_scd-adj.R"
-# area in each of 9 climate caused SEI class change categories
-c9_area2 <- read_csv(paste0('data_processed/raster_means/', runv, vr_name, yr_lab, 
-                            '_c9-area_scd-adj_summaries_by-ecoregion.csv'))
 
 # map of ecoregions create in
 # "scripts/04_ecoregion_map.R"
@@ -89,52 +87,10 @@ qsei2 <- qsei1 %>%
 # * gcm-wise calculations -------------------------------------------------
 
 
-c3_gcm2 <- sei_byGCM1 %>% 
-  mutate(percent_ora = 100 - percent_csa - percent_goa) %>% 
-  select(-matches('SEI_'), -group, -type, -id) %>% 
-  pivot_longer(matches('percent_'), 
-               values_to = 'c3_percent',
-               names_to = 'c3') %>% 
-  mutate(c3 = str_replace(c3, 'percent_', ''),
-         c3 = str_to_upper(c3),
-         c3_area = area*c3_percent/100) %>% 
-  select(-area) %>% 
-  df_factor()
+c3_gcm2 <- c3_to_long(sei_byGCM1)
 
-join_vars <- c('region', 'RCP', 'years', 'graze')
-
-# which GCM has low, median or high values of 'mean' SEI
-# using mean SEI to sort gcms instead of median, because
-# because in some regions and scenarios median SEI is at or near
-# 0 so doesn't give seperation between GCMs
-sei_med_smry <- sei_byGCM1 %>% 
-  group_by(across(all_of(join_vars))) %>% 
-  summarize_across_GCMs(var = 'SEI_mean') %>% 
-  left_join(sei_byGCM1[c(join_vars, 'GCM', 'SEI_mean')],
-            by = c(join_vars, 'SEI_mean')) %>% 
-  filter(!is.na(GCM))
-
-test <- sei_med_smry %>% 
-  group_by(across(all_of(join_vars)), summary) %>% 
-  summarise(n = n(), .groups = 'drop')
-
-stopifnot(all(test$n == 1))
-
-# gcm-wise c3 class area
-sei_pcent1 <- c3_gcm2 %>% 
-  right_join(sei_med_smry, by = c(join_vars, 'GCM')) %>% 
-  filter_clim_extremes(years = years) %>% 
-  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
-                              add_newline = TRUE)) %>% 
-  df_factor()
-
-# check if that got a 'unique' gcm for low, median and high
-test <- sei_pcent1 %>% 
-  group_by(across(all_of(join_vars)), summary, c3) %>% 
-  mutate(n = n(), .groups = 'drop') %>% 
-  pull(n)
-
-stopifnot(all(test == 1))
+sei_pcent1 <- summarize_c3_gw(sei_byGCM1) %>% 
+  filter_clim_extremes(years = years) 
 
 # * SEI class area --------------------------------------------------------
 
@@ -227,7 +183,7 @@ c3_graze_delta_wide <- c3_graze_delta %>%
 
 # *save tables ------------------------------------------------------------
 
-# pixelwise summaries across GCMs
+# gw summaries across GCMs
 p1 <- paste0('data_processed/area/c3/c3_clim_delta-area_gw_', vr, '_', years, '_',
             runv, '.csv')
 write_csv(c3_clim_delta_wide, p1)
@@ -255,13 +211,14 @@ plots[[n]] <- plots[[n]] + theme(strip.text.y = element_blank())
 
 g_sei <- box_fivenum1(df = filter(qsei2, group == 'SEI'),
                        ylab = lab_sei0,
-                       subtitle = 'SEI')
+                       subtitle = 'SEI') +
+  theme(legend.position = 'none')
 
 
 g2 <- combine_grid_panels1(plots, remove_y_axis_labels = TRUE)
 g3 <- g2 + g_sei + plot_layout(guides = 'collect')
 
-png(paste0("figures/sei/q-sei_scd-adj_weighted_by-region_3pft_boxplot", 
+png(paste0("figures/sei/q-sei_scd-adj_weighted_by-region_3pft_boxplot_gw", 
            vr_name, yr_lab, "_", suffix, ".png"),
     width = 11, height = 2.3 + 7.7*mr, units = 'in', res = 600)
 print(g3&theme(legend.position = 'bottom'))
@@ -397,9 +354,12 @@ heightr <- if (nr <= 6) 6 else 7
 
 # build & save for each target RCP --------------------------------------
 df <- sei_pcent1 %>% 
-  filter(region != entire)
+  filter(region != entire,
+         c3 != 'ORA') %>% 
+  mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE))
 purrr::walk(rcps, function(rcp) {
   suffix2 <- paste0(vr, "_", rcp, '_', years,   "_", runv)
+
   g_stack <- make_stacked_c3_panels(df = df, rcp = rcp, vr = vr)
 
   ggsave(
@@ -416,48 +376,7 @@ purrr::walk(rcps, function(rcp) {
 
 # c9 area barcharts -------------------------------------------------------
 
-# c9_area3 <- c9_area2 %>% 
-#   select(-id) %>% 
-#   pivot_wider(values_from = c('area', 'area_perc'),
-#               names_from = summary) %>% 
-#   mutate(across(matches('area'), .fns = \(x) ifelse(is.na(x), 0, x)),
-#          c9 = c9_factor(c9)) %>% 
-#   df_factor()
-# 
-# pmap(scen_l, function(RCP, years) {
-#   
-#   df <- c9_area3 %>% 
-#     filter(RCP == !!RCP, 
-#            years == !! years)
-# 
-#   g <- ggplot(df, aes(c9, y = area_perc_median,fill = c9)) +
-#     base_c9_area() +
-#     geom_errorbar(aes(ymin = area_perc_low, ymax = area_perc_high, group = graze),
-#                   stat = 'identity',
-#                   width=.3,
-#                   position=position_dodge(0.9)) +
-#     guides(pattern = guide_legend(ncol = 1,
-#                                   override.aes = list(fill = "white", color = 'black',
-#                                                       size = 0.1))) + 
-#     labs(x = 'Projected change in SEI class',
-#          y = '% of region') +
-#     facet_manual_region(color_strips = TRUE,
-#                         legend.position.inside = c(0.45, 0.31),
-#                         # skipping letter used for map
-#                         region_letters = fig_letters[c(-4)]) 
-#     # make_legend_small()
-# 
-#   
-#   g_region2 <- g_region1 +
-#     theme(legend.position = 'none') +
-#     labs(subtitle = fig_letters[4])
-#   
-#   g2 <- g +
-#     inset_element(g_region2, 
-#                   left = -0.05, bottom = 0.05, right = 0.4, top = 0.4,
-#                   align_to = 'full')
-# 
-# 
+# see pre-Nov 2025 commits
 #   path <- paste0(
 #     "figures/sei/c9-bar_scd-adj_by-region", vr_name, 
 #     "_", RCP, "_", years, "_", suffix, ".png"
@@ -465,8 +384,7 @@ purrr::walk(rcps, function(rcp) {
 #   ggsave(path, g2, dpi = 600, width = 9*mr, height = 7*mr)
 #   
 # })
-# 
-# 
+
 
 
 

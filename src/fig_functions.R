@@ -263,8 +263,8 @@ box_fivenum1 <- function(df, ylab = NULL, subtitle = NULL) {
           strip.text.x.top = element_text(size = rel(0.7))) +
     labs(x = lab_graze,
          y = ylab,
-         subtitle = subtitle,
-         fill = 'Summary across GCMs')
+         subtitle = subtitle) +
+    scale_fill_smry()
 }
 
 weighted_violin1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
@@ -433,12 +433,16 @@ box_abs_diff <- function(df_abs,
 #' @title Build a stacked bar panel of SEI classes
 #' @description Creates a stacked bar chart for one region × climate facet (e.g. Current or RCP scenario),
 #' with left axis showing % of region and right axis showing area in ha.
+#'
 #' @param df_panel Data frame filtered to one region and one climate facet. Must contain:
 #'   \code{graze}, \code{c3_percent} (0–100), \code{c3} (SEI class), and \code{area_region}.
 #' @param area_total Numeric, total area of the region in ha.
+#' @param y_text  y location of the rcp - year text on the panels
 #' @param legend.position.inside Numeric vector of length 2 giving legend position inside plot.
 stacked_panel <- function(df_panel,  area_total = NULL,
-                          legend.position.inside = c(0.08, 0.2)) {
+                          legend.position.inside = c(0.08, 0.2),
+                          y_text = 85
+                          ) {
   # df_panel: filtered to one region & one climate facet (Current or future)
   # expects columns: graze, c3_percent, c3, area_region
   df_panel$c3 <- forcats::fct_rev(df_panel$c3) # so CSA at bottom of stack
@@ -498,7 +502,7 @@ stacked_panel <- function(df_panel,  area_total = NULL,
     scale_y() +
     geom_text(# to avoid overplotting the word many times
               data = distinct(df_panel[, 'rcp_year']), 
-              mapping = aes(x = x_text, y = 85, label = rcp_year),
+              mapping = aes(x = x_text, y = y_text, label = rcp_year),
               family = "sans",
               size = 8, size.unit = 'pt', fontface = 1) +
     theme(
@@ -527,7 +531,8 @@ stacked_panel <- function(df_panel,  area_total = NULL,
 #' @description Builds a patchwork of stacked_panel plots for each region, showing Current vs selected RCP scenario.
 #' @param rcp Character, the RCP scenario to plot (must be present in \code{sei_pcent1}).
 #' @return A patchwork object combining all regions  with a shared legend.
-make_stacked_c3_panels <- function(df, rcp, vr, include_sec_y = FALSE) {
+make_stacked_c3_panels <- function(df, rcp, vr, include_sec_y = FALSE,
+                                   y_mult = NULL) {
   
   # filter to median summary and to Current vs selected rcp
   df0 <- df %>%
@@ -540,6 +545,17 @@ make_stacked_c3_panels <- function(df, rcp, vr, include_sec_y = FALSE) {
   )
   regions <- unique(sort(df0$region))
   region_label <- region_label_factory(v = vr)
+  y_max <- df0 %>% 
+    group_by(region, RCP, years, graze, summary) %>% 
+    mutate(total = sum(c3_percent)) %>% 
+    pull(total) %>% 
+    max()
+  
+  if(is.null(y_mult)) {
+    if(y_max >= 100) y_mult <- 0.85 else y_mult <- 1.05
+  }
+  y_text <- y_max*y_mult
+  
   # build per-region patchwork rows
   plots <- purrr::map(regions, function(rr) {
     
@@ -553,7 +569,8 @@ make_stacked_c3_panels <- function(df, rcp, vr, include_sec_y = FALSE) {
     }
 
     # two panels for this region
-    g1 <- stacked_panel(df_panel = d_reg, area_total = area_total) 
+    g1 <- stacked_panel(df_panel = d_reg, area_total = area_total,
+                        y_text = y_text) 
     
     title <- region_label(rr)
     g1 + 
@@ -601,7 +618,7 @@ make_stacked_c3_panels <- function(df, rcp, vr, include_sec_y = FALSE) {
 #'
 #' @param df_panel Data frame filtered to one region and one climate facet. 
 #' @param ylim y limits
-fire_dot_panel <- function(df_panel, ylim) {
+fire_dot_panel <- function(df_panel, ylim, df_panel_gcm) {
   
   
   x_text <- (lu(df_panel$graze) + 1)/2 
@@ -613,7 +630,13 @@ fire_dot_panel <- function(df_panel, ylim) {
     mutate(y_text = ifelse(y_max > !!y_text, 0.1*max(ylim), y_text),
            x_text = x_text)
   
-  ggplot(df_panel, aes(x = graze)) +
+  g <- ggplot(df_panel, aes(x = graze))
+  
+  if(!is.null(df_panel_gcm)) {
+    g <- g + geom_point(data = df_panel_gcm, mapping = aes(y = area_perc),
+                        alpha = 0.2, size = 1.1)
+  }
+  g <- g + 
     geom_errorbar(aes(ymin = area_low_perc, ymax = area_high_perc),
                   width = 0) +
     geom_point(aes(y = area_median_perc), 
@@ -637,6 +660,7 @@ fire_dot_panel <- function(df_panel, ylim) {
     facet_wrap(~rcp_year) +
     labs(y = lab_ba1) +
     coord_cartesian(ylim = ylim)
+  g
 }
 
 #' @title Build  fire dotplots, 1 panel per region
@@ -644,28 +668,45 @@ fire_dot_panel <- function(df_panel, ylim) {
 #' @param df dataframe
 #' @param vr region verion
 #' @param rcp Character, the future RCP scenario to plot .
-make_firedot_panels <- function(df, vr, rcp) {
+make_firedot_panels <- function(df, vr, rcp, df_gcm) {
   
   # filter to median summary and to Current vs selected rcp
   df0 <- df %>%
     filter(RCP %in% c("Current", rcp)) %>%
     arrange(ecoregion, graze, RCP, years)
   
-  max <- max(with(df0, c(area_high_perc, area_median_perc)),
-             na.rm = TRUE)
+  if(!is.null(df_gcm)) {
+    df_gcm0 <- df_gcm %>%
+      filter(RCP %in% c("Current", rcp)) %>%
+      arrange(ecoregion, graze, RCP, years)
+    max <- max(df_gcm0$area_perc, na.rm = TRUE)
+  } else {
+    max <- max(with(df0, c(area_high_perc, area_median_perc)),
+               na.rm = TRUE)
+  }
+
+  
   ylim <- c(0, max)
   
   # collect region order & labels
-  regions <- levels(df0$ecoregion)
+  regions <- unique(sort(df0$ecoregion))
   region_label <- region_label_factory(v = vr)
   # build per-region patchwork rows
   plots <- purrr::map(regions, function(rr) {
     
     # split to current and selected future for this region
-    d_reg <- filter(df0, ecoregion == rr)
+    df_panel <- filter(df0, ecoregion == rr)
+    
+    if(!is.null(df_gcm)) {
+      df_panel_gcm <- filter(df_gcm0, ecoregion == rr)
+    } else {
+      df_panel_gcm <- NULL
+    } 
+    
     
     # two panels for this region
-    g1 <- fire_dot_panel(df_panel = d_reg,ylim = ylim) 
+    g1 <- fire_dot_panel(df_panel = df_panel,ylim = ylim,
+                         df_panel_gcm = df_panel_gcm) 
     
     title <- region_label(rr)
     g1 + 
@@ -762,7 +803,8 @@ area_bar_map <- function(df_smry) {
     mutate(area_perc = area/sum(area)*100)
   limits <- c(0, max(area_perc$area_perc))
   
-  regions <- levels(df_smry$region) %>% 
+  regions <- unique(sort(df_smry$region)) %>% 
+    as.character() %>% 
     setNames(nm = .)
   
   map(regions, function(region) {
@@ -777,7 +819,9 @@ area_bar_map <- function(df_smry) {
 # make the tradeoff lines/point plot 
 tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim,
                            v,
-                           gcm_path = TRUE) {
+                           gcm_path = TRUE,
+                           include_entire = TRUE # manages how letters are handled
+                           ) {
   
   cols2 <- setNames(c3Palette, relable_c3_current(names(c3Palette)))
   region <- unique(df_smry_region$region)
@@ -789,7 +833,15 @@ tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim,
     g <- g + geom_path(data = df_gcm_region, aes(group = rcp_year_c3_gcm, linetype = rcp_year),
                        linewidth = 0.2, alpha = 0.5) 
   }
-  region_labeller <- region_labeller_factory(v = vr)
+  
+  if(include_entire) {
+    region_letters <- fig_letters
+  } else {
+    region_letters <- c('', fig_letters) # so first ecoregion gets 'a'
+  }
+  region_letters
+  region_labeller <- region_labeller_factory(region_letters = region_letters, 
+                                             v = vr)
   subtitle <- region_labeller(region)[[1]]
   g +  
     geom_path(aes(group = rcp_year_c3, linetype = rcp_year),
@@ -808,7 +860,8 @@ tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim,
 }
 
 # map over region
-tradeoff_lines_map <- function(df_smry, df_gcm, v, gcm_path = TRUE) {
+tradeoff_lines_map <- function(df_smry, df_gcm, v, gcm_path = TRUE,
+                               include_entire = TRUE) {
   x <- df_smry$SEI_mean
   y <- df_smry$expected_ba_perc
   if(gcm_path) {
@@ -817,7 +870,8 @@ tradeoff_lines_map <- function(df_smry, df_gcm, v, gcm_path = TRUE) {
   }
   xlim <- range(x)
   ylim <- range(y)
-  regions <- levels(df_smry$region) %>% 
+  regions <- unique(sort(df_smry$region)) %>% 
+    as.character() %>% 
     setNames(nm = .)
   
   map(regions, function(region) {
@@ -826,7 +880,8 @@ tradeoff_lines_map <- function(df_smry, df_gcm, v, gcm_path = TRUE) {
     df_gcm_region <- df_gcm %>% 
       filter(region == !!region)
     tradeoff_lines(df_smry_region, df_gcm_region, xlim = xlim, ylim = ylim,
-                   v = v, gcm_path = gcm_path)
+                   v = v, gcm_path = gcm_path,
+                   include_entire = include_entire)
   })
 }
 
@@ -918,7 +973,7 @@ combine_panels_labs <- function(plots, xlab = NULL, ylab = NULL, ylab_sec = NULL
   
   f <- if(length(plots) == 4) {
     combine_4_panels 
-  } else if(length(plots ==5)) {
+  } else if(length(plots) ==5) {
     combine_5_panels
   }else {
     combine_more_panels
