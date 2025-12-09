@@ -1,5 +1,9 @@
 # Purpose: Create figures of expected burned area and area in different
 # fire return interval categories
+# Note: figures used in the manuscript have been updated
+# to rely on gcm-wise summaries (but the trade-off fig shows
+#individual GCMs and a pixelwise median [hard to select the 'right' GCM-wise
+# median])
 
 # Author: Martin Holdrege
 
@@ -34,16 +38,14 @@ source("src/SEI_functions.R")
 source("src/fig_functions.R")
 source("src/fig_params.R")
 source("src/probability_functions.R")
+source("src/gw_functions.R")
+source('src/mapping_functions.R')
 theme_set(theme_custom1())
 options(readr.show_col_types = FALSE)
 
 # read in data ------------------------------------------------------------
 
 # created in the 06_fire_area.R script
-# expected burned area
-# includes mid and end century
-ba3a <- read_csv(
-  paste0("data_processed/area/expected-burn-area_smry_", suffix,".csv"))
 
 # expected burned area by gcm
 ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
@@ -64,8 +66,8 @@ area_age_group3 <- read_csv(
 
 # expected area in different years since fire age groups
 # (calculated pixel-wise)
-area_age_group3_pw <- read_csv(
-  paste0("data_processed/area/area-by-age-group_pw_", suffix, ".csv"))
+# area_age_group3_pw <- read_csv(
+#   paste0("data_processed/area/area-by-age-group_pw_", suffix, ".csv"))
 
 # area of our study region in each of 3 ecoregions
 area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v, vr_name,
@@ -81,10 +83,6 @@ drivers1 <- read_csv(paste0('data_processed/raster_means/', run, vr_name,
 # and dominant drivers of change
 driver_l <- readRDS('data_processed/site_means/fire_dominant_drivers.RDS')
 
-# created in "scripts/06_summarize_sei_scd-adj.R"
-sei_pcent1 <- read_csv(paste0('data_processed/raster_means/', 
-                              runv, vr_name, yr_lab, 
-                              '_sei-class-pcent_scd-adj_summaries_by-ecoregion.csv'))
 
 # created in "scripts/05_interpolated_summarize_sei_scd-adj.R"
 sei_pcent_gcm1 <- read_csv(paste0('data_processed/raster_means/', 
@@ -132,43 +130,48 @@ if(vr == 'r1.0') {
 
 # prepare dataframes ------------------------------------------------------
 
-ba3 <- df_factor(ba3a) %>% 
+# gcm-wise summaries
+sei_pcent1 <- summarize_c3_gw(sei_pcent_gcm1) # gcm-wise summaries
+
+ba3a <- summarize_ba_gw(ba_gcm1, df_area = area_eco)
+
+ba3 <- ba3a %>% 
   filter_clim_extremes(years = years) %>% 
   arrange(graze, RCP, years)  %>% 
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
-         id2 = factor(id2, levels = unique(id2)),
-         rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
-  mutate(across(matches("^area_"), .fns = \(x) x/area_total*100,
-                .names = '{.col}_perc')) 
+         id2 = factor(id2, levels = unique(id2))) 
 
 area_age_group3 <- area_age_group3 %>% 
   filter_clim_extremes(years = years) %>% 
   left_join(area_eco, by = join_by(ecoregion)) %>% 
-  arrange(graze, RCP, years)  %>% 
+  arrange(graze, RCP, years, age_group)  %>% 
   mutate(id2 = paste(RCP, years, graze, sep = '_'),
          id2 = factor(id2, levels = unique(id2)),
          # not reproducible (yet)
          age_group = factor(age_group, levels = names(age_groups)),
-         rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
-  df_factor()
-  
-area_age_group4_pw <- area_age_group3_pw %>% 
-  filter_clim_extremes(years = years) %>% 
-  left_join(area_eco, by = join_by(ecoregion)) %>% 
-  arrange(graze, RCP, years)  %>% 
-  mutate(age_group = factor(age_group, levels = rev(names(age_groups))),
-         rcp_year = rcp_label(RCP, years, include_parenth = FALSE,
-                              add_newline = TRUE),
+         rcp_year = rcp_label(RCP, years, include_parenth = FALSE),
          area_median_perc = area_median/area*100) %>% 
   df_factor()
+  
+
+ba_gcm2 <- ba_gcm1 %>% 
+  left_join(rename(area_eco, total_area = area), by = 'ecoregion') %>% 
+  mutate(ba_perc = area/total_area*100, 
+         rcp_year = rcp_label(RCP, years = years, include_parenth = FALSE,
+                                       add_newline = TRUE)) %>% 
+  select(-type, -total_area)
   
 # *trade-offs ba vs core --------------------------------------------------
 
 # showing area of core vs expected burned area to illustrate the grazing
 # trade-off
 sei_pcent2 <- sei_pcent1 %>% 
-  select(-id, -group, -type) %>% 
-  pivot_wider(values_from = c('percent_csa', 'percent_goa'),
+  mutate(c3 = str_to_lower(as.character(c3))) %>% 
+  select(-c3_area, -SEI_mean,-GCM) %>% 
+  pivot_wider(values_from = 'c3_percent',
+              names_from = 'c3',
+              names_prefix = 'percent_') %>% 
+  pivot_wider(values_from = c('percent_goa', 'percent_csa', 'percent_ora'),
               names_from = 'summary') %>% 
   df_factor() %>% 
   # correct run is in file name when read in
@@ -282,6 +285,7 @@ c3eco_gcm3 <- c3eco_gcm2 %>%
 
 # * drivers of fire change ------------------------------------------------
 
+# these are 'pixelwise' summaries of the dominant driver
 dom_drivers2 <- driver_l$dominant_driver1 %>% 
   filter_clim_extremes(years = years) %>% 
   select(-id) %>% 
@@ -358,16 +362,23 @@ if(create_figs){
 # expected burned area figs --------------------------------------------------
 # see pre-nov 2025 commits for version making old version of this
 # figure with total area and colored grazing
-widthr  <- 6.3 
+widthr  <- 5 
 heightr <- 6 
 ba3_tmp <- ba3 %>% 
   mutate(rcp_year = rcp_label(RCP, years = years, include_parenth = FALSE,
-                              add_newline = TRUE))
+                              add_newline = TRUE)) %>% 
+  filter(ecoregion != entire)
+
+ba_gcm_tmp <- ba_gcm2 %>% 
+  rename(area_perc = ba_perc) %>% 
+  filter_clim_extremes(years = years) %>% 
+  filter(ecoregion != entire)
 for (rcp in rcps) {
-  g <- make_firedot_panels(df = ba3_tmp, vr = vr, rcp = rcp)
+  g <- make_firedot_panels(df = ba3_tmp, vr = vr, rcp = rcp,
+                           df_gcm = ba_gcm_tmp)
   # saving as pdf so can better be combined with fire change maps
   ggsave(
-    paste0("figures/fire/area/expected_ba_dotplot_", 
+    paste0("figures/fire/area/expected_ba_dotplot_gw_", 
            vr, '_', rcp, '_', years, '_', runv, '.pdf'),
     plot = g,
     height = heightr, width = widthr,
@@ -457,16 +468,17 @@ dev.off()
 # * stacked barchart ------------------------------------------------------
 
 # check--area should sum to 100% (with some rounding error)
-check <- area_age_group4_pw %>% 
+check <- area_age_group3%>% 
   group_by(ecoregion, graze, rcp_year) %>% 
   summarize(sum_perc = sum(area_median_perc)) %>% 
   pull(sum_perc)
 
-stopifnot(abs(check - 100) < 0.01)
+stopifnot(abs(check - 100) < 1)
 
 map(rcps, function(rcp){
-  g <- area_age_group4_pw %>% 
+  g <- area_age_group3 %>% 
     filter(RCP %in% c('Current', rcp)) %>% 
+    mutate(age_group = forcats::fct_rev(age_group)) %>% 
     ggplot(aes(x = graze, y = area_median_perc, fill = age_group)) +
     geom_bar(stat = 'identity') +
     facet_grid(ecoregion~rcp_year, scales = 'free_y') +
@@ -476,7 +488,7 @@ map(rcps, function(rcp){
     labs(y = lab_areaperc0b) +
     theme(strip.text = element_text(size = rel(0.7)))
   
-  filename <- paste0("figures/fire/area/area_age_group_by-region_bar_", rcp, 
+  filename <- paste0("figures/fire/area/area_age_group_by-region_bar_gw_", rcp, 
                      yr_lab, "_", 
                      suffix, '.png')
   ggsave(filename, g, height = 2+6*mr, width = 4, dpi = 600)
@@ -546,15 +558,21 @@ args <- expand_grid(rcp = rcps,
                     # also show lines for each GCM
                     gcm_path = c(TRUE, FALSE))
 
+include_entire <- FALSE
 width_tradeoff <- 8
 height_tradeoff <- 7
 if(nr == 9) {
   remove_x = 1:6
   remove_y = c(2, 3, 5 , 6, 8, 9)
-} else if(nr == 5) {
+} else if(nr == 5 & include_entire) {
   remove_x = c(2, 3)
   remove_y = c(2, 3, 5)
   width_tradeoff <- 7
+  height_tradeoff <- 5
+} else if(nr == 5 & !include_entire) {
+  remove_x = c(1, 2)
+  remove_y = c(2, 4)
+  width_tradeoff <- 6
   height_tradeoff <- 5
 } else {
   stop('update')
@@ -573,6 +591,10 @@ pmap(args, function(rcp, gcm_path) {
     mutate(c3_cur = relable_c3_current(c3),
            graze_long = relable_graze_long(graze))
   
+  if(!include_entire) {
+    df_smry <- filter(df_smry, region != entire)
+    df_gcm <- filter(df_gcm, region != entire)
+  }
   
   # barcharts showing % of total area by SEI class
   # (to be used as insets)
@@ -580,7 +602,8 @@ pmap(args, function(rcp, gcm_path) {
   plotsl1 <- tradeoff_lines_map(df_smry = df_smry,
                                 df_gcm = df_gcm,
                                 v = vr,
-                                gcm_path = gcm_path)
+                                gcm_path = gcm_path,
+                                include_entire = include_entire)
 
   
   plotsl1 <- remove_axis_labels(plotsl1, remove_x = remove_x, 
@@ -589,13 +612,16 @@ pmap(args, function(rcp, gcm_path) {
   
   comb <- combine_panels_labs(plotsl2,
                                 xlab = 'Mean Sagebrush Ecological Integrity',
-                                ylab = 'Expected burned area (%/year)')
+                                ylab = lab_ba1)
   
   prefix <- if(gcm_path) '' else 'noGCM_'
+  prefix <- if(!include_entire) paste0(prefix, 'noESA_')
 
   ggsave(paste0("figures/sei/tradeoff/", "sei", "-scd-adj-vs-ba_perc_dotplot_", 
-              'c3eco_', prefix, rcp, yr_lab, "_", suffix, ".png"), 
-         plot = comb, dpi = 600, width = width_tradeoff, height = height_tradeoff)
+              'c3eco_', prefix, rcp, yr_lab, "_", suffix, ".pdf"), 
+         plot = comb, dpi = 600, width = width_tradeoff, height = height_tradeoff,
+         device = cairo_pdf, # so text can be edited
+         family = "sans")  # or a specific font like "Arial")
 })
 
 
@@ -635,10 +661,7 @@ ggsave("figures/sei/tradeoff/conceptual_fig_v1.png",
 
 drivers2 <- drivers1 %>% 
   select(-p25, -median, -p75)
-ba_gcm2 <- ba_gcm1 %>% 
-  left_join(rename(area_eco, total_area = area), by = 'ecoregion') %>% 
-  mutate(ba_perc = area/total_area*100) %>% 
-  select(-type, -total_area)
+
 
 ba_gcm3 <- drivers2 %>% 
   filter(is.na(graze)) %>% 
@@ -838,7 +861,7 @@ pmap(args, function(rcp, region) {
   
   # years since fire
   
-  g_bar1 <- area_age_group4_pw %>% 
+  g_bar1 <- area_age_group3 %>% 
     filter(RCP %in% c('Current', rcp), ecoregion == region) %>% 
     ggplot(aes(x = graze, y = area_median_perc, fill = age_group)) +
     geom_bar(stat = 'identity') +
@@ -868,7 +891,7 @@ pmap(args, function(rcp, region) {
     g <- g + plot_annotation(subtitle = region)
   }
   
-  ggsave(paste0("figures/fire/area/comb_ba-age-driver_", 
+  ggsave(paste0("figures/fire/area/comb_ba-age-driver_gw_", 
                 words2abbrev(region), vr_name, "_", rcp, yr_lab, "_", v, "_", 
                 runv, '.png'),
          plot = g,
