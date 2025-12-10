@@ -21,6 +21,9 @@ option_list <- list(
   optparse::make_option("--test_run", action = "store_true", default = FALSE),
   # reference grazing level
   optparse::make_option("--ref_graze", type = "character", default = "Moderate"),
+  # the alternate (comparison) grazing level shown in maps (where all 
+  # grazing levels can't be shown)
+  optparse::make_option("--target_graze", type = "character", default = "Heavy"),
   # string for entire study area
   optparse::make_option("--entire", type = "character", default = "Entire study area")
 )

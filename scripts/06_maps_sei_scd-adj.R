@@ -11,9 +11,10 @@ source('src/params.R')
 v <- v_interp
 runv <- paste0(run, v)
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
-test_run <- FALSE
+test_run <- opt$test_run # TRUE # 
 c3_rcps <- c('RCP45', 'RCP85') # future scenario shown on map
 ref_graze <-  opt$ref_graze
+target_graze_v <- c('Heavy', 'Very Heavy') # comparison grazing levels
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -56,18 +57,14 @@ r_qsei_d1 <- rast(
 
 if(test_run) {
   size <- 100
-  r_cov1 <- spatSample(r_cov1, size = size, method = 'regular',
-                      as.raster = TRUE)
-  r_qsei1 <- spatSample(r_qsei1, size = size, method = 'regular',
-                         as.raster = TRUE)
-  r_cov_d1 <- spatSample(r_cov_d1, size = size, method = 'regular',
-                       as.raster = TRUE)
-  r_qsei_d1 <- spatSample(r_qsei_d1, size = size, method = 'regular',
-                       as.raster = TRUE)
+  r_cov1 <- downsample(r_cov1)
+  r_qsei1 <- downsample(r_qsei1)
+  r_cov_d1 <- downsample(r_cov_d1)
+  r_qsei_d1 <- downsample(r_qsei_d1)
 }
 
 
-r_comb1 <- c(r_cov1, r_cov_d1, r_qsei1, r_qsei_d1)
+r_comb1 <-c(r_cov1, r_cov_d1, r_qsei1, r_qsei_d1)
 into = c("group", "type", "RCP", "years", "graze", "summary")
 
 info1 <- create_rast_info(r_comb1, into = into) %>% 
@@ -255,25 +252,47 @@ for(rcp in c3_rcps) {
 # as well as one map of change due to grazing and one map of change
 # due to climate
 
-
-target_graze <- 'Very Heavy'
 target_rcp <- 'RCP45'
 target_yr <- '2070-2100'
+for (target_graze in target_graze_v) {
 
-g <- plot_c3c9_3panel(r_sei = r_comb1,
-                      info = info1,
-                      ref_graze = ref_graze,
-                      target_rcp = target_rcp,
-                      target_yr = target_yr)
-
-filename <- paste0('figures/sei/maps/c3c9cgref_3panel_',
-                   target_rcp, '_',target_yr, '_', words2abbrev(target_graze), 
-                   '_', runv, ".pdf")
-ggsave(
-  filename = filename,
-  plot = g,
-  height = 6.8, width = 7.4,
-  device = cairo_pdf, # so text can be edited
-  family = "sans"  
-)
-
+  
+  g <- plot_c3c9_3panel(r_sei = r_comb1,
+                        info = info1,
+                        ref_graze = ref_graze,
+                        target_rcp = target_rcp,
+                        target_yr = target_yr,
+                        target_graze = target_graze,
+                        include_cgref = FALSE)
+  
+  filename <- paste0('figures/sei/maps/c3c9cgref_3panel_',
+                     target_rcp, '_',target_yr, '_', words2abbrev(target_graze), 
+                     '_', runv, ".pdf")
+  ggsave(
+    filename = filename,
+    plot = g,
+    height = 6.8, width = 7.4,
+    device = cairo_pdf, # so text can be edited
+    family = "sans"  
+  )
+  
+  # 4 panel version (that includes cgref--the combined 
+  # grazing and climate change effect)
+  g <- plot_c3c9_3panel(r_sei = r_comb1,
+                        info = info1,
+                        ref_graze = ref_graze,
+                        target_rcp = target_rcp,
+                        target_yr = target_yr,
+                        target_graze = target_graze,
+                        include_cgref = TRUE)
+  filename <- paste0('figures/sei/maps/c3c9cgref_4panel_',
+                     target_rcp, '_',target_yr, '_', words2abbrev(target_graze), 
+                     '_', runv, ".pdf")
+  ggsave(
+    filename = filename,
+    plot = g,
+    height = 6.8, width = 7.4,
+    device = cairo_pdf, # so text can be edited
+    family = "sans"  
+  )
+}

@@ -502,6 +502,27 @@ global_smry <- function(r) {
   out
 }
 
+# create layers that show the effect of combined changes in climate and 
+# grazing (relative to moderate grazing and
+# historical conditions)
+calc_cgref_delta <- function(r, info, target_graze, ref_graze) {
+  ref <- info %>% 
+    filter(RCP == 'Current',
+           graze == ref_graze)
+  
+  tar <-  info %>% 
+    filter(RCP != 'Current',
+           graze == target_graze)
+  
+  stopifnot(nrow(ref) == 1, nrow(tar) >= 1)
+  
+  delta <- r[[tar$id]] - r[[ref$id]]
+  names(delta) <- str_replace(names(delta),
+                              'fire-prob',
+                              'fire-prob-rdiff-cgref')
+  delta
+}
+
 # maps --------------------------------------------------------------------
 
 
@@ -1003,28 +1024,36 @@ plot_c3c9_gref <- function(r_c3, r_c9, info_c3, info_c9) {
 #' @param ref_graze reference grazing level
 #' @param target_graze target grazing level
 #' @param target_rcp future rcp
+#' @param include_cgref logical--add additional panel showing combined change in 
+#' climate and grazing
 #' @param target_yr future time period
 plot_c3c9_3panel <- function(r_sei, 
                              info, 
                              ref_graze = 'Moderate',
                              target_graze = 'Very Heavy',
                              target_rcp = 'RCP45', 
-                             target_yr = '2070-2100') {
+                             target_yr = '2070-2100',
+                             include_cgref = FALSE) {
+  
+
   info <- info %>% 
-    filter(type == 'SEI',
-           (graze == ref_graze & RCP %in% c('Current', target_rcp) 
-            & years %in% c('Current', target_yr)) |
-             (graze == target_graze & RCP == 'Current')) %>% 
+    filter(years %in% c('Current', target_yr),
+           type == 'SEI') %>% 
     select(-run2, -group, -type) %>% 
     mutate(type = case_when(
       RCP == 'Current' & graze == ref_graze ~ 'c3', # should plot C3
       RCP == 'Current' & graze == target_graze ~ 'gref', # should plto grazing c9
-      RCP == target_rcp ~ 'cref', # should plot climate effect
+      RCP == target_rcp & graze == ref_graze ~ 'cref', # should plot climate effect
+      RCP == target_rcp & graze == target_graze & include_cgref~ 'cgref',
+      TRUE ~ NA
     ),
-    type= factor(type, levels = c('c3', 'gref', 'cref'))) %>% 
+    type= factor(type, levels = c('c3', 'gref', 'cref', 'cgref'))) %>% 
+    filter(!is.na(type)) %>%  # this keeps only the layers of interest
     arrange(type) %>% 
     mutate(tag = fig_letters[1:n()])
-  stopifnot(nrow(info) == 3)
+  
+  n <- nrow(info)
+  stopifnot((n == 3 & !include_cgref) |  (n == 4 & include_cgref))
   
   info$title <- NA
   info$title[info$type == 'c3'] <- paste0('SEI class\n(historical climate, ',
@@ -1034,6 +1063,11 @@ plot_c3c9_3panel <- function(r_sei,
   info$title[info$type == 'cref'] <- paste0(
     '\u0394SEI class: climate effect\n(response to ',
     rcp_label(target_rcp, target_yr, include_parenth = FALSE), ')')
+  
+  info$title[info$type == 'cgref'] <- paste0(
+    '\u0394SEI class: climate + grazing effect\n(response to ',
+    rcp_label(target_rcp, target_yr, include_parenth = FALSE), ' & ',
+    str_to_lower(target_graze), ' grazing)')
   
   r_c3 <- sei2c3(r_sei[[info$id]])
   r_c9 <- c3toc9(current = r_c3[[info$id[info$type == 'c3']]],
@@ -1045,16 +1079,19 @@ plot_c3c9_3panel <- function(r_sei,
                  gref = data.frame(ID = 1:9, 
                                    class = c9Names))
   levs_l$cref <- levs_l$gref
+  levs_l$cgref <- levs_l$gref
   
   r_c3c9 <- c(r_c3[info$id[info$type == 'c3']], r_c9)
   fill <- list(
     'c3' = scale_fill_c3,
     'gref' = scale_fill_c9,
-    'cref' = scale_fill_c9
+    'cref' = scale_fill_c9,
+    'cgref' = scale_fill_c9
   )
   
   
-  guide_l <- list('c3' = 'right', 'gref' = 'none', 'cref' = 'none')
+  guide_l <- list('c3' = 'right', 'gref' = 'none', 'cref' = 'none',
+                  'cgref' = 'none')
   
   plots1 <- pmap(info[c('id', 'type', 'tag', 'title')], 
                  function(id, type, tag, title) {
@@ -1067,7 +1104,8 @@ plot_c3c9_3panel <- function(r_sei,
                      theme(legend.position = 'none',
                            plot.tag.position =  'topleft',
                            plot.tag.location = 'panel',
-                           plot.margin = unit(c(0, 0, 0, 0), units = 'in')) +
+                           plot.margin = unit(c(0, 0, 0, 0), units = 'in'),
+                           plot.subtitle = element_text(size = rel(0.8))) +
                      labs(subtitle = title)
                  })
   
@@ -1079,10 +1117,20 @@ plot_c3c9_3panel <- function(r_sei,
   
   # wrapping color matrix so that 
   plots2 <- c(plots1, list(wrap_elements(color_matrix1)))
-  design <- '
+  
+  if(n == 3) {
+    design <- '
     ABD
     c##
   '
+  } else if (n == 4) {
+    design <- '
+    ABE
+    CD#
+  '
+    
+  }
+
   patchwork::wrap_plots(plots2, 
                         widths = c(1, 1, 0.6), 
                         heights = c(1, 1),
@@ -1173,8 +1221,10 @@ plot_delta_fire <- function(r, panel_tag = NULL,
  
 }
 
+
 # absolute fire probability (historical, reference), and one map, each,
 # of change due to grazing and change due to climate
+# can also make 4panel version that shows combined grazing and climate change
 plot_fire_3panel <- function(r, 
                              info, 
                              ref_graze = 'Moderate',
@@ -1186,13 +1236,17 @@ plot_fire_3panel <- function(r,
                (graze == target_graze & RCP == 'Current' 
                 & type == 'fire-prob-rdiff-gref') |
                (graze == ref_graze & RCP == target_rcp & years == target_yr 
-                & type == 'fire-prob-rdiff-cref')) %>% 
-    mutate(type = str_extract(type, 'cref|gref'),
+                & type == 'fire-prob-rdiff-cref') |
+             (graze == target_graze & RCP == target_rcp & years == target_yr 
+               & type == 'fire-prob-rdiff-cgref')) %>% 
+    mutate(type = str_extract(type, 'cref|gref|cgref'),
            type = ifelse(is.na(type), 'abs', type),
-           type= factor(type, levels = c('abs', 'gref', 'cref'))) %>% 
+           type= factor(type, levels = c('abs', 'gref', 'cref', 'cgref'))) %>% 
     arrange(type) %>% 
     mutate(tag = fig_letters[1:n()])
-  stopifnot(nrow(info) == 3)
+  
+  n <- nrow(info)
+  stopifnot(n == 4 | n == 3)
   
   info$title <- NA
   info$title[info$type == 'abs'] <- paste0('Wildfire\n(historical climate, ',
@@ -1203,10 +1257,16 @@ plot_fire_3panel <- function(r,
     '\u0394Wildfire: climate effect\n(response to ',
     rcp_label(target_rcp, target_yr, include_parenth = FALSE), ')')
   
+  info$title[info$type == 'cgref'] <- paste0(
+    '\u0394Wildfire: climate + grazing effect\n(response to ',
+    rcp_label(target_rcp, target_yr, include_parenth = FALSE), ' & ',
+    str_to_lower(target_graze), ' grazing)')
+  
   f_l <- list(
     'abs' = plot_fire,
     'gref' = plot_delta_fire,
-    'cref' = plot_delta_fire
+    'cref' = plot_delta_fire,
+    'cgref' = plot_delta_fire
   )
   
   limits <- list(
@@ -1215,24 +1275,37 @@ plot_fire_3panel <- function(r,
                           absolute = TRUE)
   )
   limits$cref <- limits$gref
-  
+  limits$cgref <- limits$gref
+
   plots1 <- pmap(info[c('id', 'type', 'tag', 'title')], 
                  function(id, type, tag, title) {
                    f <- f_l[[type]]
                    r <- r[[id]]
                    f(r = r,panel_tag = tag,
                      limits = limits[[type]]) + 
-                     labs(subtitle = title)
-                 })
+                     labs(subtitle = title) +
+                     theme(
+                       plot.subtitle = element_text(size = rel(0.8))
+                     )
+                 }) 
   
   
   
   # wrapping color matrix so that 
   plots2 <- c(plots1, list(guide_area()))
-  design <- '
+  
+  if(n == 3) {
+    design <- '
     ABD
-    c##
+    C##
   '
+  } else {
+    design <- '
+    ABE
+    CD#
+    '
+  }
+
   patchwork::wrap_plots(plots2, 
                         widths = c(1, 1, 0.6), 
                         heights = c(1, 1),
@@ -1240,6 +1313,7 @@ plot_fire_3panel <- function(r,
     plot_layout(guides = 'collect')
   
 }
+
 
 
 plot_fire_gref_18panel <- function(info, r, legend_title) {
