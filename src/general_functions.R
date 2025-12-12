@@ -1159,8 +1159,9 @@ join4cref <- function(df, by) {
 
 # temporary files ---------------------------------------------------------
 
-tmp_exists <- function(object_name, rerun, suffix = '.tif') {
-  file.exists(paste0('tmp/', object_name, suffix)) & !rerun
+tmp_exists <- function(object_name, rerun, suffix = '.tif',
+                       dir = 'tmp') {
+  file.exists(file.path(dir, paste0(object_name, suffix))) & !rerun
 }
 
 read_tmp_tif <- function(object_name, dir = 'tmp') {

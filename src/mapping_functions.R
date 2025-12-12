@@ -490,6 +490,33 @@ calc_rast_cref <- function(r, info, type_from, type_to = NULL,
   diff
 }
 
+# calculate change relative to reference grazing level
+calc_rast_gref <- function(r, info, type_from, type_to = NULL,
+                           ref_graze = 'Moderate',
+                           by = c('run', 'PFT', 'type', 'RCP', 'years')) {
+  if(is.null(type_to)) {
+    type_to <- paste0(type_from, "-rdiff-gref")
+  }
+  
+  stopifnot(
+    c('id', 'graze', by) %in% names(info),
+    info$id %in% names(r)
+  )
+  info_ref <- info %>% 
+    filter(.data$graze == ref_graze) 
+  
+  info_tar <- info %>% 
+    filter(.data$RCP != ref_graze)
+  
+  info_comb <- info_tar[c('id', by)] %>% 
+    left_join(info_ref, suffix = c("_tar", "_ref"), by = by)
+  
+  diff <- r[[info_comb$id_tar]] - r[[info_comb$id_ref]]
+  names(diff) <- str_replace(names(diff), type_from, type_to)
+  diff
+  
+}
+
 downsample <- function(r, n = 100) {
   spatSample(r, size = n, method = 'regular',as.raster = TRUE)
 }
@@ -522,6 +549,8 @@ calc_cgref_delta <- function(r, info, target_graze, ref_graze) {
                               'fire-prob-rdiff-cgref')
   delta
 }
+
+
 
 # maps --------------------------------------------------------------------
 

@@ -16,9 +16,10 @@ vr <- opt$vr
 vr_name <- opt$vr_name
 yr_lab <- opt$yr_lab
 fire_breaks <- c(seq(0, 2.5, by = 0.25), 3, 4) # intervals to cut fire probability into
-
+ref_graze <- opt$ref_graze
 path_tmp <- file.path('tmp', yr_lab)
-
+rerun <- FALSE
+dir <- file.path('tmp', yr_lab)
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -26,6 +27,7 @@ library(terra)
 source('src/general_functions.R')
 source('src/mapping_functions.R')
 source("src/SEI_functions.R")
+source("src/distrib_functions.R")
 
 # read in data ------------------------------------------------------------
 
@@ -62,6 +64,87 @@ info1 <- create_rast_info(r_qsei1, into = into) %>%
   mutate(type = ifelse(type == 'biomass', 'Q', type))
 
 
+# calculate change layers -------------------------------------------------
+# these are for calculate summary stats needed for histograms
+
+info_sei <- info1 %>% 
+  filter(type == 'SEI') %>% 
+  select(-group)
+
+# not including r_eco4 in the digest b/ 
+# ecoregion summaries are not saved (re-run every time, and this
+# way not everything will rerun if use new regions--change
+# if code adjusted)
+hash <- digest::digest(list(r_qsei1, r_eco1, size))
+
+path_hash <- paste0(dir, "/06_hash", ".txt")
+
+if(!file.exists(path_hash)) {
+  dir.create('tmp/', showWarnings = FALSE)
+  write_lines(hash, path_hash)
+  rerun <- TRUE
+} else {
+  old_hash <- read_lines(path_hash)
+  
+  if(old_hash != hash & !test_run) {
+    write_lines(hash, path_hash)
+    rerun <- TRUE # have to rerun if the hash is different (inputs don't match)
+  } else if (test_run) {
+    rerun <- TRUE
+  }
+}
+
+if(tmp_exists('r_sei_cref', rerun, dir = dir)) {
+  r_sei_cref <- read_tmp_tif('r_sei_cref', dir = dir)
+  r_sei_gref <- read_tmp_tif('r_sei_gref', dir = dir)
+} else {
+  # change due to climate
+  r_sei_cref <- calc_rast_cref(r_qsei1, info = info_sei, 
+                               type_from = 'SEI_SEI',
+                               type_to = 'SEI-cref',
+                               by = c('run', 'type', 'graze'))
+  
+  # change due to grazing
+  r_sei_gref <- calc_rast_gref(r_qsei1, info = info_sei, 
+                               ref_graze = ref_graze,
+                               type_from = 'SEI_SEI',
+                               type_to = 'SEI-gref',
+                               by = c('run', 'type', 'RCP', 'years', 'GCM'))
+  if(!test_run) {
+    r_sei_cref <- writeReadRast(r_sei_cref, 'r_sei_cref', dir = dir)
+    r_sei_gref <- writeReadRast(r_sei_gref, 'r_sei_gref', dir = dir)
+  }
+
+}
+
+
+# calculate distribution summaries --------------------------------------------
+
+
+
+p1_cref <- paste0('data_processed/raster_means/', runv, '_', vr,
+              '_', years, '_sei_hist-data_by-gcm-ecoregion_cref.rds')
+p1_gref <- paste0('data_processed/raster_means/', runv, '_', vr,
+                  '_', years, 
+                  '_sei_hist-data_by-gcm-ecoregion_gref.rds')
+
+if(file.exists(p1_cref) & file.exists(p1_gref) & !rerun) {
+  # nothing needs to be done
+} else {
+  breaks <- seq(-1, 1, length.out = 201)
+  hist_sei_cref <- hist_from_rast(r = c(r_eco1, r_sei_cref), breaks = breaks,
+                                  by_ecoregion = TRUE)
+  hist_sei_gref <- hist_from_rast(c(r_eco1, r_sei_gref), breaks = breaks,
+                                  by_ecoregion = TRUE)
+  
+  if(!test_run) {
+    saveRDS(hist_sei_cref, p1_cref)
+    
+    saveRDS(hist_sei_gref, p1_gref)
+  }
+
+}
+
 # calculate means by ecoregions -------------------------------------------
 
 # taking  unweighted summary stats is ok, because we're using an equal area projection
@@ -70,13 +153,33 @@ sixnum <- function(x, na.rm = TRUE) {
   c(five, mean(x, na.rm = na.rm))
 }
 sixnum_names <- c('min', 'lower', 'middle', 'upper', 'max', 'mean')
-test <- terra::extract(r_qsei1, eco2, sixnum, na.rm = TRUE)
+
+# doing several layers at a time 
+# because getting memory errors
+nms <- names(r_qsei1)
+chunk_size <- 50
+nms_chunks <- split(nms, ceiling(seq_along(nms) / chunk_size))
+
+
+if(tmp_exists('tmp_l_sixnum', rerun, dir = dir, suffix = '.rds')) {
+  tmp_l_sixnum <- readRDS(file.path(dir, 'tmp_l_sixnum.rds')) 
+} else {
+  tmp_l_sixnum <- map(nms_chunks, function(nm) {
+    as_tibble(terra::extract(r_qsei1[[nm]], eco2, sixnum, na.rm = TRUE))
+  })
+  
+  if(!test_run) {
+    saveRDS(tmp_l_sixnum, file.path(dir, 'tmp_l_sixnum.rds')) 
+  }
+}
+
+tmp <- reduce(tmp_l_sixnum, .f = left_join, by = 'ID')
 
 gcms <- str_replace_all(unique(info1$GCM), '\\-', '\\.')
 regex <- '\\.\\d$'
 regex <- paste0('(?<=(', paste0(gcms, collapse = ')|('), '))\\.\\d$')
 
-eco_gcm1 <- as_tibble(test) %>% 
+eco_gcm1 <- as_tibble(tmp) %>% 
   pivot_longer(cols = -ID) %>% 
   mutate(id = str_replace(name, regex, ''),
          # output of terra::extract had the '-' replaced by '.', 
@@ -158,18 +261,18 @@ check <- eco_smry_gw0 %>%
 
 stopifnot(all(check == 3)) # check for non-unique GCMs
 
-eco_smry_gw <- eco_smry_gw0 %>% 
-  select(-GCM)
+eco_smry_gw <- eco_smry_gw0%>% 
+  rename(gcm_srmy = GCM)
 
 tmp <- eco_smry_gw0 %>% 
   select(region, RCP, years, graze, GCM) %>% 
   distinct()
 
 sei_pcent_gw <- left_join(tmp, sei_pcent) %>% 
-  select(-GCM)
+  rename(gcm_srmy = GCM)
 
 sei_pcent_long_gw <- left_join(tmp, sei_pcent_long) %>% 
-  select(-GCM)
+  rename(gcm_srmy = GCM)
 
 # save output -------------------------------------------------------------
 
@@ -183,6 +286,8 @@ write_csv(sei_pcent_gw , paste0('data_processed/raster_means/', prefix,
 
 write_csv(sei_pcent_long_gw, paste0('data_processed/raster_means/', prefix, 
                              '_sei-class-pcent-long_scd-adj_smry-gw_by-ecoregion.csv'))
+
+
 
 # see pre Dec 2025 commits for code to create this output
 # write_csv(df_seifire3, paste0('data_processed/raster_means/', prefix, 
