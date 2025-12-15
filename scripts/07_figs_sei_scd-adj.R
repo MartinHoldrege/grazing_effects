@@ -37,6 +37,7 @@ source("src/general_functions.R")
 source("src/SEI_functions.R")
 source('src/mapping_functions.R')
 source('src/gw_functions.R')
+source('src/distrib_functions.R')
 theme_set(theme_custom1())
 
 # Read in data ------------------------------------------------------------
@@ -73,6 +74,15 @@ ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_",
 # "scripts/04_ecoregion_map.R"
 g_region1 <- readRDS(paste0("figures/ecoregions_", v_interp, "_", vr, ".rds"))
 
+# files for histograms of change
+# create in  "scripts/06_summarize_sei_scd-adj.R"
+hist_sei_cref1 <- readRDS(paste0('data_processed/raster_means/', runv, '_', vr,
+       '_', years,  '_sei_hist-data_by-gcm-ecoregion_cref.rds'))
+
+hist_sei_gref1 <- readRDS(paste0('data_processed/raster_means/', runv, '_', vr,
+                                 '_', years,  
+                                 '_sei_hist-data_by-gcm-ecoregion_gref.rds'))
+
 # prepare dataframes ------------------------------------------------------
 nr <- lu(qsei1$region) # number of regions
 mr <- nr/5 # multiplier for number of regions (i.e. for figure heights etc. )
@@ -83,6 +93,12 @@ qsei2 <- qsei1 %>%
   df_factor() %>% 
   filter_clim_extremes(years = years)
 
+
+# * distribution data -------------------------------------------------------
+
+hist_sei_cref2 <- hist_dat2df(hist_sei_cref1)
+hist_sei_gref2 <- hist_dat2df(hist_sei_gref1) %>% 
+  filter(graze != ref_graze)
 
 # * gcm-wise calculations -------------------------------------------------
 
@@ -116,7 +132,7 @@ c3_gcm2 <- sei_byGCM1 %>%
                values_to = 'c3_percent') %>% 
   mutate(c3 = str_to_upper(str_extract(c3, '[a-z]{3}$')),
          c3_area = c3_percent * area) %>% 
-  select(-matches('SEI_'), -area, -group, -type, -id, -c3_percent)
+  select(-matches('SEI_p'), -area, -group, -type, -id, -c3_percent)
 
 c3_gcm3 <- c3_gcm2 %>% 
   filter(graze == ref_graze) %>% 
@@ -126,23 +142,28 @@ c3_gcm3 <- c3_gcm2 %>%
          suffix = c('_ref', '')) %>% 
   # across grazing delta
   mutate(delta_area = c3_area - c3_area_ref,
-         delta_area_perc = (delta_area)/c3_area_ref*100) 
+         delta_area_perc = (delta_area)/c3_area_ref*100,
+         # using delta continuous SEI for selecting the 'median' 
+         # GCM to keep the methods consistent
+         delta_SEI = SEI_mean - SEI_mean_ref) 
 
 # summarize across gcms
 # gcm-wise summaries b/ comparing within a climate scenario
 c3_graze_delta0 <- c3_gcm3 %>% 
+  # here grouping by c3 isn't really doing anything (mean SEI )
+  # is just repeated
   group_by(region, run, RCP, years, c3, graze) %>% 
-  summarise(across(.cols = c('delta_area_perc'),
+  summarise(across(.cols = c('delta_SEI'),
                    .fns = list(
                      'median' = median,
                      'low' = calc_low,
                      'high' = calc_high
                    )),
             .groups = 'drop') %>% 
-  pivot_longer(cols = matches('delta_area_perc'),
-               values_to = 'delta_area_perc',
+  pivot_longer(cols = matches('delta_SEI'),
+               values_to = 'delta_SEI',
                names_to = 'summary',
-               names_prefix = 'delta_area_perc_') %>% 
+               names_prefix = 'delta_SEI_') %>% 
   mutate(rcp_year = rcp_label(RCP, years, include_parenth = FALSE, 
                               add_newline = TRUE))
 
@@ -151,8 +172,14 @@ c3_graze_delta0 <- c3_gcm3 %>%
 # the other numbers (absolute area change) are secondary]
 c3_graze_delta <- c3_graze_delta0 %>% 
   left_join(c3_gcm3, 
-            by = join_by(region, run, RCP, years, c3, graze, delta_area_perc)) %>% 
+            by = join_by(region, run, RCP, years, c3, graze, delta_SEI)) %>% 
   df_factor()
+
+# GCMs associated with each across gcm summary level for grazing effects
+# (for use for filter). This is based on grazing effect on mean SEI
+smry_gcms_sei_gref <- c3_graze_delta %>% 
+  filter(c3 == 'CSA') %>% 
+  select(region, run, RCP, years, graze, summary, GCM)
 
 stopifnot(
   # check for for any multiple to one matches
@@ -306,13 +333,6 @@ map(rcps, function(rcp) {
   df <- c3_graze_delta_wide %>% 
     filter(RCP %in% c('Current', rcp)) 
   
-  # g <- ggplot(df, aes(y = delta_area)) +
-  #   hline()+
-  #   base_bar() +
-  #   facet_grid(region ~rcp_year, scales = 'free_y') +
-  #   labs(y = paste('Change in SEI class area relative to',
-  #                  str_to_lower(ref_graze), 'grazing (ha)'))
-  # 
   # ggsave(paste0('figures/sei/c3_area/c3-bar_graze-delta-area_by-region',
   #               suffix, '.png'),
   #        plot = g,
@@ -348,11 +368,11 @@ map(rcps, function(rcp) {
 
 # *stacked bar ------------------------------------------------------------
 
-# dimensions (match your style above) -----------------------------------
+# dimensions 
 widthr  <- if (nr <= 6) 6.3 else 7
 heightr <- if (nr <= 6) 6 else 7
 
-# build & save for each target RCP --------------------------------------
+# build & save for each target RCP
 df <- sei_pcent1 %>% 
   filter(region != entire,
          c3 != 'ORA') %>% 
@@ -374,6 +394,18 @@ purrr::walk(rcps, function(rcp) {
 })
 
 
+# Delta SEI distribution --------------------------------------------------
+
+df <- hist_sei_gref2 %>% 
+  filter(RCP == 'Current', region == levels(region)[[1]]) %>% 
+  filter(counts > 50)
+
+ggplot(df) +
+  geom_bar(aes(x = mids, y = density), stat = 'identity') +
+  facet_wrap(~graze) +
+  geom_vline(xintercept = 0, linetype = 2, alpha = 0.5)
+df %>% 
+  filter(mids == min(mids))
 # c9 area barcharts -------------------------------------------------------
 
 # see pre-Nov 2025 commits
@@ -390,7 +422,7 @@ purrr::walk(rcps, function(rcp) {
 
 # GCM level results vs drivers --------------------------------------------
 
-# burned area--attribution ------------------------------------------------
+# --attribution ------------------------------------------------
 
 drivers2 <- drivers1 
 

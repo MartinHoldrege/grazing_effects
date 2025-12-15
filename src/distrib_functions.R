@@ -91,9 +91,10 @@ hist_dat2df <- function(l, by_ecoregion = TRUE,
   f <- if(by_ecoregion) region2df else id2df
   df <- f(l)
   
-  out <- create_rast_info(unique(out$id), 
+  out <- create_rast_info(unique(df$id), 
                    into = into) %>% 
-    right_join(df, by = 'id')
+    right_join(df, by = 'id') %>% 
+    df_factor()
   out
 }
 
