@@ -104,6 +104,17 @@ weights1 <- read_csv(paste0('data_processed/interpolation_data/interpolation_wei
                             v_interp, vr_name, '.csv')) %>% 
   df_factor()
 
+
+# * site level fire data --------------------------------------------------
+
+# created in 02_summarize_bio.R
+bio <- readRDS('data_processed/site_means/summarize_bio.RDS')
+
+fire0 <- bio$fire0 %>% # site level fire results
+  filter(run == !!run)
+fire_gref_gcm <- bio$fire_d_wgcm_gcm %>%  # grazing effects on fire (by site)
+  filter(run == !!run)
+
 # vectors -----------------------------------------------------------------
 
 ecoregions <- region_factor(area_eco$ecoregion) %>% 
@@ -352,6 +363,45 @@ one_change_gcm_sas1 <- one_change_gcm2 %>%
   mutate(rcp_year_gcm = paste(rcp_year, GCM))
 
 
+# * site level fire -------------------------------------------------------
+# dfs for histograms of fire probability
+
+# climate effect on fire prob
+fire1 <- fire0 %>% 
+  select(-n_fires, -fire_return, -id) %>% 
+  filter_clim_extremes(years = years)
+
+fire_cref_gcm1 <- scaled_change(fire1, var = 'fire_prob',
+              by = c('graze'),
+              percent = FALSE, divide_by_max = FALSE) %>% 
+  select(-fire_prob)
+
+
+fire_cref_gcm2 <- fire_cref_gcm1 %>% 
+  right_join(weights1, by = 'site', relationship = 'many-to-many')
+
+# gcm-wise summary
+fire_cref_smry <- gw_select_smry_site(fire_cref_gcm2, 
+                                      summarize_vars = 'fire_prob_diff',
+                                      group_vars = c('region', 'graze', 
+                                                     'RCP', 'years'),
+                                      smry_fun = weighted.mean)
+
+# grazing effect
+
+fire_gref_gcm2 <- fire_gref_gcm %>% 
+  filter_clim_extremes(years = years) %>% 
+  select(-n_fires, -fire_prob, -fire_return) %>% 
+  right_join(weights1, by = 'site', relationship = 'many-to-many')
+
+# gcm-wise summary
+fire_gref_smry <- gw_select_smry_site(fire_gref_gcm2, 
+                                      summarize_vars = 'fire_prob_diff',
+                                      group_vars = c('region', 'graze', 
+                                                     'RCP', 'years'),
+                                      smry_fun = weighted.mean)
+
+
 # * write files -------------------------------------------------------------
 
 write_csv(c3eco_gcm3, paste0('data_processed/raster_means/', 
@@ -388,6 +438,56 @@ for (rcp in rcps) {
 }
 
 
+# fire probability (hists) ------------------------------------------------
+# show distributions of changes in fire
+
+hist_base <- function() {
+  list(
+    geom_vline(xintercept = 0, linetype = 2, alpha = 0.5),
+    geom_histogram(aes(x = fire_prob_diff,y = after_stat(density),
+                 weight = weight), binwidth = 0.1),
+    labs(x = lab_firep1)
+  )
+}
+
+for (rcp in rcps){
+  df_cref <- fire_cref_smry %>% 
+    filter(RCP == rcp, summary == 'median')
+    
+  rcp_yr <- rcp_label(unique(df_cref$RCP), unique(df_cref$years))
+  
+  g <- ggplot(df_cref) +
+    hist_base() +
+    facet_grid(region~graze) +
+    labs(subtitle = paste0('Climate effect (',rcp_yr, ')'))
+  filename <- paste0('figures/fire/distributions/hist_firep_cref_by-region_',
+                     vr, '_', rcp, '_', years, '_', runv, '.png')
+  ggsave(filename, 
+         plot = g,
+         width = 7,
+         height = 8,
+         dpi = 600)
+  
+  df_gref <- fire_gref_smry %>% 
+    filter(RCP %in% c('Current', rcp), summary == 'median') %>% 
+    mutate(rcp_year = rcp_label(RCP, years))
+  
+  
+  g <- ggplot(df_gref) +
+    hist_base() +
+    facet_grid(region~rcp_year + graze) +
+    labs(subtitle = paste0('Grazing effect (relative to ',
+                           str_to_lower(ref_graze), ' grazing)'))
+  
+  filename <- paste0('figures/fire/distributions/hist_firep_gref_by-region_',
+                     vr, '_', words2abbrev(ref_graze), rcp, '_', years, '_', runv, '.png')
+  
+  ggsave(filename, 
+         plot = g,
+         width = 10,
+         height = 8,
+         dpi = 600)
+}
 # age_group figs -----------------------------------------------------
 
 

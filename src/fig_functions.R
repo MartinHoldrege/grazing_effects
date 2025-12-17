@@ -1447,7 +1447,7 @@ if (FALSE){
 #'
 #' @return character vector
 rcp_label <- function(rcp, years, add_letters = FALSE,
-                      include_parenth = TRUE, add_newline = FALSE) {
+                      include_parenth = FALSE, add_newline = FALSE) {
   years <- as.character(epoch2factor(years)) # convert 2070 to 2071 etc. so labels are correct
   rcp <- update_rcp(rcp)
   if(add_newline) {

@@ -94,11 +94,6 @@ qsei2 <- qsei1 %>%
   filter_clim_extremes(years = years)
 
 
-# * distribution data -------------------------------------------------------
-
-hist_sei_cref2 <- hist_dat2df(hist_sei_cref1)
-hist_sei_gref2 <- hist_dat2df(hist_sei_gref1) %>% 
-  filter(graze != ref_graze)
 
 # * gcm-wise calculations -------------------------------------------------
 
@@ -179,13 +174,34 @@ c3_graze_delta <- c3_graze_delta0 %>%
 # (for use for filter). This is based on grazing effect on mean SEI
 smry_gcms_sei_gref <- c3_graze_delta %>% 
   filter(c3 == 'CSA') %>% 
-  select(region, run, RCP, years, graze, summary, GCM)
+  select(region, run, RCP, years, rcp_year, graze, summary, GCM)
 
 stopifnot(
   # check for for any multiple to one matches
   nrow(c3_graze_delta) == nrow(c3_graze_delta0),
   # check that all % change values are their 
           all(!is.na(filter(c3_graze_delta, RCP != 'Current'))))
+
+# * distribution data -------------------------------------------------------
+
+hist_sei_cref2 <- hist_dat2df(hist_sei_cref1)
+hist_sei_gref2 <- hist_dat2df(hist_sei_gref1) %>% 
+  filter(graze != ref_graze)
+
+# gcm-wise summaries
+
+
+hist_sei_gref3 <- hist_sei_gref2 %>% 
+  right_join(smry_gcms_sei_gref, 
+             by = join_by(run, RCP, years, graze, GCM, region))
+
+hist_sei_cref3 <- sei_pcent1 %>% 
+  select(RCP, years, rcp_year, graze, GCM, region, summary) %>% 
+  distinct() %>% 
+  # inner join b/ hist_sei_gref2 doesn't have values 
+  # for current climate
+  inner_join(hist_sei_cref2,
+             by = join_by(RCP, years, graze, GCM, region))
 
 # *format for output ------------------------------------------------------
 # versions for saving to output as summary stats
@@ -394,18 +410,51 @@ purrr::walk(rcps, function(rcp) {
 })
 
 
-# Delta SEI distribution --------------------------------------------------
+# delta SEI distribution --------------------------------------------------
+# histograms of change in SEI
 
-df <- hist_sei_gref2 %>% 
-  filter(RCP == 'Current', region == levels(region)[[1]]) %>% 
-  filter(counts > 50)
+hist_base <- function() {
+  list(
+    geom_vline(xintercept = 0, linetype = 2, alpha = 0.5),
+    geom_bar(aes(x = mids, y = density), stat = 'identity'),
+    coord_cartesian(xlim = c(-0.3, 0.3)),
+    labs(x = lab_sei1)
+  )
+}
 
-ggplot(df) +
-  geom_bar(aes(x = mids, y = density), stat = 'identity') +
-  facet_wrap(~graze) +
-  geom_vline(xintercept = 0, linetype = 2, alpha = 0.5)
-df %>% 
-  filter(mids == min(mids))
+for(rcp in rcps) {
+  # grazing effect
+  g <- hist_sei_gref3 %>% 
+    filter(RCP %in% c('Current', rcp),
+           summary == 'median') %>% 
+    ggplot() +
+    hist_base() +
+    facet_grid(region~rcp_year+graze)
+  
+  filename <- paste0('figures/sei/distributions/hist_sei_gref_by-region_',
+                     vr, '_', rcp, '_', years, '_', runv, '.png')
+  
+  ggsave(filename, 
+      plot = g,
+      width = 10,
+      height = 8,
+      dpi = 600)
+  # climate effect
+  df_cref <- hist_sei_cref3 %>% 
+    filter(RCP == rcp, summary == 'median') 
+  g <- ggplot(df_cref) +
+    hist_base() +
+    facet_grid(region~graze) +
+    labs(subtitle = str_replace(unique(df_gref$rcp_year), '\n', ' '))
+    
+  filename <- paste0('figures/sei/distributions/hist_sei_cref_by-region_',
+                     vr, '_', rcp, '_', years, '_', runv, '.png')
+  ggsave(filename, 
+         plot = g,
+         width = 7,
+         height = 8,
+         dpi = 600)
+}
 # c9 area barcharts -------------------------------------------------------
 
 # see pre-Nov 2025 commits

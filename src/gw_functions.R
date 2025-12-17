@@ -9,17 +9,21 @@
 #' @param df dataframe
 #' @param summarize_vars vector of variables interested in
 #' @param group_vars grouping variables
+#' @param smry_fun function that takes two arguments: x and weight vectors
 #'
 #' @returns original data, except just for the low, median and high GCMs
 gw_select_smry_site <- function(df, summarize_vars, 
                                 group_vars = c('years', 'RCP', 'graze', 
-                                               'PFT', 'region')) {
+                                               'PFT', 'region'),
+                                smry_fun = weighted_median) {
   vars <- summarize_vars
   gcm_smry <- df %>% 
     group_by(across(all_of(group_vars)), .data$GCM) %>% 
     summarise(across(all_of(vars), 
-                     .fns = \(x) weighted_median(x, weight = weight)),
+                     .fns = \(x) smry_fun(x, weight)),
               .groups = 'drop')
+  
+  
   dfs_smry <- map(vars, function(var) {
     
     df2 <- df[c(group_vars, 'site', 'weight', 'GCM', var)]
