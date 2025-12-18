@@ -303,6 +303,8 @@ c3toc9 <- function(current, future) {
   c9b
 }
 
+
+
 # convert two digits into c3 (first digit is c3)
 c3eco_to_c3 <- function(x) {
   stopifnot(x >= 10 & x < 40)
@@ -389,7 +391,7 @@ load_c3eco <- function(v) {
   out <- c3 * 10 + (as.numeric(eco) + 1L)
   names(out) <- "c3eco"
   
-  ## ----- build and attach RAT (categories) -----
+  ## ----- build and attach RAT (categories) 
   # eco levels (assume first non-ID column is the name/label)
   eco_lvls <- cats(eco)[[1]]
   if(is.null(eco_lvls)) {
@@ -411,6 +413,122 @@ load_c3eco <- function(v) {
   levels(out)
   out
 }
+
+# convert c9 categories to 12 (based
+# the additionaly categories are 'stable' (not class change)
+# but have a decline in SEI)
+c9toc12 <- function(c9, delta_sei) {
+  stopifnot(nlyr(c9) == nlyr(delta_sei),
+            identical(names(c9), names(delta_sei)))
+  
+  delta_cutoff <- -0.01
+  
+  # recode c9 -> c12 values (only meaningful where decline is TRUE)
+  recoded <- c9 +
+    (c9 == 1) * 9 +
+    (c9 == 5) * 6 +
+    (c9 == 9) * 3
+  
+  terra::ifel(delta_sei < delta_cutoff, recoded, c9)
+  
+}
+
+# calculate c12 from sei, where change is relative to 
+# reference scenario (historical climate and reference grazing)
+sei2c12_cgref <- function(r, info, ref_graze = 'Moderate',
+                          type_old = '_SEI_SEI', # for renaming band names
+                          type_new = '_c12') {
+  id_ref <- info %>% 
+    filter(RCP == 'Current' & graze == ref_graze) %>% 
+    pull(id)
+  
+  id_tar <- info$id 
+  # also calculating for reference (
+  # useful for some are calculations, even though by definition 
+  # everything will be stable)
+  # filter(!(RCP == 'Current' & graze == ref_graze)) %>% 
+  
+  
+  if('type' %in% names(info)) {
+    stopifnot(all(info$type == 'SEI'))
+  }
+  
+  stopifnot(length(id_ref) == 1)
+  r_ref <- r[[id_ref]]
+  r_tar <- r[[id_tar]]
+  
+  
+  delta_sei <- r_tar - r_ref
+  c3_ref <- sei2c3(r_ref)
+  c3_tar <- sei2c3(r_tar)
+  c9 <- c3toc9(c3_ref, c3_tar)
+  out <- c9toc12(c9, delta_sei)
+  names(out) <- str_replace(names(out), type_old, type_new)
+  out
+}
+
+# first two digit is the ecoregion, 2nd two are the c12 code
+combine_eco_c12 <- function(c12, eco) {
+  eco_num <- as.numeric(eco) +1
+  stopifnot(min(range_raster(eco_num)) == 1,
+            nlyr(eco) == 1)
+  out <- eco_num*100 + c12
+  names(out) <- names(c12)
+  out
+}
+
+c12_factor <- function(x) {
+  c12Names <-  c(
+    'Stable CSA', # i.e. sei stable or increase and stays CSA
+    'CSA becomes GOA',
+    'CSA becomes ORA',
+    'GOA becomes CSA',
+    'Stable GOA',
+    'GOA becomes ORA',
+    'ORA becomes CSA',
+    'ORA becomes GOA',
+    'Stable ORA',
+    'CSA (SEI decline)', # stable CSA but w/ SEI decline
+    'GOA (SEI decline)',
+    'ORA (SEI decline)'
+  )
+  
+  
+  levels <- c(1, 10, 2, 3, 4, 5, 11, 6, 7, 8, 9, 12)
+  labels <- c12Names[levels]
+  levels <- if(all(x %in% c12Names)) {
+    labels
+  } else if (all(x %in% 1:12)) {
+    levels
+  } else {
+    stop('x does not have the right values')
+  }
+  
+  factor(x, levels = levels,
+         labels = labels)
+}
+
+# 2nd two of three digits is the c12 code
+ecoc12_to_c12 <- function(x) {
+  stopifnot(x >= 100 & x < 1000)
+  c12_num <- x %% 100 
+  c12_factor(c12_num)
+}
+
+# first of 3 digits is the ecoregion
+ecoc12_to_eco <- function(x, regions) {
+  
+  stopifnot(x >= 100 & x < 1000)
+  eco_num <- floor(x/100) # returning the digit in the 1000s position
+  stopifnot(unique(eco_num) %in% 1:length(regions))
+  if(!all(1:length(regions) %in% unique(eco_num))) {
+    warning('some region levels missing from x')
+  }
+  # the IDs in factor spatrasters start at 0, not 1
+  out <- regions[eco_num]
+  region_factor(out, v = vr)
+}
+
 
 
 #' relativize proportional change in q

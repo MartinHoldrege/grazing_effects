@@ -8,7 +8,7 @@
 # params ------------------------------------------------------------------
 
 source("src/params.R")
-test_run <- opt$test_run
+test_run <- FALSE #opt$test_run
 run <- opt$run
 v_interp <- opt$v_interp
 runv <- paste0(paste0(opt$run), v_interp)
@@ -32,8 +32,9 @@ source("src/distrib_functions.R")
 # read in data ------------------------------------------------------------
 
  # file create in 05_interpolated_summarize_sei_scd-adj.R
-# r_qsei1 <- rast(file.path("data_processed/interpolated_rasters", v_interp,
-#                      paste0(runv, yr_lab, "_q-sei_scd-adj_summary.tif")))
+# pixel wise summary of sei for creating c12 layer (for plotting)
+r_qsei_pw <- rast(file.path("data_processed/interpolated_rasters", v_interp,
+                            paste0(runv, yr_lab, "_q-sei_scd-adj_summary.tif")))
 
 r_q1 <- rast(file.path(path_tmp, 'q_scd_adj1.tif')) # q layers for each GCM
 r_sei1 <- rast(file.path(path_tmp, 'sei_scd_adj1.tif')) # sei layers for each GCM
@@ -50,6 +51,7 @@ size <- load_cell_size()
 # * setup -----------------------------------------------------------------
 
 if(test_run) {
+  r_qsei_pw <- downsample(r_qsei_pw)
   r_qsei1 <- downsample(r_qsei1)
   r_eco1 <- downsample(r_eco1)
   size <- downsample(size)
@@ -118,9 +120,102 @@ if(tmp_exists('r_sei_cref', rerun, dir = dir)) {
 }
 
 
+# calculate c12 change ----------------------------------------------------
+# change in SEI class and if 'stable' also whether SEI has declined
+ #(e.g. stays core, but SEI has declined)
+
+# gcm-wise
+p_c12 <- paste0('data_processed/interpolated_rasters/',v_interp, '/', runv, '_c12_by-GCM_', 
+                years, '.tif')
+
+if(file.exists(p_c12) & !rerun & file.size(p_c12) > 1e7) {
+  c12a_gcm <- rast(p_c12)
+} else {
+  c12a_gcm <- sei2c12_cgref(
+    r = r_qsei1,
+    info = filter(info1, type == 'SEI'),
+    type_old = 'SEI_SEI',
+    type_new = 'c12',
+    ref_graze = ref_graze
+  )
+  
+  if(!test_run) {
+    # as a side effect this also gets this file out of memory
+    c12a_gcm <- writeRaster(c12a_gcm, p_c12, overwrite = TRUE)
+  }
+}
+
+# pixelwise
+info_pw <- create_rast_info(r_qsei_pw, 
+                            into = str_replace(into, 'GCM', 'summary')) %>% 
+  filter(type == 'SEI', summary == 'median')
+
+p_c12_pw <- paste0('data_processed/interpolated_rasters/',v_interp, '/', runv, '_c12_median-pw_', 
+                years, '.tif')
+
+# adding file size check, so also if saved a small
+# file while testing it will be over-written
+if(file.exists(p_c12_pw) & !rerun & file.size(p_c12_pw) > 1e6) {
+  c12_pw <- rast(p_c12_pw)
+} else {
+  c12_pw <- sei2c12_cgref(
+    r = r_qsei_pw,
+    info = info_pw,
+    ref_graze = ref_graze
+  )
+  
+  if(!test_run) {
+    # as a side effect this also gets this file out of memory
+    c12_pw <- writeRaster(c12_pw, p_c12_pw, overwrite = TRUE)
+  }
+}
+
+
+# * c12 area ----------------------------------------------------------------
+
+p_c12_area <- paste0('data_processed/raster_means/', runv, '_', vr, '_', years,
+                '_c12-area_by-region-GCM.csv')
+
+run_chunk <- TRUE
+if(file.exists(p_c12_area) & !rerun) {
+  area_ecoc12_gcm3 <- read_csv(p_c12_area)
+  
+  # if min area is 100 then file was accidentally created in 
+  # a test_run and should be over-written 
+  if(any(min(area_ecoc12_gcm3$area) < 100)) {
+    run_chunk <- FALSE
+  }
+  
+}
+
+if(run_chunk) {
+  eco_c12 <- combine_eco_c12(c12 = c12a_gcm, eco = r_eco1)
+  
+  area_ecoc12_gcm1 <- map(names(eco_c12), function(lyr) {
+    df <- terra::zonal(size, eco_c12[[lyr]], sum,  na.rm = TRUE)
+    stopifnot(names(df[2]) == 'area')
+    names(df) <- c('eco_c12', 'area')
+    df$id <- lyr
+    df
+  })
+  
+  area_ecoc12_gcm2 <- bind_rows(area_ecoc12_gcm1) %>% 
+    as_tibble() %>% 
+    mutate(region = ecoc12_to_eco(eco_c12, 
+                                  regions = levels(r_eco1)[[1]]$ecoregion),
+           c12 = ecoc12_to_c12(eco_c12)) %>% 
+    select(-eco_c12)
+  
+  area_ecoc12_gcm3 <- create_rast_info(unique(area_ecoc12_gcm2$id),
+                                       into = c('type', 'RCP', 'years', 'graze', 'GCM')) %>% 
+    select(-run2) %>% 
+    right_join(area_ecoc12_gcm2, by = 'id')
+  if(!test_run) write_csv(area_ecoc12_gcm3, p_c12_area)
+}
+
+
+
 # calculate distribution summaries --------------------------------------------
-
-
 
 p1_cref <- paste0('data_processed/raster_means/', runv, '_', vr,
               '_', years, '_sei_hist-data_by-gcm-ecoregion_cref.rds')
@@ -274,6 +369,21 @@ sei_pcent_gw <- left_join(tmp, sei_pcent) %>%
 sei_pcent_long_gw <- left_join(tmp, sei_pcent_long) %>% 
   rename(gcm_srmy = GCM)
 
+
+# summary GCMs based on mean SEI
+summary_gcms <- eco_smry_gw0 %>% 
+  filter(type == 'SEI') %>% 
+  select(RCP, years, graze, region, summary, GCM) %>% 
+  distinct()
+
+dup <- duplicated(select(summary_gcms, -GCM)) # should be 1 unique GCM per grouping
+stopifnot(all(!dup))
+
+
+area_ecoc12_smry_gw <- area_ecoc12_gcm3 %>% 
+  right_join(summary_gcms, by = join_by(RCP, years, graze, GCM, region)) %>% 
+  rename(GCM_smry = GCM)
+
 # save output -------------------------------------------------------------
 
 prefix <- if(test_run) 'test' else paste0(runv, vr_name, yr_lab)
@@ -286,6 +396,12 @@ write_csv(sei_pcent_gw , paste0('data_processed/raster_means/', prefix,
 
 write_csv(sei_pcent_long_gw, paste0('data_processed/raster_means/', prefix, 
                              '_sei-class-pcent-long_scd-adj_smry-gw_by-ecoregion.csv'))
+
+if(!test_run) {
+  write_csv(area_ecoc12_smry_gw, paste0('data_processed/raster_means/', 
+                                        runv, '_', vr, '_', years,
+                                        '_c12-area_by-region-smry-gw.csv'))
+}
 
 
 

@@ -404,19 +404,19 @@ writeRaster(cov_scd_adj_smry,
             overwrite = TRUE)
 
 writeRaster(q_sei_smry, 
-            file.path("data_processed/interpolated_rasters/", v_interp,
-                      paste0(runv, "_q-sei_scd-adj_summary.tif")),
+            file.path("data_processed/interpolated_rasters", v_interp,
+                      paste0(runv, yr_lab, "_q-sei_scd-adj_summary.tif")),
             overwrite = TRUE)
 
 # differences relative to current climate (comparison within grazing level)
 writeRaster(cov_scd_adj_diff, 
             file.path("data_processed/interpolated_rasters/", v_interp,
-                      paste0(runv, "_cover-rdiff-cref_scd-adj_summary.tif")),
+                      paste0(runv, yr_lab, "_cover-rdiff-cref_scd-adj_summary.tif")),
             overwrite = TRUE)
 
 writeRaster(q_sei_diff, 
             file.path("data_processed/interpolated_rasters/", v_interp,
-                      paste0(runv, "_q-sei-rdiff-cref_scd-adj_summary.tif")),
+                      paste0(runv, yr_lab, "_q-sei-rdiff-cref_scd-adj_summary.tif")),
             overwrite = TRUE)
 
 
