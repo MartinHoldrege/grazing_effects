@@ -15,6 +15,8 @@ test_run <- opt$test_run # TRUE #
 c3_rcps <- c('RCP45', 'RCP85') # future scenario shown on map
 ref_graze <-  opt$ref_graze
 target_graze_v <- c('Heavy', 'Very Heavy') # comparison grazing levels
+years <- opt$years
+v_interp <- opt$v_interp
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -52,15 +54,17 @@ r_qsei_d1 <- rast(
             paste0(runv, "_q-sei-rdiff-cref_scd-adj_summary.tif"))
 )
 
+r_c12a <-  rast(paste0('data_processed/interpolated_rasters/',v_interp,
+                       '/', runv, '_c12_median-pw_',  years, '.tif'))
 
 # prepare data ------------------------------------------------------------
 
 if(test_run) {
-  size <- 100
   r_cov1 <- downsample(r_cov1)
   r_qsei1 <- downsample(r_qsei1)
   r_cov_d1 <- downsample(r_cov_d1)
   r_qsei_d1 <- downsample(r_qsei_d1)
+  r_c12a <- r_c12a
 }
 
 
@@ -68,7 +72,7 @@ r_comb1 <-c(r_cov1, r_cov_d1, r_qsei1, r_qsei_d1)
 into = c("group", "type", "RCP", "years", "graze", "summary")
 
 info1 <- create_rast_info(r_comb1, into = into) %>% 
-  filter(years != '2030-2060' & years != '2031-2060',
+  filter(years != !!years,
          summary == 'median') 
 
 
@@ -253,7 +257,7 @@ for(rcp in c3_rcps) {
 # due to climate
 
 target_rcp <- 'RCP45'
-target_yr <- '2070-2100'
+target_yr <- years
 for (target_graze in target_graze_v) {
 
   
