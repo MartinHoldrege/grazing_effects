@@ -147,6 +147,38 @@ c3Palette <- c9Palette[c(1, 5, 9)]
 names(c3Palette) <- c3Names
 cols_c3 <- c3Palette
 
+# c12
+c12Names <-  c(
+  'Stable CSA', # i.e. sei stable or increase and stays CSA
+  'CSA (SEI decline)', # stable CSA but w/ SEI decline
+  'CSA becomes GOA',
+  'CSA becomes ORA',
+  'GOA becomes CSA',
+  'Stable GOA',
+  'GOA (SEI decline)',
+  'GOA becomes ORA',
+  'ORA becomes CSA',
+  'ORA becomes GOA',
+  'Stable ORA',
+  'ORA (SEI decline)'
+)
+
+c12Palette = c('#142b65', # stable core (black)
+               '#7a0177', # stable core, but declining SEI
+              '#b30000', #'#d7301f', # core becomes grow # reds from 9-class OrRd
+              '#67001f',  # core becomes other
+              '#000000', # grow becomes core
+              '#99d4e7', # stable grow
+              '#f768a1', # stable grow but declining SEI
+              '#67001f', # grow becomes other
+              '#000000', # other becomes core
+              '#757170', # other becomes grow
+              '#eee1ba',# stable other
+              '#fee391' # stable other but decline sei
+              ) 
+
+names(c12Palette) <- c12Names
+
 # * for maps --------------------------------------------------------------
 
 # Create color ramp that represents the proportional changes in biomass...

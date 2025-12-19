@@ -833,7 +833,6 @@ plot_map_20panel_perc <- function(
   if(is.null(name4diff)) {
     name4diff <- paste("\u0394", name4absolute, '(%)')
   }
-  
   plot_map_20panel_perc(
     r = r_perc,
     info = info,
@@ -851,95 +850,6 @@ plot_map_20panel_perc <- function(
   )
 }
 
-
-# four panels, top row is is historical c3, bottomr row is future c9,
-# columns are two grazing levels
-plot_4panel_c3c9 <- function(r_c3, r_c9, info_c3, info_c9) {
-  
-  stopifnot(
-    nrow(info_c3) == 2,
-    nrow(info_c9) ==2
-  )
-  
-  info_c3$type <- 'c3'
-  info_c9$type <- 'c9'
-  info_comb <- bind_rows(info_c3, info_c9) %>% 
-    arrange(type, RCP, years, graze) %>%
-    ungroup() %>% 
-    mutate(tag_label = fig_letters[1:n()])
-  
-  levs <- levels(info_comb$graze)
-  graze_labs <- paste0(levs[levs %in% info_comb$graze], '\nGrazing')
-  names4leftside <- c('c3' = 'SEI class',
-                      'c9' = 'Change in SEI class')
-  levs_l <- list(c3 = data.frame(ID = 1:3, 
-                                 class = c3Names),
-                 c9 = data.frame(ID = 1:9, 
-                                 class = c9Names))
-  label_left <- info_comb %>% 
-    filter(.data$graze == unique(.data$graze)[1]) %>% 
-    mutate(rcp_year = rcp_label(.data$RCP, .data$years,
-                                include_parenth = FALSE),
-           label_left = paste0(rcp_year, '\n', names4leftside[type])) %>% 
-    pull(label_left)
-  
-  fill <- list(
-    'c3' = scale_fill_c3,
-    'c9' = scale_fill_c9
-  )
-  
-  r_l <- list('c3' = r_c3,
-              'c9' = r_c9)
-  
-  guide_l <- list('c3' = 'right', 'c9' = 'none')
-  
-  plots1 <- pmap(info_comb[c('id', 'type', 'tag_label')], 
-                 function(id, type, tag_label) {
-                   fl <- fill[[type]]
-                   r <- r_l[[type]][[id]]
-                   levels(r) <- levs_l[[type]]
-                   plot_map2(r = r,
-                             panel_tag = tag_label) + 
-                     fl() + 
-                     theme(legend.position = guide_l[[type]],
-                           plot.tag.position =  'topleft',
-                           plot.tag.location = 'panel',
-                           plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
-                 })
-
-  # labels for the top margin
-  plots_top <- map(graze_labs, function(x) {
-    ggplot() +
-      theme_void() +
-      annotate("text", x = 1, y = 1, label = x, size = 3) +
-      theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
-  })
-  
-  # labels for the left margin
-  plots_left <- map(label_left, function(x) {
-    ggplot() +
-      theme_void() +
-      annotate("text", x = 1, y = 1, label = x, angle = 90, size = 3) +
-      theme(plot.margin = unit(c(0, 0, 0, 0), units = 'in'))
-  })
-  color_matrix1 <- color_matrix() # to serve as a legend
-  # this is hard coded, would need to make this more
-  # flexible if want to change number of panels
-  s <- list(plot_spacer())
-  
-  plots2 <- c(s, plots_top, s,
-              plots_left[1], plots1[1:2], list(guide_area()), 
-              plots_left[2], plots1[3:4], list(free(color_matrix1)))
-  
-  # for troubleshooting layout
-  # plots2 <- map(plots2, \(x) x +   theme(plot.background = element_rect(color = "blue", fill = NA, size = 1)))
-
-  patchwork::wrap_plots(plots2, ncol = 4,
-                             widths = c(0.13, 1, 1, 0.55), 
-                             heights = c(0.13, 1, 1)) + 
-    plot_layout(guides = 'collect')
- 
-}
 
 
 
@@ -1170,8 +1080,19 @@ plot_c3c9_3panel <- function(r_sei,
 
 
 
-
-
+plot_c12 <- function(r, panel_tag = '', 
+                     subtitle = NULL) {
+  
+  plot_map2(r = r,
+         panel_tag = tag) + 
+  fl() + 
+  theme(legend.position = 'none',
+        plot.tag.position =  'topleft',
+        plot.tag.location = 'panel',
+        plot.margin = unit(c(0, 0, 0, 0), units = 'in'),
+        plot.subtitle = element_text(size = rel(0.8))) +
+  labs(subtitle = NULL)
+}
 # map of (continuous) change in SEI
 plot_delta_sei <- function(r, panel_tag = NULL,
                            legend_title = '\u0394SEI') {

@@ -11,7 +11,7 @@ source('src/params.R')
 v <- v_interp
 runv <- paste0(run, v)
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
-test_run <- opt$test_run # TRUE # 
+test_run <- TRUE #  opt$test_run # 
 c3_rcps <- c('RCP45', 'RCP85') # future scenario shown on map
 ref_graze <-  opt$ref_graze
 target_graze_v <- c('Heavy', 'Very Heavy') # comparison grazing levels
@@ -54,6 +54,7 @@ r_qsei_d1 <- rast(
             paste0(runv, "_q-sei-rdiff-cref_scd-adj_summary.tif"))
 )
 
+# created in "scripts/06_summarize_sei_scd-adj.R"
 r_c12a <-  rast(paste0('data_processed/interpolated_rasters/',v_interp,
                        '/', runv, '_c12_median-pw_',  years, '.tif'))
 
@@ -64,7 +65,7 @@ if(test_run) {
   r_qsei1 <- downsample(r_qsei1)
   r_cov_d1 <- downsample(r_cov_d1)
   r_qsei_d1 <- downsample(r_qsei_d1)
-  r_c12a <- r_c12a
+  r_c12a <- downsample(r_c12a)
 }
 
 
@@ -74,6 +75,12 @@ into = c("group", "type", "RCP", "years", "graze", "summary")
 info1 <- create_rast_info(r_comb1, into = into) %>% 
   filter(years != !!years,
          summary == 'median') 
+
+
+info_c12 <- create_rast_info(r_c12a,into =  c("type", "RCP", "years", 
+                                              "graze", 'summary')) %>% 
+  filter(summary == 'median')
+
 
 
 # 20 panel map (absolute delta) -------------------------------------------
@@ -155,43 +162,14 @@ map2(args$groups, args$type_absolute, function(group, type) {
 # * climate c9 ------------------------------------------------------------
 # include map of change in sei
 
-c3_graze <- c('M' = 'Moderate', 'VH' = 'Very Heavy')
+# see pre December 2025 commits for code to make this figure
+# four panels, top row is is historical c3, bottomr row is future c9,
+# columns are two grazing levels
+# filename <- paste0('figures/sei/maps/4panel_c3c9_',
+#                    c3_rcp, '_',
+#                    paste(names(c3_graze), collapse = ''), '_scd-adj_', 
+#                    runv, ".png")
 
-
-for(c3_rcp in c3_rcps) {
-c3_info <- info1 %>% 
-  filter(type == 'SEI', graze %in% c3_graze,
-         RCP %in% c('Current', c3_rcp)) %>% 
-  select(-run2)
-
-c3_info2 <- c3_info %>% 
-  filter(RCP == 'Current') %>% 
-  select(-RCP, -years) %>% 
-  left_join(c3_info[c3_info$RCP != 'Current', ],
-            by = join_by(run, group, type, graze, summary),
-            suffix = c('_cur', '_fut'))
-
-r_c3 <- sei2c3(r_comb1[[c3_info$id]])
-
-r_c9 <- c3toc9(current = r_c3[[c3_info2$id_cur]],
-               future = r_c3[[c3_info2$id_fut]])
-
-
-
-g <- plot_4panel_c3c9(r_c3 = r_c3, r_c9 = r_c9,
-                 info_c3 = c3_info[c3_info$RCP == 'Current', ],
-                 info_c9 = c3_info[c3_info$RCP != 'Current', ]
-                 )
-
-
-filename <- paste0('figures/sei/maps/4panel_c3c9_',
-                   c3_rcp, '_',
-                   paste(names(c3_graze), collapse = ''), '_scd-adj_', 
-                   runv, ".png")
-png(filename, res = 600, height = 6.2, width = 7.5, units = 'in')
-  print(g)
-dev.off()
-}
 
 
 # * grazing c9 --------------------------------------------------------------
@@ -300,3 +278,10 @@ for (target_graze in target_graze_v) {
     family = "sans"  
   )
 }
+
+
+# **c12 -------------------------------------------------------------------
+# 4 panel showing c12 change (i.e. 'stable' class broken down
+# into areas with stable SEI and those with decline SEI)
+
+

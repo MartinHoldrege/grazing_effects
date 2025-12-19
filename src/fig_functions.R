@@ -1626,6 +1626,16 @@ scale_fill_c9 <- function(...) {
                     ...)
 }
 
+scale_fill_c12 <- function(...) {
+  scale_fill_manual(values = unname(c12Palette),
+                    labels = names(c12Palette),
+                    na.value = 'transparent',
+                    na.translate = FALSE,
+                    name = 'SEI class change',
+                    drop = FALSE,
+                    ...)
+}
+
 scale_fill_c3 <- function(...) {
   scale_fill_manual(values = unname(c3Palette),
                     na.value = 'transparent',
@@ -1739,9 +1749,7 @@ color_matrix <- function(xlab = 'Future',
   text_color[c(1, 2, 3, 4, 7)] <- 'white' # background is dark
   names(text_color) <- c9Names
   stopifnot(names(c9Palette) == df_c9$c9Name)
-  c9Palette
-  text_color
-  c9Names
+
   ggplot(df_c9, aes(future, current)) +
     geom_tile(aes(fill = c9Name)) +
     geom_text(aes(label = label, color = c9Name), size = 2) +
@@ -1761,4 +1769,117 @@ color_matrix <- function(xlab = 'Future',
           aspect.ratio = 1)
 }
 
+# create 12 color matrix ---------------------------------------------------
+# Creating a 3x3 colored matrix of current and future SEI classes,
+# with diagonals split in half to show stable classes but declining SEI
 
+# create 12 color matrix ---------------------------------------------------
+# 3x3 matrix, but diagonal cells are split into 2 triangles (12 total colors)
+
+color_matrix_c12 <- function(xlab = "Comparison scenario",
+                             ylab = "Reference Scenario") {
+  
+  c3_levels <- c("CSA", "GOA", "ORA")
+  
+  # name the palette (required for scale_fill_manual)
+  stopifnot(length(c12Names) == 12, length(c12Palette) == 12)
+  names(c12Palette) <- c12Names
+  
+
+  # c9 levels, with there associated current and future SEI categories
+  df_rect <- tibble(
+    c12  = c12_factor(c9Names), 
+    c9Value = 1:9,
+    current = rep(c3_levels, each = 3), # Current SEI (3 levels)
+    future = rep(c3_levels, 3) # future SEI (3 levels)
+  ) %>% 
+    mutate(
+      current = factor(current, levels = rev(c3_levels)),
+      future = factor(future, levels = c3_levels)
+    ) %>% 
+    filter(current != future) %>% 
+    mutate(x = as.integer(future),
+           y = as.integer(current),
+           xmin = x - 0.5, 
+           xmax = x + 0.5,
+           ymin = y - 0.5, 
+           ymax = y + 0.5,
+           label = ifelse(as.numeric(fct_rev(current)) > as.numeric(future), 
+                          'Increase', 'Decrease'))
+  
+ 
+  ll_x <- c(0.5, 0.5, 1.5) # lower left triangle x coordinates (for CSA)
+  ll_y <- c(2.5, 3.5, 2.5)
+  ur_x <- c(1.5, 0.5, 1.5)# upper right triangle x coordinates (for CSA)
+  ur_y <- c(3.5, 3.5, 2.5)
+  
+  csa_diag <- tibble(c3 = 'CSA',
+                     triangle = c(rep('ll', 3), rep('ur', 3)),
+                     x = c(ll_x, ur_x),
+                     y = c(ll_y, ur_y))
+  
+  goa_diag <- csa_diag %>% 
+    mutate(x = x + 1,
+           y = y - 1,
+           c3 = 'GOA')
+  
+  ora_diag <- csa_diag %>% 
+    mutate(x = x + 2,
+           y = y - 2,
+           c3 = 'ORA')
+  
+  df_diag <- bind_rows(csa_diag, goa_diag, ora_diag) %>% 
+    mutate(group = paste0(triangle, '_', c3),
+           c12 = ifelse(triangle == 'll',
+                        paste('Stable', c3),
+                        paste(c3, '(SEI decline)')),
+           c12 = c12_factor(c12),
+           label = ifelse(triangle == 'll', 'SEI\nstable', 'SEI\ndecline'))
+  
+  stopifnot(df_diag$c12 %in% names(c12Palette))
+  
+  df_label <- df_diag %>% 
+    group_by(c12, label, triangle) %>% 
+    summarize(x = mean(x),
+              y = mean(y),
+              .groups = 'drop') %>% 
+    mutate(y = ifelse(triangle == 'll', y - 0.1, y + 0.1),
+           x = ifelse(triangle == 'll', x, x + 0.03),) %>% 
+    bind_rows(df_rect[c('c12', 'label', 'x', 'y')]) %>% 
+    arrange(c12)
+  
+  
+  
+  ggplot()+
+    geom_rect(
+      data = df_rect,
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, group = c12,
+          fill = c12),
+      color = "white"
+    ) +
+  geom_polygon(
+    data = df_diag,
+    aes(x = x, y = y, group = c12, fill = c12),
+    color = "white"
+  ) +
+    geom_text(data = df_label, aes(x, y, label = label), color = 'white', 
+              lineheight = 0.8,
+              size = 2.4
+              ) +
+    scale_x_continuous(breaks = 1:3, labels = c3_levels, position = "top") +
+    scale_y_continuous(breaks = 1:3, labels = rev(c3_levels)) +
+    scale_fill_manual(values = c12Palette) +
+    labs(x = xlab, y = ylab) +
+    coord_equal(expand = FALSE) +
+    theme_minimal() +
+    theme(
+      panel.grid = element_blank(),
+      legend.position = "none",
+      #text = element_text(size = 8),
+      plot.background = element_rect(fill = "transparent", color = "transparent"),
+      plot.margin = unit(c(0, 0, 0, 0), "in")
+    )
+  
+}
+
+#color_matrix_c12()
