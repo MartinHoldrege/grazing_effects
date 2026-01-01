@@ -1627,13 +1627,15 @@ scale_fill_c9 <- function(...) {
 }
 
 scale_fill_c12 <- function(...) {
-  scale_fill_manual(values = unname(c12Palette),
-                    labels = names(c12Palette),
-                    na.value = 'transparent',
-                    na.translate = FALSE,
-                    name = 'SEI class change',
-                    drop = FALSE,
-                    ...)
+  scale_fill_manual(
+    values = unname(c12Palette),
+    labels = names(c12Palette),
+    na.value = "transparent",
+    na.translate = FALSE,
+    name = "SEI class change",
+    drop = FALSE,
+    ... 
+  ) 
 }
 
 scale_fill_c3 <- function(...) {

@@ -11,12 +11,14 @@ source('src/params.R')
 v <- v_interp
 runv <- paste0(run, v)
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
-test_run <- TRUE #  opt$test_run # 
+test_run <- opt$test_run # 
 c3_rcps <- c('RCP45', 'RCP85') # future scenario shown on map
 ref_graze <-  opt$ref_graze
 target_graze_v <- c('Heavy', 'Very Heavy') # comparison grazing levels
 years <- opt$years
 v_interp <- opt$v_interp
+target_graze <- opt$target_graze
+
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -73,7 +75,7 @@ r_comb1 <-c(r_cov1, r_cov_d1, r_qsei1, r_qsei_d1)
 into = c("group", "type", "RCP", "years", "graze", "summary")
 
 info1 <- create_rast_info(r_comb1, into = into) %>% 
-  filter(years != !!years,
+  filter(years %in% c('Current', !!years),
          summary == 'median') 
 
 
@@ -284,4 +286,22 @@ for (target_graze in target_graze_v) {
 # 4 panel showing c12 change (i.e. 'stable' class broken down
 # into areas with stable SEI and those with decline SEI)
 
+for (target_rcp in c3_rcps) {
+  g <- plot_c3c12_4panel(r_c12 = r_c12a,
+                    info = info_c12,
+                    ref_graze = ref_graze,
+                    target_graze = target_graze,
+                    target_yr = years)
+  
+  filename <- paste0('figures/sei/maps/c3c12cgref_4panel_',
+                     target_rcp, '_',years, '_', words2abbrev(target_graze), 
+                     '_', runv, ".pdf")
+  ggsave(
+    filename = filename,
+    plot = g,
+    height = 6.5, width = 5.8,
+    device = cairo_pdf, # so text can be edited
+    family = "sans"  
+  )
+}
 
