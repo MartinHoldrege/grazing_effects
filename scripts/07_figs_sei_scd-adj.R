@@ -20,7 +20,7 @@ v_input <- paste0('v2', vr_name) # version for some input files
 scen_l <- list(RCP = c('RCP45', 'RCP85'),
                years = rep(opt$years, 2))
 
-ref_graze <- 'Moderate'
+ref_graze <- opt$ref_graze
 rcps <- unique(scen_l$RCP)
 years <- opt$years
 
@@ -83,6 +83,11 @@ hist_sei_gref1 <- readRDS(paste0('data_processed/raster_means/', runv, '_', vr,
                                  '_', years,  
                                  '_sei_hist-data_by-gcm-ecoregion_gref.rds'))
 
+# created in 'scripts/06_summarize_sei_scd-adj.R'
+c12_area1 <- read_csv(paste0('data_processed/raster_means/', 
+                             runv, '_', vr, '_', years,
+                             '_c12-area_by-region-smry-gw.csv'))
+
 # prepare dataframes ------------------------------------------------------
 nr <- lu(qsei1$region) # number of regions
 mr <- nr/5 # multiplier for number of regions (i.e. for figure heights etc. )
@@ -93,8 +98,18 @@ qsei2 <- qsei1 %>%
   df_factor() %>% 
   filter_clim_extremes(years = years)
 
+c12_area2 <- c12_area1 %>% 
+  filter(!is.na(area)) %>%  # no data for entire study area seperately
+  group_by(RCP, years, graze, summary, region) %>% 
+  mutate(area_perc = area/sum(area)*100,
+         c12 = c12_factor(c12),
+         rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
+  df_factor()
 
-
+c12_area3 <- c12_area2 %>% 
+  # just groups that are CSA or GOA under the given scenario
+  # i.e not stable ora or where it became ora
+  filter(!str_detect(c12, 'ORA(?!.*becomes)'))
 # * gcm-wise calculations -------------------------------------------------
 
 
@@ -409,7 +424,23 @@ purrr::walk(rcps, function(rcp) {
 
 })
 
+# c12 stacked bar ---------------------------------------------------------
+# 
 
+purrr::walk(rcps, function(rcp) {
+
+  g_stack <- make_stacked_c12_panels(df = c12_area3, rcp = rcp, vr = vr)
+  
+  ggsave(
+    filename = paste0("figures/sei/c3_area/c12-bar-stack_abs-area_by-region_gw_",
+                      vr, "_", rcp, '_', years,   "_", runv, ".pdf"),
+    plot = g_stack,
+    height = 4.5, width = 4.7,
+    device = cairo_pdf, # so text can be edited
+    family = "sans"  # or a specific font like "Arial"
+  )
+  
+})
 # delta SEI distribution --------------------------------------------------
 # histograms of change in SEI
 
@@ -445,7 +476,7 @@ for(rcp in rcps) {
   g <- ggplot(df_cref) +
     hist_base() +
     facet_grid(region~graze) +
-    labs(subtitle = str_replace(unique(df_gref$rcp_year), '\n', ' '))
+    labs(subtitle = str_replace(unique(df_cref$rcp_year), '\n', ' '))
     
   filename <- paste0('figures/sei/distributions/hist_sei_cref_by-region_',
                      vr, '_', rcp, '_', years, '_', runv, '.png')
@@ -455,6 +486,10 @@ for(rcp in rcps) {
          height = 8,
          dpi = 600)
 }
+
+
+
+
 # c9 area barcharts -------------------------------------------------------
 
 # see pre-Nov 2025 commits

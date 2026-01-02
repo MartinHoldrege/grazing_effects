@@ -526,6 +526,81 @@ stacked_panel <- function(df_panel,  area_total = NULL,
     labs(y = lab_areaperc0)
 }
 
+#' @title Build a stacked bar panel of SEI classes
+#' @description Creates a stacked bar chart for one region × climate facet (e.g. Current or RCP scenario),
+#' with left axis showing % of region and right axis showing area in ha.
+#'
+#' @param df_panel Data frame filtered to one region and one climate facet. Must contain:
+#'   \code{graze}, \code{c3_percent} (0–100), \code{c3} (SEI class), and \code{area_region}.
+#' @param area_total Numeric, total area of the region in ha.
+#' @param y_text  y location of the rcp - year text on the panels
+#' @param legend.position.inside Numeric vector of length 2 giving legend position inside plot.
+stacked_panel_c12 <- function(df_panel,y_text = 85
+) {
+  # df_panel: filtered to one region & one climate facet (Current or future)
+  # expects columns: graze, c3_percent, c3, area_region
+  df_panel$c12 <- c12_factor4stack(df_panel$c12)
+  df_panel$c12 <- forcats::fct_rev(df_panel$c12) # so CSA at bottom of stack
+  
+  x_text <- (lu(df_panel$graze) + 1)/2 
+  
+  wide <- 0.5
+  narrow <- 0.15
+  dodge_width = wide + narrow*2
+  
+  # making sideby side bars
+  # showing gcm uncertainty
+  df_dodge <- df_panel %>%
+    mutate(
+      graze_id    = as.numeric(graze),
+      summary_id  = as.numeric(summary),
+      n_summary   = n_distinct(summary),
+      dodge_width = dodge_width,                        # total cluster width around each graze
+      bar_width   = ifelse(summary == 'median', wide, narrow),
+    ) %>% 
+    group_by(rcp_year, graze) %>% 
+    mutate(x_pos = graze_id + case_when(
+      summary_id == 2 ~ 0,
+      summary_id == 1 ~ -(wide + narrow)/2,
+      summary_id == 3 ~ (wide + narrow)/2
+    ))
+  
+  ggplot(df_dodge) +
+    # one stacked bar per (graze, summary), stacked by c3
+    geom_col(aes(x = x_pos,
+                 y = area_perc,
+                 fill = c12,
+                 width = bar_width)) +
+    scale_x_continuous(
+      breaks = sort(unique(df_dodge$graze_id)),
+      labels = levels(df_panel$graze),
+      expand = expansion(mult = c(0.05, 0.05))
+    ) +
+    adjust_graze_x_axis() +
+    scale_fill_manual(values = c12Palette, name = lab_c3) +
+    geom_text(# to avoid overplotting the word many times
+      data = distinct(df_panel[, 'rcp_year']), 
+      mapping = aes(x = x_text, y = y_text, label = rcp_year),
+      family = "sans",
+      size = 8, size.unit = 'pt', fontface = 1) +
+    theme(
+      legend.position = "bottom",
+      legend.direction = "vertical",
+      # shrink subtitle
+      plot.subtitle = element_text(size = 9, margin = margin(b = 1)),
+      strip.text = element_blank(),
+      # reduce panel spacing between facets
+      panel.spacing.x = unit(0, "lines"),
+      panel.spacing.y = unit(0, "lines"),
+      # shrink plot margins
+      plot.margin = margin(2, 3, 2, 2),
+      theme(text = element_text(face = "plain"))
+    )+
+    facet_wrap(~rcp_year) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    labs(y = lab_areaperc0)
+}
+
 # main builder for one RCP across all regions 
 #' @title Build stacked SEI class panels for all regions
 #' @description Builds a patchwork of stacked_panel plots for each region, showing Current vs selected RCP scenario.
@@ -605,6 +680,59 @@ make_stacked_c3_panels <- function(df, rcp, vr, include_sec_y = FALSE,
   comb <- combine_panels_labs(plots, xlab = xlab, ylab = ylab, 
                       ylab_sec = ylab_sec,
                       axes = axes) 
+  
+  comb
+  
+}
+
+
+#' @title Build stacked SEI class change (c12) panels for all regions
+#' @description Builds a patchwork of stacked_panel plots for each region, showing Current vs selected RCP scenario.
+#' @param rcp Character, the RCP scenario to plot (must be present in \code{sei_pcent1}).
+#' @return A patchwork object combining all regions  with a shared legend.
+make_stacked_c12_panels <- function(df, rcp, vr,
+                                   y_mult = NULL) {
+  
+  # filter to median summary and to Current vs selected rcp
+  df0 <- df %>%
+    filter(RCP %in% c("Current", rcp)) %>%
+    arrange(region, graze, RCP, years)
+  
+  # collect region order & labels
+  stopifnot(
+    is.factor(df0$region)
+  )
+  regions <- unique(sort(df0$region))
+  region_label <- region_label_factory(v = vr)
+  y_max <- df0 %>% 
+    group_by(region, RCP, years, graze, summary) %>% 
+    mutate(total = sum(area_perc)) %>% 
+    pull(total) %>% 
+    max()
+  
+  if(is.null(y_mult)) {
+    if(y_max >= 100) y_mult <- 0.85 else y_mult <- 1.05
+  }
+  y_text <- y_max*y_mult
+  
+  # build per-region patchwork rows
+  plots <- purrr::map(regions, function(rr) {
+    
+    # split to current and selected future for this region
+    d_reg <- filter(df0, region == rr)
+
+    # two panels for this region
+    g1 <- stacked_panel_c12(df_panel = d_reg, y_text = y_text) 
+    
+    title <- region_label(rr)
+    g1 + 
+      labs(subtitle = title) 
+  })
+  
+  comb <- combine_panels_labs(plots, xlab = NULL, ylab = NULL, 
+                              ylab_sec = NULL,
+                              guides = NULL) &
+    theme(legend.position = 'none')
   
   comb
   
@@ -968,7 +1096,8 @@ combine_more_panels <- function(plots, axes = 'collect',
 # the y and x axis labels
 # this requires the axis labels of the individual
 # plots to already have been removed as needed
-combine_panels_labs <- function(plots, xlab = NULL, ylab = NULL, ylab_sec = NULL, ...) {
+combine_panels_labs <- function(plots, xlab = NULL, ylab = NULL, ylab_sec = NULL,
+                                guides = 'collect', ...) {
 
   
   f <- if(length(plots) == 4) {
@@ -997,12 +1126,13 @@ combine_panels_labs <- function(plots, xlab = NULL, ylab = NULL, ylab_sec = NULL
         y, panels, y_sec, patchwork::guide_area(),
         ncol = 4,
         widths = c(0.02, 1, 0.02, 0.14),
-        guides = "collect"
+        guides = guides
       ) & theme(legend.position = "right")
     }
 
   } else {
-    main <- wrap_plots(y, panels, ncol = 2, widths = c(0.02, 1))
+    main <- wrap_plots(y, panels, ncol = 2, widths = c(0.02, 1),
+                       guides = guides)
   }
   # Combine with x label
   final <- wrap_plots(main, x, ncol = 1, heights = c(1, 0.02))

@@ -508,6 +508,29 @@ c12_factor <- function(x) {
          labels = labels)
 }
 
+# factor levels for stacked barchart
+c12_factor4stack <- function(x) {
+  x2 <- as.character(x)
+  
+  levels <- c(
+    'ORA becomes CSA',
+    'GOA becomes CSA',
+    'Stable CSA', # i.e. sei stable or increase and stays CSA
+    'CSA (SEI decline)', # stable CSA but w/ SEI decline
+    'CSA becomes GOA',
+    'ORA becomes GOA',
+    'Stable GOA',
+    'GOA (SEI decline)',
+    'Stable ORA',
+    'ORA (SEI decline)',
+    'GOA becomes ORA',
+    'CSA becomes ORA'
+  )
+  
+  stopifnot(x %in% levels)
+  factor(x, levels = levels)
+}
+
 # 2nd two of three digits is the c12 code
 ecoc12_to_c12 <- function(x) {
   stopifnot(x >= 100 & x < 1000)
