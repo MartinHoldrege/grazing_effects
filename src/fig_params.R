@@ -215,6 +215,8 @@ cols_sei_driver <- c(Sagebrush = '#d95f02',
                      Aherb = "#7570b3", 
                      'None' = 'lightgrey')
 
+col_rect <- 'lightgray' # CSA rectangle
+
 # shapes ------------------------------------------------------------------
 
 shapes_scen <- c("Historical" = 21, 
@@ -232,6 +234,8 @@ linetypes_scen <- c(
   "RCP4.5\n2031-2060" = "solid", "RCP4.5 2031-2060" = "solid",
   "RCP8.5\n2031-2060" = "41", "RCP8.5 2031-2060" = "41"
 )
+
+linetype_rect <- '21' # for CSA rectangle
 
 # panel letters -----------------------------------------------------------
 

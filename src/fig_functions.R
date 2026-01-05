@@ -544,9 +544,10 @@ stacked_panel_c12 <- function(df_panel,y_text = 85
   
   x_text <- (lu(df_panel$graze) + 1)/2 
   
+  name_rect <- 'Total CSA'
   wide <- 0.5
   narrow <- 0.15
-  dodge_width = wide + narrow*2
+  gap <- 0.05
   
   # making sideby side bars
   # showing gcm uncertainty
@@ -555,15 +556,46 @@ stacked_panel_c12 <- function(df_panel,y_text = 85
       graze_id    = as.numeric(graze),
       summary_id  = as.numeric(summary),
       n_summary   = n_distinct(summary),
-      dodge_width = dodge_width,                        # total cluster width around each graze
+      # total cluster width around each graze
       bar_width   = ifelse(summary == 'median', wide, narrow),
     ) %>% 
     group_by(rcp_year, graze) %>% 
     mutate(x_pos = graze_id + case_when(
       summary_id == 2 ~ 0,
-      summary_id == 1 ~ -(wide + narrow)/2,
-      summary_id == 3 ~ (wide + narrow)/2
+      summary_id == 1 ~ -(wide + narrow)/2 - gap,
+      summary_id == 3 ~ (wide + narrow)/2 + gap
     ))
+  
+  csa_levels <- levels(df_panel$c12)[9:12]
+  stopifnot(str_detect(csa_levels, 'CSA'), !str_detect(csa_levels, 'CSA becomes'))
+  
+  # box around the csa colors
+  df_box_csa <- df_dodge |>
+    filter(c12 %in% csa_levels) |>
+    group_by(rcp_year, graze, x_pos, summary, bar_width) |>
+    summarise(
+      ymin = 0,
+      ymax = sum(area_perc),
+      .groups = "drop"
+    ) |>
+    mutate(
+      xmin = x_pos - bar_width/ 2,
+      xmax = x_pos + bar_width/ 2
+    )
+  
+  df_star <- df_dodge |>
+    filter(
+      RCP == "Current",
+      graze == "Moderate"
+    ) |>
+    group_by(rcp_year, graze, x_pos) |>
+    summarise(
+      y = sum(area_perc),
+      .groups = "drop"
+    ) %>% 
+    mutate(
+      y = ifelse(y >= 0.8*y_text, y* 0.7, y)
+    )
   
   ggplot(df_dodge) +
     # one stacked bar per (graze, summary), stacked by c3
@@ -575,6 +607,21 @@ stacked_panel_c12 <- function(df_panel,y_text = 85
       breaks = sort(unique(df_dodge$graze_id)),
       labels = levels(df_panel$graze),
       expand = expansion(mult = c(0.05, 0.05))
+    ) +
+    geom_text(
+      data = df_star,
+      aes(x = x_pos, y = y),
+      label = "*",
+      vjust = -0.1,
+      size = 6
+    ) +
+    geom_rect(
+      data = df_box_csa,
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax,
+          linetype = !!name_rect),
+      fill = NA,
+      color = col_rect,
+      linewidth = 0.3
     ) +
     adjust_graze_x_axis() +
     scale_fill_manual(values = c12Palette, name = lab_c3) +
@@ -598,8 +645,9 @@ stacked_panel_c12 <- function(df_panel,y_text = 85
     )+
     facet_wrap(~rcp_year) +
     guides(fill = guide_legend(reverse = TRUE)) +
-    labs(y = lab_areaperc0)
-}
+    labs(y = lab_areaperc0) +
+    legend_rect(name = name_rect)
+ }
 
 # main builder for one RCP across all regions 
 #' @title Build stacked SEI class panels for all regions
@@ -703,7 +751,9 @@ make_stacked_c12_panels <- function(df, rcp, vr,
     is.factor(df0$region)
   )
   regions <- unique(sort(df0$region))
-  region_label <- region_label_factory(v = vr)
+  region_label <- region_label_factory(v = vr,
+                                       region_letters = fig_letters[-(1:3)],
+                                       add_abbrev = TRUE)
   y_max <- df0 %>% 
     group_by(region, RCP, years, graze, summary) %>% 
     mutate(total = sum(area_perc)) %>% 
@@ -732,7 +782,7 @@ make_stacked_c12_panels <- function(df, rcp, vr,
   comb <- combine_panels_labs(plots, xlab = NULL, ylab = NULL, 
                               ylab_sec = NULL,
                               guides = NULL) &
-    theme(legend.position = 'none')
+    guides(fill = 'none')
   
   comb
   
@@ -1606,7 +1656,8 @@ rcp_label <- function(rcp, years, add_letters = FALSE,
 }
 
 region_label_factory <- function(region_letters = NULL,
-                                 v = NULL) {
+                                 v = NULL,
+                                 add_abbrev = FALSE) {
   if(is.null(region_letters)) {
     region_letters <- fig_letters # from the global environment
   }
@@ -1615,6 +1666,10 @@ region_label_factory <- function(region_letters = NULL,
     x <- region_factor(x, v = v)
     levels <- levels(x)
     labels <- paste(region_letters[1:length(levels)], levels)
+    if(add_abbrev) {
+      abbrev <- words2abbrev(levels)
+      labels <- paste0(labels, ' (', abbrev, ')')
+    }
     out <- factor(as.character(x), levels = levels,
                   labels = labels)
     as.character(out)
@@ -1623,9 +1678,10 @@ region_label_factory <- function(region_letters = NULL,
 }
 
 region_labeller_factory <- function(region_letters = NULL,
-                                    v = NULL) {
+                                    v = NULL,
+                                    add_abbrev = FALSE) {
   region_label <- region_label_factory(region_letters = region_letters,
-                                       v = v)
+                                       v = v, add_abbrev = FALSE)
   ggplot2::as_labeller(x = region_label)
 }
 
@@ -1724,6 +1780,28 @@ smaller_legend <- function() {
   )
 }
 
+# creates a legend for a rectangle
+legend_rect <- function(name){
+  
+  values <- linetype_rect
+  names(values) = name
+  list(
+    scale_linetype_manual(
+      name = NULL,
+      values = values
+      ),
+    guides(
+      linetype = guide_legend(
+        override.aes = list(
+          shape = NA,
+          fill = NA,
+          color = col_rect,
+          linewidth = 0.8
+        )
+      )
+    )
+  )
+}
 # color functions ---------------------------------------------------------
 
 # grazing colors (cols_graze defined in the fig_params.R script)
@@ -1848,7 +1926,7 @@ ggsave_delta_prob <- function(plot, rcp, smry) {
   )
 }
 
-# create 9 color matrix ---------------------------------------------------
+# color matrices ---------------------------------------------------
 # Creating a 3x3 colored matrix of current and future SEI classes,
 
 
@@ -1901,16 +1979,13 @@ color_matrix <- function(xlab = 'Future',
           aspect.ratio = 1)
 }
 
-# create 12 color matrix ---------------------------------------------------
-# Creating a 3x3 colored matrix of current and future SEI classes,
-# with diagonals split in half to show stable classes but declining SEI
-
-# create 12 color matrix ---------------------------------------------------
+# create 12 color matrix
 # 3x3 matrix, but diagonal cells are split into 2 triangles (12 total colors)
 
 # needs src/SEI_functions.R loaded
 color_matrix_c12 <- function(xlab = "Comparison scenario",
-                             ylab = "Reference Scenario") {
+                             ylab = "Reference Scenario",
+                             add_line = TRUE) {
   
   c3_levels <- c("CSA", "GOA", "ORA")
   
@@ -1980,9 +2055,16 @@ color_matrix_c12 <- function(xlab = "Comparison scenario",
     mutate(y = ifelse(triangle == 'll', y - 0.02, y + 0.15),
            x = ifelse(triangle == 'll', x, x + 0.35)) 
   
-  
-  
-  ggplot()+
+  # dotted line going around all colors that correspond to 'core'
+  df_line <- df_rect %>% 
+    summarize(
+      xmax = min(xmax),
+      xmin = min(xmin),
+      ymin = min(ymin),
+      ymax = max(ymax)
+    )
+
+  g <- ggplot()+
     geom_rect(
       data = df_rect,
       aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, group = c12,
@@ -2018,5 +2100,17 @@ color_matrix_c12 <- function(xlab = "Comparison scenario",
       plot.margin = unit(c(0, 0, 0, 0), "in")
     )
   
+  if(add_line) {
+    g <- g + geom_rect(
+      data = df_line,
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+      fill = NA,
+      linetype = linetype_rect, 
+      color = col_rect,
+      linewidth = 0.3
+    ) 
+
+  }
+  g
 }
 

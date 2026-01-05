@@ -435,7 +435,7 @@ purrr::walk(rcps, function(rcp) {
     filename = paste0("figures/sei/c3_area/c12-bar-stack_abs-area_by-region_gw_",
                       vr, "_", rcp, '_', years,   "_", runv, ".pdf"),
     plot = g_stack,
-    height = 4.5, width = 4.7,
+    height = 4.5, width = 6,
     device = cairo_pdf, # so text can be edited
     family = "sans"  # or a specific font like "Arial"
   )
