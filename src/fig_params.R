@@ -254,7 +254,7 @@ lab_bio1 <- expression(~Delta*" Biomass ("*gm^-2*")")
 lab_bio1b <- "\u0394Biomass" # delta biomass
 lab_bio2 <- expression(~Delta*" Biomass (%)")
 lab_bio2_cref = '\u0394Biomass (%), relative to historical climate'
-lab_bio2_gref = paste0('\u0394Biomass (%), relative to ', str_to_lower(ref_graze),
+lab_bio2_gref = paste0('\u0394Biomass (%), relative to ', stringr::str_to_lower(ref_graze),
                        ' grazing')
 lab_c4on0 <- expression("Biomass ("*gm^-2*"); C4Pgrass on")
 lab_c4off0 <- expression("Biomass ("*gm^-2*"); C4Pgrass off")
@@ -297,7 +297,7 @@ lab_fire1 <- "Change in fire return interval (years)"
 lab_firep0 <- "# fires/century"
 lab_firep1 <- '\u0394 # fires/century'
 lab_firep1_gref <- paste0('\u0394 # fires/century, relative to ', 
-                          str_to_lower(ref_graze), ' grazing')
+                          stringr::str_to_lower(ref_graze), ' grazing')
 # fire area
 lab_ba0 <- "Burned area (ha/year)"
 lab_ba1 <- "Burned area (%/year)"

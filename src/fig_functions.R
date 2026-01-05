@@ -1908,6 +1908,7 @@ color_matrix <- function(xlab = 'Future',
 # create 12 color matrix ---------------------------------------------------
 # 3x3 matrix, but diagonal cells are split into 2 triangles (12 total colors)
 
+# needs src/SEI_functions.R loaded
 color_matrix_c12 <- function(xlab = "Comparison scenario",
                              ylab = "Reference Scenario") {
   
@@ -1918,6 +1919,7 @@ color_matrix_c12 <- function(xlab = "Comparison scenario",
   names(c12Palette) <- c12Names
   
 
+  text_offset <- 0.02 # how far off left edge the text is
   # c9 levels, with there associated current and future SEI categories
   df_rect <- tibble(
     c12  = c12_factor(c9Names), 
@@ -1966,19 +1968,17 @@ color_matrix_c12 <- function(xlab = "Comparison scenario",
                         paste('Stable', c3),
                         paste(c3, '(SEI decline)')),
            c12 = c12_factor(c12),
-           label = ifelse(triangle == 'll', 'SEI\nstable', 'SEI\ndecline'))
+           label = ifelse(triangle == 'll', 'SEI\nstable/\nincrease', 'SEI\ndecline'))
   
   stopifnot(df_diag$c12 %in% names(c12Palette))
   
-  df_label <- df_diag %>% 
+  df_diag2 <- df_diag %>% 
     group_by(c12, label, triangle) %>% 
-    summarize(x = mean(x),
+    summarize(x = min(x) + text_offset,
               y = mean(y),
               .groups = 'drop') %>% 
-    mutate(y = ifelse(triangle == 'll', y - 0.1, y + 0.1),
-           x = ifelse(triangle == 'll', x, x + 0.03),) %>% 
-    bind_rows(df_rect[c('c12', 'label', 'x', 'y')]) %>% 
-    arrange(c12)
+    mutate(y = ifelse(triangle == 'll', y - 0.02, y + 0.15),
+           x = ifelse(triangle == 'll', x, x + 0.35)) 
   
   
   
@@ -1994,10 +1994,16 @@ color_matrix_c12 <- function(xlab = "Comparison scenario",
     aes(x = x, y = y, group = c12, fill = c12),
     color = "white"
   ) +
-    geom_text(data = df_label, aes(x, y, label = label), color = 'white', 
+    geom_text(data = df_diag2, aes(x, y, label = label), color = 'white', 
               lineheight = 0.8,
-              size = 2.4
+              size = 2.4,
+              hjust = 0
               ) +
+    geom_text(data = df_rect, aes(x, y, label = label), color = 'white', 
+              lineheight = 0.8,
+              size = 2.4,
+              hjust = 0.5
+    ) +
     scale_x_continuous(breaks = 1:3, labels = c3_levels, position = "top") +
     scale_y_continuous(breaks = 1:3, labels = rev(c3_levels)) +
     scale_fill_manual(values = c12Palette) +
@@ -2014,4 +2020,3 @@ color_matrix_c12 <- function(xlab = "Comparison scenario",
   
 }
 
-#color_matrix_c12()
