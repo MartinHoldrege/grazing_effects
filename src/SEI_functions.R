@@ -531,6 +531,27 @@ c12_factor4stack <- function(x) {
   factor(x, levels = levels)
 }
 
+# convert c12 to the origin c3 category
+c12_to_origin_c3 <- function(x) {
+  x <- as.character(x)
+  lookup <- c(`Stable CSA` = "CSA", 
+              `CSA (SEI decline)` = "CSA", 
+              `CSA becomes GOA` = "CSA", 
+              `CSA becomes ORA` = "CSA", 
+              `GOA becomes CSA` = "GOA", 
+              `Stable GOA` = "GOA", 
+              `GOA (SEI decline)` = "GOA",
+              `GOA becomes ORA` = "GOA", 
+              `ORA becomes CSA` = "ORA", 
+              `ORA becomes GOA` = "ORA", 
+              `Stable ORA` = "ORA", 
+              `ORA (SEI decline)` = "ORA"
+  )
+  stopifnot(all(x %in% names(lookup)))
+  c3 <- unname(lookup[x])
+  c3_factor(c3)
+}
+
 # 2nd two of three digits is the c12 code
 ecoc12_to_c12 <- function(x) {
   stopifnot(x >= 100 & x < 1000)

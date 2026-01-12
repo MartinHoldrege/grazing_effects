@@ -532,9 +532,7 @@ stacked_panel <- function(df_panel,  area_total = NULL,
 #'
 #' @param df_panel Data frame filtered to one region and one climate facet. Must contain:
 #'   \code{graze}, \code{c3_percent} (0–100), \code{c3} (SEI class), and \code{area_region}.
-#' @param area_total Numeric, total area of the region in ha.
 #' @param y_text  y location of the rcp - year text on the panels
-#' @param legend.position.inside Numeric vector of length 2 giving legend position inside plot.
 stacked_panel_c12 <- function(df_panel,y_text = 85
 ) {
   # df_panel: filtered to one region & one climate facet (Current or future)

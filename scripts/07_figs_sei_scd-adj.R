@@ -98,20 +98,66 @@ qsei2 <- qsei1 %>%
   df_factor() %>% 
   filter_clim_extremes(years = years)
 
+
+# c12 area ----------------------------------------------------------------
+
+
+# calculating area for entire study area
+c12_area_tot <- c12_area1 %>% 
+  group_by(run, type, RCP, years, graze, c12, summary) %>% 
+  summarize(area = sum(area),
+            .groups = 'drop') %>% 
+  mutate(region = entire)
+
 c12_area2 <- c12_area1 %>% 
+  bind_rows(c12_area_tot) %>% 
   filter(!is.na(area)) %>%  # no data for entire study area seperately
   group_by(RCP, years, graze, summary, region) %>% 
   mutate(area_perc = area/sum(area)*100,
          c12 = c12_factor(c12),
          rcp_year = rcp_label(RCP, years, include_parenth = FALSE)) %>% 
-  df_factor()
+  ungroup() %>% 
+  df_factor() %>% 
+  select(-run, -id, -type)
 
 c12_area3 <- c12_area2 %>% 
   # just groups that are CSA or GOA under the given scenario
   # i.e not stable ora or where it became ora
-  filter(!str_detect(c12, 'ORA(?!.*becomes)'))
-# * gcm-wise calculations -------------------------------------------------
+  filter(!str_detect(c12, 'ORA(?!.*becomes)'),
+         region != entire)
 
+# convert % of c3 class
+tmp <- c12_area2 %>% 
+  mutate(c3 = c12_to_origin_c3(c12)) %>% 
+  select(-area_perc)
+
+ref <- tmp %>% 
+  filter(RCP == 'Current',
+         graze == ref_graze) %>% 
+  select(-c12, -years, -RCP, -c12,  -GCM_smry, -summary, -rcp_year, 
+         -graze)
+
+tmp2 <- tmp %>%  # adding in 0s for missing levels
+  #filter(!(RCP == 'Current' & graze == ref_graze)) %>% # not relevant for reference level
+  complete(c12, graze, region, summary, nesting(RCP, years, rcp_year)) %>% 
+  filter(!(RCP == 'Current' & summary != 'median')) %>% 
+  mutate(area = ifelse(is.na(area), 0, area),
+         c3 = c12_to_origin_c3(c12))
+test <- ref %>% 
+  group_by(c3, region) %>% 
+  summarize(n = n(), .groups = 'drop') %>% 
+  pull(n)
+
+stopifnot(all(test == 1))
+
+tmp2 %>% 
+  left_join(ref, by = c('region', 'c3'), suffix = c('', '_ref')) %>% 
+  mutate(area_perc_c3 = area/area_ref*100) %>% 
+  arrange(region, rcp_year, c12)
+
+
+
+# * gcm-wise calculations -------------------------------------------------
 
 c3_gcm2 <- c3_to_long(sei_byGCM1)
 
