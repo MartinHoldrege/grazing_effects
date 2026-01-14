@@ -102,16 +102,7 @@ qsei2 <- qsei1 %>%
 # c12 area ----------------------------------------------------------------
 
 
-# calculating area for entire study area
-c12_area_tot <- c12_area1 %>% 
-  group_by(run, type, RCP, years, graze, c12, summary) %>% 
-  summarize(area = sum(area),
-            .groups = 'drop') %>% 
-  mutate(region = entire)
-
 c12_area2 <- c12_area1 %>% 
-  bind_rows(c12_area_tot) %>% 
-  filter(!is.na(area)) %>%  # no data for entire study area seperately
   group_by(RCP, years, graze, summary, region) %>% 
   mutate(area_perc = area/sum(area)*100,
          c12 = c12_factor(c12),
@@ -150,11 +141,12 @@ test <- ref %>%
 
 stopifnot(all(test == 1))
 
-tmp2 %>% 
+# c12 area as a percentage of the 'origin' c3 area
+c12_area_perc_c3 <- tmp2 %>% 
   left_join(ref, by = c('region', 'c3'), suffix = c('', '_ref')) %>% 
   mutate(area_perc_c3 = area/area_ref*100) %>% 
-  arrange(region, rcp_year, c12)
-
+  arrange(region, rcp_year, c12) %>% 
+  select(-area_ref, -rcp_year)
 
 
 # * gcm-wise calculations -------------------------------------------------
@@ -285,6 +277,18 @@ c3_graze_delta_wide <- c3_graze_delta %>%
               names_from = summary) %>% 
   arrange(RCP, years, region, graze, c3)
 
+c12_area_perc_c3_w <- c12_area_perc_c3 %>% 
+  select(-area, -c3, -GCM_smry) %>% 
+  mutate(area_perc_c3 = signif(area_perc_c3, digits = 2)) %>% 
+  pivot_wider(values_from = "area_perc_c3",
+              names_from = 'c12')
+
+c12_area2_w <- c12_area2 %>% 
+  select(-area, -GCM_smry) %>% 
+  mutate(area_perc = signif(area_perc, digits = 2)) %>% 
+  pivot_wider(values_from = "area_perc",
+              names_from = 'c12')
+
 # *save tables ------------------------------------------------------------
 
 # gw summaries across GCMs
@@ -296,6 +300,16 @@ write_csv(c3_clim_delta_wide, p1)
 p2 <- paste0('data_processed/area/c3/c3_graze_delta-area_gw_', vr, '_', years, '_',
              runv, '.csv')
 write_csv(c3_graze_delta_wide, p2)
+
+# c12 as percentage of total area 
+p3 <- paste0('data_processed/area/c12/c12_cgref_tot-perc_', vr, '_', years, '_',
+             runv, '.csv')
+write_csv(c12_area2_w, p3)
+
+# c12 as percentage of origin c3 class
+p4 <- paste0('data_processed/area/c12/c12_cgref_perc-c3_', vr, '_', years, '_',
+             runv, '.csv')
+write_csv(c12_area_perc_c3_w, p4)
 
 # boxplots ----------------------------------------------------------------
 if(create_figs) {

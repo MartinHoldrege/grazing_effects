@@ -8,7 +8,7 @@
 # params ------------------------------------------------------------------
 
 source("src/params.R")
-test_run <- FALSE #opt$test_run
+test_run <- opt$test_run
 run <- opt$run
 v_interp <- opt$v_interp
 runv <- paste0(paste0(opt$run), v_interp)
@@ -20,6 +20,7 @@ ref_graze <- opt$ref_graze
 path_tmp <- file.path('tmp', yr_lab)
 rerun <- FALSE
 dir <- file.path('tmp', yr_lab)
+entire <- opt$entire
 # dependencies ------------------------------------------------------------
 
 library(tidyverse)
@@ -179,16 +180,10 @@ p_c12_area <- paste0('data_processed/raster_means/', runv, '_', vr, '_', years,
 run_chunk <- TRUE
 if(file.exists(p_c12_area) & !rerun) {
   area_ecoc12_gcm3 <- read_csv(p_c12_area)
-  
-  # if min area is 100 then file was accidentally created in 
-  # a test_run and should be over-written 
-  if(any(min(area_ecoc12_gcm3$area) < 100)) {
-    run_chunk <- FALSE
-  }
-  
+  run_chunk <- FALSE
 }
 
-if(run_chunk) {
+if(run_chunk | rerun) {
   eco_c12 <- combine_eco_c12(c12 = c12a_gcm, eco = r_eco1)
   
   area_ecoc12_gcm1 <- map(names(eco_c12), function(lyr) {
@@ -206,11 +201,22 @@ if(run_chunk) {
            c12 = ecoc12_to_c12(eco_c12)) %>% 
     select(-eco_c12)
   
+  # calculating areas for entire study area
+  area_ecoc12_gcm2b <- area_ecoc12_gcm2 %>% 
+    group_by(c12, id) %>% 
+    summarize(area = sum(area),
+              .groups = 'drop') %>% 
+    mutate(region = entire) %>% 
+    bind_rows(area_ecoc12_gcm2)
+  
   area_ecoc12_gcm3 <- create_rast_info(unique(area_ecoc12_gcm2$id),
                                        into = c('type', 'RCP', 'years', 'graze', 'GCM')) %>% 
     select(-run2) %>% 
-    right_join(area_ecoc12_gcm2, by = 'id')
-  if(!test_run) write_csv(area_ecoc12_gcm3, p_c12_area)
+    right_join(area_ecoc12_gcm2b, by = 'id')
+  if(!test_run) {
+    write_csv(area_ecoc12_gcm3, p_c12_area)
+    message('p_c12_area created')
+  }
 }
 
 
@@ -381,7 +387,7 @@ stopifnot(all(!dup))
 
 
 area_ecoc12_smry_gw <- area_ecoc12_gcm3 %>% 
-  right_join(summary_gcms, by = join_by(RCP, years, graze, GCM, region)) %>% 
+ inner_join(summary_gcms, by = join_by(RCP, years, graze, GCM, region)) %>% 
   rename(GCM_smry = GCM)
 
 # save output -------------------------------------------------------------
