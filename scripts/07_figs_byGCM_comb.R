@@ -135,7 +135,9 @@ for(rcp in rcps) {
     
     g <- crossplot_multipanel(df = df,
                               vars_df = vars_df,
-                              legend_title = legend_title)
+                              legend_title = legend_title,
+                              wrap = 10)
+    g
     
     if(region != regions[1]) {
       g <- g +
@@ -149,8 +151,8 @@ for(rcp in rcps) {
     ggsave(
       filename = filename,
       plot = g,
-      width = 11,
-      height = 10,
+      width = 8,
+      height = 7,
       dpi = 600
     )
   }

@@ -1392,7 +1392,7 @@ crossplot_1panel <- function(df_wide, var1, var2, linewidth =0.3,
          y = labeller(var2)) +
     theme(axis.title.y = ggtext::element_markdown(),
           axis.title.x = ggtext::element_markdown(),
-          plot.margin = unit(rep(1, 4), units = 'mm'),)
+          plot.margin = unit(rep(0.5, 4), units = 'mm'),)
   g
 
 }
@@ -1405,12 +1405,13 @@ crossplot_multipanel <- function(df, vars_df,
                                   jklmno
                                   pqrstu
                                   ',
-                                 legend_title = ggplot2::waiver()) {
+                                 legend_title = ggplot2::waiver(),
+                                 wrap = NULL) {
   plots <- pmap(vars_df, function(x, y, tag) {
     df_wide <- make_wide_4crossplot(df, var1 = x, var2 = y)
     g <- crossplot_1panel(df_wide, x, y, colors = cols_GCM2,
                      shapes = shapes_GCM2,
-                     labeller = driver_labeller(delta = TRUE),
+                     labeller = driver_labeller(delta = TRUE,wrap = wrap),
                      legend_title = legend_title)
     g + labs(tag = tag) 
       
@@ -1686,8 +1687,18 @@ region_labeller_factory <- function(region_letters = NULL,
 }
 
 region_labeller <- region_labeller_factory(fig_letters)
+
+wrap_after <- function(x, n = 20) {
+  sub(
+    paste0("^(.{", n, "}[^ ]*) "),
+    "\\1<br>",
+    x
+  )
+}
+
   
-driver_labeller <- function(delta = FALSE) {
+driver_labeller <- function(delta = FALSE, wrap = NULL) {
+  
   lookup_md <- c(
     "MAT" = "MAT (\u00b0C)",
     "MAP" = "MAP (mm)",
@@ -1697,19 +1708,23 @@ driver_labeller <- function(delta = FALSE) {
     "Pherb" = "Pherb (g/m<sup>2</sup>)",
     "Sagebrush" = "Sagebrush (g/m<sup>2</sup>)",
     "SEI" = "SEI",
-    'csa' = 'Core sagebrush area (%)',
-    'csa_goa' = 'CSA + GOA (%)',
-    'ba_delta_perc' = 'Annual burned area (%)',
-    'ba' = lab_ba1
+    "csa" = "Core sagebrush area (%)",
+    "csa_goa" = "CSA + GOA (%)",
+    "ba_delta_perc" = "Annual burned area (%)",
+    "ba" = lab_ba1
   )
-  if(delta) {
-    nms <- names(lookup_md)
-    lookup_md <- paste("\u0394", lookup_md)
-    names(lookup_md) <- nms
+  
+  if (delta) {
+    lookup_md[] <- paste("\u0394", lookup_md)
+  }
+  
+  if (!is.null(wrap)) {
+    lookup_md[] <- wrap_after(lookup_md, n = wrap)
   }
   
   as_labeller(lookup_md)
 }
+
 
 #' create legend labels
 #'

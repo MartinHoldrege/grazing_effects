@@ -70,7 +70,8 @@ ba_smry_delta_clim1 <- ba_smry2 %>%
                 ),
          across(starts_with("ba") & !contains("perc"), ~ round(.x, 0)),
          across(contains("delta_perc"), ~ round(.x, 1))) %>% 
-  arrange(RCP, years, ecoregion, graze)
+  df_factor() %>% 
+  arrange(RCP, rev(years), ecoregion, graze)
 
   
 
