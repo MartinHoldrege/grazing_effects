@@ -144,7 +144,8 @@ if(vr == 'r1.0') {
 # gcm-wise summaries
 sei_pcent1 <- summarize_c3_gw(sei_pcent_gcm1) # gcm-wise summaries
 
-ba3a <- summarize_ba_gw(ba_gcm1, df_area = area_eco)
+ba3a <- summarize_ba_gw(ba_gcm1, df_area = area_eco) %>% 
+  arrange(ecoregion, RCP, years, graze)
 
 ba3 <- ba3a %>% 
   filter_clim_extremes(years = years) %>% 
@@ -408,12 +409,14 @@ write_csv(c3eco_gcm3, paste0('data_processed/raster_means/',
                              runv, '_', vr, "_", years, 
        '_sei-mean_ba_by-GCM-region-c3.csv'))
 
+
+
 if(create_figs){
 # expected burned area figs --------------------------------------------------
 # see pre-nov 2025 commits for version making old version of this
 # figure with total area and colored grazing
 widthr  <- 5 
-heightr <- 6 
+heightr <- 4 
 ba3_tmp <- ba3 %>% 
   mutate(rcp_year = rcp_label(RCP, years = years, include_parenth = FALSE,
                               add_newline = TRUE)) %>% 

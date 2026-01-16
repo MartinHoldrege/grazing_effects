@@ -798,7 +798,7 @@ fire_dot_panel <- function(df_panel, ylim, df_panel_gcm) {
   
   
   x_text <- (lu(df_panel$graze) + 1)/2 
-  y_text <- 0.95*max(ylim)
+  y_text <- 0.9*max(ylim)
   df_text <- df_panel %>% 
     group_by(rcp_year) %>% 
     summarize(y_max = max(c(area_high_perc, area_median_perc),
@@ -866,7 +866,9 @@ make_firedot_panels <- function(df, vr, rcp, df_gcm) {
   
   # collect region order & labels
   regions <- unique(sort(df0$ecoregion))
-  region_label <- region_label_factory(v = vr)
+  region_label <- region_label_factory(v = vr,
+                                       region_letters = fig_letters[-(1:3)],
+                                       add_abbrev = TRUE)
   # build per-region patchwork rows
   plots <- purrr::map(regions, function(rr) {
     

@@ -17,7 +17,7 @@ run <- opt$run
 v_interp <- opt$v_interp
 v <- paste0('v2', opt$vr_name) # version for output files
 runv <- paste0(opt$run, opt$v_interp)
-ref_graze <- 'Moderate' # the reference grazing level for SEI calculations
+ref_graze <- opt$ref_graze # the reference grazing level for SEI calculations
 # (i.e. current climate at ref graze means we are not adjusting
 # the sei values with stepwat results)
 # dependencies ------------------------------------------------------------
@@ -28,7 +28,7 @@ source("src/general_functions.R")
 source("src/mapping_functions.R")
 source("src/probability_functions.R")
 source("src/SEI_functions.R")
-
+source("src/gw_functions.R")
 # read in data ------------------------------------------------------------
 
 # fire probability for each GCM
@@ -148,6 +148,8 @@ ba_eco2 <- ba_eco1 %>%
   left_join(info_gcm1, by = 'id') %>% 
   select(-id)
 
+ba_eco2_gw <- summarize_ba_gw(ba_eco2, df_area = area_eco) %>% 
+  arrange(ecoregion, RCP, years, graze)
 
 # * pixewlise -------------------------------------------------------------
 
@@ -307,6 +309,7 @@ area_age_group3_pw <- area_age_group2_pw %>%
 # save output -------------------------------------------------------------
 
 if(!test_run) {
+  
   write_csv(ba_eco_smry3, 
             paste0("data_processed/area/expected-burn-area_smry_", v, "_", run, 
                    ".csv"))
@@ -321,6 +324,11 @@ if(!test_run) {
   
   write_csv(ba_eco2, 
             paste0("data_processed/area/expected-burn-area_by-GCM_", v, "_", run, 
+                   ".csv"))
+  
+  # gcm-wise
+  write_csv(ba_eco2_gw, 
+            paste0("data_processed/area/expected-burn-area_smry-gw_", v, "_", run, 
                    ".csv"))
   
   write_csv(area_eco, 

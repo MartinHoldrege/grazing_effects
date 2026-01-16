@@ -28,7 +28,7 @@ scripts_yr <- c(
 # to run for all combinations of vr and years
 scripts_vr_yr <- c(
   #'scripts/05_interpolated_summarize_sei_scd-adj.R'
-  # 'scripts/06_summarize_sei_scd-adj.R',
+  'scripts/06_summarize_sei_scd-adj.R',
   # 'scripts/06_summarize_fire_drivers.R',
   #'scripts/07_figs_sei_scd-adj.R'
   # 'scripts/08_fire_area_figs.R',
@@ -72,9 +72,10 @@ if(length(scripts_yr) > 0) {
 
 if(length(scripts_vr_yr) > 0) {
   for(script in scripts_vr_yr) {
-    # callr::rscript(script, cmdargs = uu(arg_list_end))
+    callr::rscript(script, cmdargs = uu(arg_list_end))
     # callr::rscript(script, cmdargs = uu(arg_list_mid))
-    callr::rscript(script, cmdargs = uu(arg_list_r1.0_end))
-    callr::rscript(script, cmdargs = uu(arg_list_r1.0_mid))
+    # this is what we need for the main analysis: 
+    # callr::rscript(script, cmdargs = uu(arg_list_r1.0_end)) 
+    # callr::rscript(script, cmdargs = uu(arg_list_r1.0_mid))
   }
 }
