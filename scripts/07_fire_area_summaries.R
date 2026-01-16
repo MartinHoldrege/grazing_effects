@@ -27,7 +27,7 @@ source('src/mapping_functions.R')
 ba_gcm1 <- read_csv(paste0("data_processed/area/expected-burn-area_by-GCM_", 
                             v, vr_name, "_", run, ".csv"))
 
-ba_smry1 <- read_csv(paste0("data_processed/area/expected-burn-area_smry_", 
+ba_smry1 <- read_csv(paste0("data_processed/area/expected-burn-area_smry-gw_", 
                            v, vr_name, "_", run, ".csv"))
 
 area_eco <- read_csv(paste0("data_processed/area/ecoregion-area_", v, vr_name, ".csv"))
@@ -55,21 +55,22 @@ ba_gcm_delta_graze1 <- ba_gcm2 %>%
          ba_delta_perc = ba_delta/ba_ref*100)
 
 ba_smry2 <- ba_smry1 %>%  
-  select(-run2, -matches('_perc')) %>% 
+  select(-matches('_perc')) %>% 
   rename_with(.fn = \(x) str_replace(x, 'area_(?!total)', 'ba_')) 
 
 ba_smry_delta_clim1 <- ba_smry2 %>% 
   filter(RCP == 'Current') %>% 
   rename(ba_cur = ba_median) %>% 
-  select(ecoregion, run, graze, ba_cur) %>% 
+  dplyr::select(ecoregion, graze, ba_cur) %>% 
   right_join(filter(ba_smry2, RCP != 'Current'), 
-             by = join_by(ecoregion, run, graze)) %>% 
+             by = join_by(ecoregion, graze)) %>% 
   mutate(across(.cols = c('ba_median', 'ba_high', 'ba_low'),
                 .fns = list('delta' = \(x) (x - ba_cur),
                             'delta_perc' = \(x) (x - ba_cur)/ba_cur*100)
                 ),
          across(starts_with("ba") & !contains("perc"), ~ round(.x, 0)),
-         across(contains("delta_perc"), ~ round(.x, 1)))
+         across(contains("delta_perc"), ~ round(.x, 1))) %>% 
+  arrange(RCP, years, ecoregion, graze)
 
   
 
@@ -115,5 +116,6 @@ write_csv(ba_smry_delta_graze2,
                 vr, "_", runv, ".csv"))
 
 write_csv(ba_smry_delta_clim1,
-          paste0("data_processed/area/ba_summaries/ba_clim-delta_pixel-wise_", 
+          paste0("data_processed/area/ba_summaries/ba_clim-delta_gw_", 
                  vr, "_", runv, ".csv"))
+
