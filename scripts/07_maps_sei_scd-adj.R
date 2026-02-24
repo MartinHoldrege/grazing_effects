@@ -291,6 +291,7 @@ for (target_rcp in c3_rcps) {
                     info = info_c12,
                     ref_graze = ref_graze,
                     target_graze = target_graze,
+                    target_rcp = target_rcp,
                     target_yr = years)
   
   filename <- paste0('figures/sei/maps/c3c12cgref_4panel_',
