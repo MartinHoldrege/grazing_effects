@@ -1194,6 +1194,85 @@ plot_c3c12_4panel <- function(r_c12,
   
 }
 
+#' Graze and climate effects on SEI (maps).
+#' more panel version of plot_c312_4panel() function
+#' # (for figs in appendices)
+#' 
+#' @description
+#' 8 panel maps shoing change in SEI class (and if stable
+#' whether SEI declined). Shows reference class, and changes
+#' due to grazing, climate and combined grazing & climate
+#' 
+#'
+#' @param r_c12 raster of c12 sei class changes (include the reference layer
+#' which has no change)
+#' @param info info dataframe
+#' @param ref_graze reference grazing level
+#' @param target_graze target grazing levels
+#' @param target_rcp future rcp
+#' @param target_yr future time period
+plot_c3c12_multipanel <- function(r_c12, 
+                              info, 
+                              ref_graze = 'Moderate',
+                              target_graze = c('Light', 'Heavy', 'Very Heavy'),
+                              target_rcp = 'RCP45', 
+                              target_yr = '2070-2100') {
+  
+  
+  info <- info %>% 
+    filter(years %in% c('Current', target_yr),
+           type == 'c12') %>% 
+    mutate(type = case_when(
+      RCP == 'Current' & graze == ref_graze ~ 'c3', # should plot C3
+      RCP == 'Current' & graze %in% target_graze ~ 'gref', # should plto grazing c9
+      RCP == target_rcp & graze == ref_graze ~ 'cref', # should plot climate effect
+      RCP == target_rcp & graze %in% target_graze ~ 'cgref',
+      TRUE ~ NA
+    ),
+    type= factor(type, levels = c('c3', 'gref', 'cref', 'cgref'))) %>% 
+    filter(!is.na(type)) %>%  # this keeps only the layers of interest
+    arrange(type) 
+  
+  n <- nrow(info)
+  stopifnot(n == 2*(length(target_graze) + 1))
+  
+  info$title <- NA
+  info$title[info$type == 'c3'] <- paste0('SEI class\n(historical climate, ',
+                                          str_to_lower(ref_graze), ' grazing)')
+  info$title[info$type == 'gref'] <- paste0('\u0394SEI class: grazing effect\n(response to ',
+                                            info$graze[info$type == 'gref'], ' grazing)')
+  
+  info$title[info$type == 'cref'] <- paste0(
+    '\u0394SEI class: climate effect\n(response to ',
+    rcp_label(target_rcp, target_yr, include_parenth = FALSE), ')')
+  
+  info$title[info$type == 'cgref'] <- paste0(
+    '\u0394SEI class: climate + grazing effect\n(response to ',
+    rcp_label(target_rcp, target_yr, include_parenth = FALSE), ' & ',
+    info$graze[info$type == 'cgref'], ' grazing)')
+  
+  info <- info %>% 
+    arrange(RCP, graze)%>% 
+    mutate(tag = fig_letters[1:n()])
+  
+  plots1 <- pmap(info[c('id','tag', 'title')], 
+                 function(id,  tag, title) {
+                   r <- r_c12[[id]]
+                   plot_c12(r,
+                            panel_tag = tag,
+                            subtitle = title) +
+                     theme(legend.position = 'none')
+                   
+                 })
+  
+
+  patchwork::wrap_plots(plots1, 
+                        nrow = lu(info$RCP),
+                        ncol = lu(info$graze)) +
+    plot_layout(guides = 'collect')
+  
+}
+
 
 # map of (continuous) change in SEI
 plot_delta_sei <- function(r, panel_tag = NULL,

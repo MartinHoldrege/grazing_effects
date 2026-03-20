@@ -11,7 +11,7 @@ source('src/params.R')
 v <- v_interp
 runv <- paste0(run, v)
 groups <- c('Sagebrush', 'Pherb', 'Aherb', 'SEI')
-test_run <- opt$test_run # 
+test_run <- opt$test_run # TRUE # 
 c3_rcps <- c('RCP45', 'RCP85') # future scenario shown on map
 ref_graze <-  opt$ref_graze
 target_graze_v <- c('Heavy', 'Very Heavy') # comparison grazing levels
@@ -304,5 +304,32 @@ for (target_rcp in c3_rcps) {
     device = cairo_pdf, # so text can be edited
     family = "sans"  
   )
+  
+
+  
 }
+
+# 8 panel version for appendix
+for (target_rcp in c3_rcps) {
+  g <- plot_c3c12_multipanel(r_c12 = r_c12a,
+                             info = info_c12,
+                             ref_graze = ref_graze,
+                             target_rcp = target_rcp,
+                             target_yr = years)
+  
+  filename <- paste0('figures/sei/maps/c3c12cgref_8panel_',
+                     target_rcp, '_',years, 
+                     '_', runv, ".pdf")
+  ggsave(
+    filename = filename,
+    plot = g,
+    height = 6.5, width = 11,
+    device = cairo_pdf, # so text can be edited
+    family = "sans"  
+  )
+  
+  # 8 panel version for appendix
+  
+}
+
 

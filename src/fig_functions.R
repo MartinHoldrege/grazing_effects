@@ -961,7 +961,7 @@ area_bar <- function(df_smry_region, area_perc_region, limits) {
     geom_bar(stat = 'identity') +
     scale_fill_manual(values = c3Palette) +
     labs(x = NULL,
-         y = lab_areaperc0) +
+         y = "Historical\nArea (%)") +
     guides(fill = 'none') +
     theme(axis.ticks = element_blank(),
           axis.title.y = element_text(size = 7),
