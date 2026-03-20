@@ -350,50 +350,33 @@ dev.off()
 target_yr <- years
 
 for(target_rcp in rcps) {
+  
+    r_cgref <- list()
+  info_cgref <- list()
+  
+  #* prepare cgref layers ------------------------------------------------------------
+  # create layers that show the effect of combined changes in climate and 
+  # grazing (relative to moderate grazing and
+  # historical conditions)
+  
+  for(target_graze in unique(c('Light', target_graze_v))) {
+    
+    r_cgref[[target_graze]] <- calc_cgref_delta(r = r1, info = info1a, 
+                                                target_graze = target_graze,
+                                ref_graze = ref_graze) 
+    
+    info_cgref[[target_graze]] <- create_rast_info(r_cgref[[target_graze]],
+                                   into = c("type", 'RCP', 'years', 
+                                            'graze', 'summary'))
+  }
   for(target_graze in target_graze_v) {
   
-    #* prepare cgref layers ------------------------------------------------------------
-    # create layers that show the effect of combined changes in climate and 
-    # grazing (relative to moderate grazing and
-    # historical conditions)
-    
-    
-    r_cgref <- calc_cgref_delta(r = r1, info = info1a, target_graze = target_graze,
-                                  ref_graze = ref_graze) 
-      
-    info_cgref <- create_rast_info(r_cgref,
-                                     into = c("type", 'RCP', 'years', 
-                                              'graze', 'summary'))
-      
-    
-    
-    # * plotting --------------------------------------------------------------
-  
-    
-    
-    g <- plot_fire_3panel(r = c(r2, rdiff1, wgcm1), 
-                     info = info_comb1,
-                     ref_graze = ref_graze,
-                     target_graze = target_graze,
-                     target_rcp = target_rcp,
-                     target_yr = target_yr)  
-    
-    filename <- paste0('figures/fire/maps/3panel_cgref_',
-                       target_rcp, '_',target_yr, '_', words2abbrev(target_graze), 
-                       '_', runv, ".pdf")
-    ggsave(
-      filename = filename,
-      plot = g,
-      height = 6.8, width = 7.4,
-      device = cairo_pdf, # so text can be edited
-      family = "sans"  
-    )
-    
+
     # 4 climate version with cgref
     
     
-    g <- plot_fire_3panel(r = c(r2, rdiff1, wgcm1, r_cgref), 
-                          info = bind_rows(info_comb1, info_cgref),
+    g <- plot_fire_3panel(r = c(r2, rdiff1, wgcm1, r_cgref[[target_graze]]), 
+                          info = bind_rows(info_comb1, info_cgref[[target_graze]]),
                           ref_graze = ref_graze,
                           target_graze = target_graze,
                           target_rcp = target_rcp,
@@ -410,4 +393,25 @@ for(target_rcp in rcps) {
       family = "sans"  
     )
   }
+  
+  # plot 8 panel version (all grazing levels) # for appendix
+  g <- plot_fire_3panel(r = c(r2, rdiff1, wgcm1, Reduce(c, r_cgref)), 
+                        info = bind_rows(info_comb1, bind_rows(info_cgref)),
+                        ref_graze = ref_graze,
+                        target_graze = c("Light", 'Heavy', "Very Heavy"),
+                        target_rcp = target_rcp,
+                        target_yr = target_yr)  
+  g <- g&theme(legend.box = 'horizontal',
+               plot.subtitle = element_text(size = rel(0.7))
+  )
+  
+  filename <- paste0('figures/fire/maps/8panel_cgref_',
+                     target_rcp, '_',target_yr,
+                     '_', runv, ".png")
+  ggsave(
+    filename = filename,
+    plot = g,
+    height = 8, width = 10,
+    dpi = 600
+  )
 }

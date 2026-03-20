@@ -1364,26 +1364,35 @@ plot_fire_3panel <- function(r,
                              target_yr = '2070-2100') {
   info <- info %>% 
     filter(  (graze == ref_graze & RCP == 'Current' & type == 'fire-prob') |
-               (graze == target_graze & RCP == 'Current' 
+               (graze %in% target_graze & RCP == 'Current' 
                 & type == 'fire-prob-rdiff-gref') |
                (graze == ref_graze & RCP == target_rcp & years == target_yr 
                 & type == 'fire-prob-rdiff-cref') |
-             (graze == target_graze & RCP == target_rcp & years == target_yr 
+             (graze %in% target_graze & RCP == target_rcp & years == target_yr 
                & type == 'fire-prob-rdiff-cgref')) %>% 
     mutate(type = str_extract(type, 'cref|gref|cgref'),
            type = ifelse(is.na(type), 'abs', type),
            type= factor(type, levels = c('abs', 'gref', 'cref', 'cgref'))) %>% 
-    arrange(type) %>% 
-    mutate(tag = fig_letters[1:n()])
+    arrange(type) 
   
   n <- nrow(info)
-  stopifnot(n == 4 | n == 3)
+  
+  if(length(target_graze) == 1) {
+    stopifnot(n == 4 | n == 3)
+  } else {
+    stopifnot(n == 8)
+    info <- info %>% arrange(RCP, graze)
+  }
+  
+  info <- info %>% 
+    mutate(tag = fig_letters[1:n()])
   
   info$title <- NA
   info$title[info$type == 'abs'] <- paste0('Wildfire\n(historical climate, ',
                                            str_to_lower(ref_graze), ' grazing)')
   info$title[info$type == 'gref'] <- paste0('\u0394Wildfire: grazing effect\n(response to ',
-                                            str_to_lower(target_graze), ' grazing)')
+                                            str_to_lower(info$graze[info$type == 'gref']), 
+                                            ' grazing)')
   info$title[info$type == 'cref'] <- paste0(
     '\u0394Wildfire: climate effect\n(response to ',
     rcp_label(target_rcp, target_yr, include_parenth = FALSE), ')')
@@ -1391,7 +1400,7 @@ plot_fire_3panel <- function(r,
   info$title[info$type == 'cgref'] <- paste0(
     '\u0394Wildfire: climate + grazing effect\n(response to ',
     rcp_label(target_rcp, target_yr, include_parenth = FALSE), ' & ',
-    str_to_lower(target_graze), ' grazing)')
+    str_to_lower(info$graze[info$type == 'cgref']), ' grazing)')
   
   f_l <- list(
     'abs' = plot_fire,
@@ -1425,21 +1434,31 @@ plot_fire_3panel <- function(r,
   # wrapping color matrix so that 
   plots2 <- c(plots1, list(guide_area()))
   
+  widths = c(1, 1, 0.6)
+  heights = c(1, 1)
   if(n == 3) {
     design <- '
     ABD
     C##
   '
-  } else {
+  } else if (n == 4) {
     design <- '
     ABE
     CD#
     '
+  } else {
+    design <- '
+    ABCD
+    EFGH
+    II##
+    '
+    widths = c(1, 1, 1, 1)
+    heights = c(1, 1, 0.8)
   }
 
   patchwork::wrap_plots(plots2, 
-                        widths = c(1, 1, 0.6), 
-                        heights = c(1, 1),
+                        widths = widths, 
+                        heights = heights,
                         design = design) + 
     plot_layout(guides = 'collect')
   
