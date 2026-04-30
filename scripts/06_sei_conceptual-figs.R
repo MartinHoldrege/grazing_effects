@@ -249,9 +249,10 @@ map2(q_long, names(q_long), function(df, pft) {
          y = 'Q Value') +
     coord_cartesian(xlim = c(0, xlim*100))
   ggsave(
-    paste0('figures/sei/conceptual/', 'q-curve_', pft, '.png'),
+    paste0('figures/sei/conceptual/', 'q-curve_', pft, '.pdf'),
     g,
-    width = 4, height = 2, dpi = 600
+    width = 4, height = 2,
+    device = cairo_pdf
     )
 })
 

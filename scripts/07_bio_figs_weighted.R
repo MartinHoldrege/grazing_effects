@@ -229,8 +229,8 @@ pmap(args, function(pfts, RCP, years) {
                y_abs = 'biomass',
                y_diff = 'bio_diff',
                ylab_abs = lab_bio0,
-               ylab_diff_gref = lab_bio2_gref,
-               ylab_diff_cref = lab_bio2_cref,
+               ylab_diff_gref = lab_bio2,
+               ylab_diff_cref = lab_bio2,
                scales_cref = 'free_y',
                scales_gref = 'fixed',
                col_ratio = 1/3)
@@ -246,7 +246,6 @@ pmap(args, function(pfts, RCP, years) {
 
 })
 
-# STOP: continue updating below
 
 # *utilization ----------------------------------------------------------------
 

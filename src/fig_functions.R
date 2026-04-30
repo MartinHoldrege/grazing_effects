@@ -278,7 +278,7 @@ weighted_violin1 <- function(df, y_string, ylab = NULL, subtitle = NULL) {
     labs(x = lab_graze,
          y = ylab,
          subtitle = subtitle,
-         fill = 'Summary across GCMs')
+         fill = 'Responses across GCMs')
 }
 
 
@@ -312,12 +312,14 @@ box_abs_diff <- function(df_abs,
 
   preserve <- if(col_ratio != 1) 'total' else 'single'   
   
-  base <- function(add_hline = FALSE, scales = 'free_y') {
+  base <- function(add_hline = FALSE, scales = 'free_y', switch = NULL) {
     out <- list(
       geom_boxplot(aes(weight = weight), coef = 10,
                    position = position_dodge2(preserve = preserve)),
       scale_fill_smry(),
-      facet_grid(PFT~rcp_year, scales = scales),
+      facet_grid(PFT~rcp_year, scales = scales,
+                 labeller = labeller(rcp_year = label_climate),
+                 switch = switch),
       theme(axis.text.x = element_text(angle = 45, hjust = 1),
             panel.spacing.x = unit(0, "lines"),
             plot.subtitle = element_text(hjust = 0.5))
@@ -334,16 +336,17 @@ box_abs_diff <- function(df_abs,
   }
 
   g1 <- ggplot(df_abs, aes(graze, .data[[y_abs]], fill = summary)) +
-    base() +
-    blank_strip() +
+    base(switch = 'y') +
+    #blank_strip() +
     labs(x = lab_graze,
          y = ylab_abs,
-         subtitle = ' ') +
+         subtitle = '\nBiomass') +
     # add space on the left (for tags)
     # (and adding space to the right, to be symetric)) 
     #scale_x_discrete(expand = expansion(add = c(1, 1))) +
     guides(fill = 'none') +
-    expand_limits(y = 0)
+    expand_limits(y = 0) +
+    theme(strip.placement = 'outside')
   
 
   g2  <- ggplot(df_diff_gref, aes(graze, .data[[y_diff]], fill = summary))+
@@ -351,14 +354,14 @@ box_abs_diff <- function(df_abs,
     blank_strip() +
     labs(x = lab_graze,
          y = ylab_diff_gref,
-         subtitle = 'Grazing effect') +
+         subtitle = '\u0394 Biomass relative to\nmoderate grazing') +
     theme(legend.position = 'none')
 
   g3  <- ggplot(df_diff_cref, aes(graze, .data[[y_diff]], fill = summary))+
     base(add_hline = TRUE, scales = scales_cref) +
     labs(x = lab_graze,
          y = ylab_diff_cref,
-         subtitle = 'Climate effect')  +
+         subtitle = '\u0394 Biomass relative to\nhistorical climate')  +
     theme(legend.position = 'bottom')
   
   
@@ -1597,6 +1600,22 @@ adjust_graze_x_axis <- function(xlab = lab_graze) {
 
 # label functions ---------------------------------------------------------
 
+#' Relabel climate scenario facet strips
+#'
+#' Converts climate scenario strings for use as facet labels:
+#' "Historical" becomes "Historical climate", and RCP strings like
+#' "RCP4.5\n2031-2060" become "Future climate\n(RCP4.5 2031-2060)".
+#'
+#' @param x Character vector of facet values.
+#' @return Character vector of relabeled values, same length as `x`.
+label_climate <- function(x) {
+  dplyr::if_else(
+    x == "Historical",
+    "Historical\nclimate",
+    paste0("Future climate\n(", stringr::str_replace(x, "\n", " "), ")")
+  )
+}
+
 # convert effect size to percent change
 # assumes effect size, was calculated as ln(trmt/ctrl). For use to create
 # secondary y axis.
@@ -1826,7 +1845,7 @@ scale_color_graze <- function() {
 
 scale_fill_smry <- function() {
   scale_fill_manual(values = cols_smry,
-                    name = 'Summary across GCMs')
+                    name = 'Responses across GCMs')
 }
 
 scale_fill_graze <- function(exclude = NULL) {
