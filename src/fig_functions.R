@@ -1414,7 +1414,9 @@ crossplot_multipanel <- function(df, vars_df,
     df_wide <- make_wide_4crossplot(df, var1 = x, var2 = y)
     g <- crossplot_1panel(df_wide, x, y, colors = cols_GCM2,
                      shapes = shapes_GCM2,
-                     labeller = driver_labeller(delta = TRUE,wrap = wrap),
+                     labeller = driver_labeller(delta = TRUE,wrap = wrap,
+                                                protect = c("\u0394 \\S+", 
+                                                            "[A-z]+ \\(%\\)")),
                      legend_title = legend_title)
     g + labs(tag = tag) 
       
@@ -1707,16 +1709,45 @@ region_labeller_factory <- function(region_letters = NULL,
 
 region_labeller <- region_labeller_factory(fig_letters)
 
-wrap_after <- function(x, n = 20) {
-  sub(
-    paste0("^(.{", n, "}[^ ]*) "),
-    "\\1<br>",
-    x
-  )
+#' Wrap a string into multiple lines after a target number of characters
+#'
+#' Inserts `<br>` after each chunk of approximately `n` characters, breaking only
+#' at word boundaries (never mid-word). Sequences matching `protect` are kept
+#' together as a single unit and not broken across lines.
+#'
+#' @param x A character vector.
+#' @param n Target number of characters per line (default 20).
+#' @param protect A regex pattern (or vector of them). Spaces inside any match of this pattern are
+#'   replaced with a non-breaking placeholder before wrapping, so the matched
+#'   sequence stays on one line. Default `NULL` (no protection).
+#'  @examples 
+#'wrap_after(x = "\u0394 Sagebrush (g/m<sup>2</sup>)", n = 7, 
+#'           protect = "\u0394 \\S+")
+#' @return A character vector with `<br>` inserted at line breaks.
+wrap_after <- function(x, n = 20, protect = NULL) {
+  pattern <- str_c("(.{1,", n, "})(\\s+|$)")
+  placeholder <- "2ZZZZZ2"
+  
+  map_chr(x, function(s) {
+    if (!is.null(protect)) {
+      for (p in protect) {
+        matches <- str_extract_all(s, p)[[1]]
+        for (m in unique(matches)) {
+          m_protected <- str_replace_all(m, " ", placeholder)
+          s <- str_replace_all(s, fixed(m), m_protected)
+        }
+      }
+    }
+    
+    s |>
+      str_replace_all(pattern, "\\1<br>") |>
+      str_remove("<br>$") |>
+      str_replace_all(placeholder, " ")
+  })
 }
 
   
-driver_labeller <- function(delta = FALSE, wrap = NULL) {
+driver_labeller <- function(delta = FALSE, wrap = NULL, protect = NULL) {
   
   lookup_md <- c(
     "MAT" = "MAT (\u00b0C)",
@@ -1738,7 +1769,7 @@ driver_labeller <- function(delta = FALSE, wrap = NULL) {
   }
   
   if (!is.null(wrap)) {
-    lookup_md[] <- wrap_after(lookup_md, n = wrap)
+    lookup_md[] <- wrap_after(lookup_md, n = wrap, protect = protect)
   }
   
   as_labeller(lookup_md)

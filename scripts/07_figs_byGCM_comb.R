@@ -136,7 +136,7 @@ for(rcp in rcps) {
     g <- crossplot_multipanel(df = df,
                               vars_df = vars_df,
                               legend_title = legend_title,
-                              wrap = 10)
+                              wrap = 7)
     g
     
     if(region != regions[1]) {
@@ -148,13 +148,68 @@ for(rcp in rcps) {
                      'panel_cref_csa_',
                      vr, "_", words2abbrev(region), '_', rcp, '_', yr, '_',
                      runv, '.png')
-    ggsave(
-      filename = filename,
-      plot = g,
-      width = 8,
-      height = 7,
-      dpi = 600
-    )
+    
+    if(words2abbrev(region) == 'ESA') {
+      filename <- str_replace(filename, 'png$', 'pdf')
+      
+      ggsave(
+        filename = filename,
+        plot = g,
+        width = 8.2,
+        height = 7,
+        device = cairo_pdf
+      )
+    } else {
+      ggsave(
+        filename = filename,
+        plot = g,
+        width = 8.2,
+        height = 7,
+        dpi = 600
+      )
+    }
+
   }
 }
+
+# create legend element to add manually to figure
+if(FALSE) {
+  # install.packages("ggbrace")  # if not already installed
+  library(ggbrace)
+  
+  legend_element <- ggplot() +
+    geom_errorbar(aes(x = 0, ymin = -0.5, ymax = 0.5), 
+                  width = 0, linewidth = 0.5) +
+    geom_errorbar(aes(y = 0, xmin = -0.5, xmax = 0.5), 
+                  width = 0, linewidth = 0.5, orientation = 'y') +
+    geom_point(aes(x = 0, y = 0), size = 2) +
+    # Brace alongside the vertical line, on the right side, pointing left
+    stat_brace(data = data.frame(x = c(0.5, 0.5), y = c(-0.5, 0.5)),
+               aes(x = x, y = y),
+               rotate = 90,
+               width = 0.1) +
+    annotate("text", x = 0.63, y = 0, 
+             label = "spatial 25th–75th percentiles of y\n(if applicable)", 
+             hjust = 0, size = 3) +
+    stat_brace(data = data.frame(x = c(-0.5, 0.5), y = c(-0.5, -0.5)),
+               aes(x = x, y = y),
+               rotate = 180,
+               width = 0.1) +
+    annotate("text", x = 0, y = -0.73, 
+             label = "spatial 25th–75th percentiles of x", 
+             hjust = 0.5, size = 3) +
+    annotate("text", x = 0.15, y = 0.08,
+             label = "Median",
+             hjust = 0, size = 3) +
+    annotate("segment", x = 0.14, y = 0.07, xend = 0.02, yend = 0.01,
+             linewidth = 0.3) +
+    coord_fixed(xlim = c(-0.6, 1.5), ylim = c(-0.7, 0.7)) +
+    theme_void()
+  legend_element
+  ggsave(filename = "figures/by_gcm_comb/legend_element.pdf", 
+         plot = legend_element, width = 4.3, height = 3, device = cairo_pdf)
+}
+
+
+
 
