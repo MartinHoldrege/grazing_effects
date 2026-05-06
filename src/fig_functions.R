@@ -938,21 +938,6 @@ base_c9_area <- function(pattern_var = 'graze', legend_title = 'Grazing') {
 
 # functions for tradeoff figure -------------------------------------------
 
-base_tradeoff <- function(group = 'rcp_year', linetypes_scen = c(1, 1, 1),
-                          xlab = '% Core Sagebrush Area') {
-  list(
-    geom_path(aes(group = .data[[group]], linetype = rcp_year), color = "blue", 
-              linewidth = 0.5, alpha = 0.5),
-    #geom_path(aes(group = graze, color = graze), linewidth = 0.5, alpha = 0.5)
-    geom_point(aes(color = graze, shape = rcp_year)),
-    scale_color_manual(values = cols_graze, name = lab_graze),
-    scale_shape_manual(values = shapes_scen, name = 'Scenario'),
-    scale_linetype_manual(name = 'Scenario', values = linetypes_scen),
-    labs(x = xlab,
-         y = 'Expected area burned (%/year)'),
-    expand_limits(x = 0)
-  )
-}
 # simple barchart (for inset) of percent area by SEI class
 area_bar <- function(df_smry_region, area_perc_region, limits) {
   
@@ -1011,8 +996,10 @@ tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim,
   g <- ggplot(df_smry_region, aes(SEI_mean, expected_ba_perc, color = c3_cur)) 
   
   if(gcm_path) {
-    g <- g + geom_path(data = df_gcm_region, aes(group = rcp_year_c3_gcm, linetype = rcp_year),
-                       linewidth = 0.2, alpha = 0.5) 
+    g <- g + geom_path(data = df_gcm_region, aes(group = rcp_year_c3_gcm, 
+                                                 linetype = rcp_year,
+                                                 linewidth = "Individual GCM result"), 
+                       alpha = 0.5) 
   }
   
   if(include_entire) {
@@ -1024,20 +1011,46 @@ tradeoff_lines <- function(df_smry_region, df_gcm_region, xlim, ylim,
   region_labeller <- region_labeller_factory(region_letters = region_letters, 
                                              v = vr)
   subtitle <- region_labeller(region)[[1]]
-  g +  
-    geom_path(aes(group = rcp_year_c3, linetype = rcp_year),
-              linewidth = 1, alpha = 1) +
+  
+  # wrap the linewidth scale + guide in the conditional
+  if (gcm_path) {
+    out_layers <- list(
+      scale_linewidth_manual(
+        name = NULL,
+        values = c("Median across GCMs" = 1, "Individual GCM result" = 0.2),
+        breaks = c("Median across GCMs", "Individual GCM result")
+      ),
+      guides(linewidth = guide_legend(
+        override.aes = list(linetype = 1, color = "black", alpha = c(1, 0.5))
+      ))
+    )
+  } else {
+    out_layers <- list(guides(linewidth = "none"))
+  }
+  
+  levs <- levels(df_smry_region$rcp_year)
+  levs <- levs[levs %in% df_smry_region$rcp_year]
+  linetypes <- setNames(linetypes_scen[seq_along(levs)], levs)
+  shapes <- setNames(shapes_scen[seq_along(levs)], levs)
+  
+  g <- g +  
+    geom_path(aes(group = rcp_year_c3, linetype = rcp_year,
+                  linewidth = "Median across GCMs"), alpha = 1) +
     scale_color_manual(values = c(cols2), name = 'Historical SEI class') +
     ggnewscale::new_scale_color() +
     geom_point(aes(color = graze, shape = rcp_year)) +
     scale_color_manual(values = cols_graze, name = 'Grazing scenario') +
-    scale_linetype_manual(name = 'Climate scenario', values = unname(linetypes_scen)[1:2]) +
-    scale_shape_manual(values = unname(shapes_scen)[1:2], name = 'Climate scenario') +
+    scale_linetype_manual(name = 'Climate scenario', values = linetypes,
+                          breaks = levs) +
+    scale_shape_manual(values = shapes, name = 'Climate scenario',
+                       breaks = levs) +
         labs(x = 'Mean SEI',
          y = 'Expected burned area (%/year)',
          subtitle = subtitle)  +
+    out_layers +
     coord_cartesian(xlim = xlim, ylim = ylim) +
     make_legend_small()
+  g
 }
 
 # map over region
@@ -1610,12 +1623,19 @@ adjust_graze_x_axis <- function(xlab = lab_graze) {
 #'
 #' @param x Character vector of facet values.
 #' @return Character vector of relabeled values, same length as `x`.
-label_climate <- function(x) {
-  dplyr::if_else(
-    x == "Historical",
-    "Historical\nclimate",
-    paste0("Future climate\n(", stringr::str_replace(x, "\n", " "), ")")
+label_climate <- function(x, one_line = FALSE) {
+  x2 <- as.character(x)
+  out <- dplyr::if_else(
+    x2 == "Historical",
+    if_else (!one_line, "Historical\nclimate","Historical climate"),
+    paste0("Future climate\n(", stringr::str_replace(x2, "\n", " "), ")")
   )
+  
+  if(is.factor(x)) {
+    levels <- label_climate(levels(x), one_line = one_line)
+    out <- factor(out, levels = levels)
+  }
+  out
 }
 
 # convert effect size to percent change
@@ -1672,7 +1692,7 @@ rcp_label <- function(rcp, years, add_letters = FALSE,
     labels <- paste(fig_letters[1:length(levs)], levs)
     x2 <- factor(x1, levels = levs, labels = labels)
   } else {
-    x2 <- x1
+    x2 <- factor(x1)
   }
   x2
 }

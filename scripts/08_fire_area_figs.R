@@ -609,53 +609,14 @@ map(rcps, function(rcp){
 # see pre 8/7/2025 commits
 
 # ** median and GCM level --------------------------------------------------
-# figure that shows the median results, and then faint GCM lines
-# b/ the low/high error bars in the x and y diretions are misleading
-# (they're correlated so direction of effect isn't actually as uncertain
-# as they suggest)
 
-args <- list(
-  rcp = c(rcps, rcps),
-  xvar = c('percent_csa', 'percent_csa', 'percent_csagoa', 'percent_csagoa')
-)
-
-xlabs <- c(percent_csa = '% Core Sagebrush Area',
-           percent_csagoa = '% CSA + GOA')
-
-pmap(args, function(rcp, xvar) {
-  df_med <- sei_pcent3 %>% 
-    filter(RCP %in% c('Current', rcp))
-  df_gcm <- sei_pcent_gcm3 %>% 
-    filter(RCP %in% c('Current', rcp))
-    
-  x_med <- paste0(xvar, '_median')
-  g <- ggplot(df_med, aes(.data[[x_med]], ba_area_median_perc)) +
-    geom_path(data = df_gcm, aes(.data[[xvar]], ba_area_perc, 
-                                         group = rcp_year_GCM, linetype = rcp_year,
-                                         color = rcp_year),
-              alpha = 0.5,
-              linewidth = 0.2, 
-              show.legend = FALSE) + # b/ different linewidth get's double plotted on legend +
-    base_tradeoff(linetypes_scen = linetypes_scen,
-                  xlab = xlabs[xvar]) +
-    facet_manual_region(legend.position.inside = c(.1, 0.15),
-                        v = vr) +
-    make_legend_small()
-  g
-  
-  ggsave_tradeoff(
-    g = g,
-    xvar = str_replace(xvar, "percent_", ""),
-    prefix = paste0('med-GCM-fix-', rcp, yr_lab),
-    height = 4.5*mr,
-    width = 7*mr
-  )
-})
+# see pre 5/2026 commits
 
 
 # * by current C3 ---------------------------------------------------------
 # showing mean SEI vs expected burned area for each combination of ecoregion 
 # and current SEI class
+# (publication quality)--creates Fig 5. 
 
 args <- expand_grid(rcp = rcps,
                     # also show lines for each GCM
@@ -682,17 +643,19 @@ if(nr == 9) {
 }
 
 pmap(args, function(rcp, gcm_path) {
-  
+
   df_smry <- c3eco_smry3 %>% 
     filter(RCP %in% c('Current', rcp),
            summary == 'median') %>% 
     mutate(c3_cur = relable_c3_current(c3),
-           graze_long = relable_graze_long(graze))
+           graze_long = relable_graze_long(graze),
+           rcp_year = label_climate(rcp_year, one_line = TRUE))
   
   df_gcm <- c3eco_gcm3 %>% 
     filter(RCP %in% rcp)%>% 
     mutate(c3_cur = relable_c3_current(c3),
-           graze_long = relable_graze_long(graze))
+           graze_long = relable_graze_long(graze),
+           rcp_year = label_climate(rcp_year, one_line = TRUE))
   
   if(!include_entire) {
     df_smry <- filter(df_smry, region != entire)
@@ -725,6 +688,7 @@ pmap(args, function(rcp, gcm_path) {
          plot = comb, dpi = 600, width = width_tradeoff, height = height_tradeoff,
          device = cairo_pdf, # so text can be edited
          family = "sans")  # or a specific font like "Arial")
+
 })
 
 
